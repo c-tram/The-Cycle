@@ -19,7 +19,7 @@ variables:
   vmImageName: 'ubuntu-latest'
   # Azure Web App name and subscription (set these to your actual values)
   azureWebAppName: 'thecycle-fxfta3e4g2cyg7c6'
-  azureSubscription: 'AzureServiceConnection'
+  azureSubscription: 'Azure subscription 1'
 
 stages:
 - stage: Build
