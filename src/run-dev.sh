@@ -9,13 +9,15 @@ git add .
 # 2. Commit with a timestamped message
 git commit -m "Automated CI/CD deploy: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
-# 3. Push to main (triggers Azure DevOps pipeline)
+# 3. Pull latest changes from Azure DevOps remote (origin) and merge
+git pull origin main --no-rebase
+
+# 4. Push to main (triggers Azure DevOps pipeline)
 git push origin main
 
 echo "Pushed to main. Azure DevOps pipeline will build and deploy your app."
 
-# 4. (Optional) Restart Azure Web App after deployment
-# Uncomment and set your resource group if you want to force a restart after deploy
+# 5. (Optional) Restart Azure Web App after deployment
 # az webapp restart --name thecycle-fxfta3e4g2cyg7c6 --resource-group Main
 
 echo "Done."
