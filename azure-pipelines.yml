@@ -1,0 +1,57 @@
+# Azure DevOps Pipeline for The Cycle - MLB Statcast Web App
+# This pipeline builds the Docker image and pushes it to Azure Container Registry (ACR),
+# then deploys it to Azure Web App for Containers.
+
+trigger:
+- main
+
+resources:
+- repo: self
+
+variables:
+  # Container registry service connection established during pipeline creation
+  dockerRegistryServiceConnection: 'baf5afca-08dd-4fc7-9507-ee43dbd75bc9'
+  imageRepository: 'thecycle'
+  containerRegistry: 'thecycle.azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/src/Dockerfile'
+  tag: '$(Build.BuildId)'
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+  # Azure Web App name and subscription (set these to your actual values)
+  azureWebAppName: 'thecycle-fxfta3e4g2cyg7c6'
+  azureSubscription: 'AzureServiceConnection'
+
+stages:
+- stage: Build
+  displayName: Build and push stage
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+
+- stage: Deploy
+  displayName: Deploy to Azure Web App
+  dependsOn: Build
+  jobs:
+  - job: Deploy
+    displayName: Deploy
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: AzureWebAppContainer@1
+      displayName: Deploy to Azure Web App for Containers
+      inputs:
+        azureSubscription: '$(azureSubscription)'
+        appName: '$(azureWebAppName)'
+        containers: '$(containerRegistry)/$(imageRepository):$(tag)'
