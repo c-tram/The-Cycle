@@ -1,19 +1,21 @@
 #!/bin/zsh
-# Run both frontend and backend in parallel
 
-cd "$(dirname "$0")"
+# Exit on error
+set -e
 
-# Start backend
-echo "Starting backend..."
-cd react-backend && npm install && npm run dev &
-BACKEND_PID=$!
-cd ..
+# 1. Add all changes
+git add .
 
-# Start frontend
-echo "Starting frontend..."
-cd react-frontend && npm install && npm run dev &
-FRONTEND_PID=$!
-cd ..
+# 2. Commit with a timestamped message
+git commit -m "Automated CI/CD deploy: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
-# Wait for both to exit
-wait $BACKEND_PID $FRONTEND_PID
+# 3. Push to main (triggers Azure DevOps pipeline)
+git push origin main
+
+echo "Pushed to main. Azure DevOps pipeline will build and deploy your app."
+
+# 4. (Optional) Restart Azure Web App after deployment
+# Uncomment and set your resource group if you want to force a restart after deploy
+# az webapp restart --name thecycle-fxfta3e4g2cyg7c6 --resource-group Main
+
+echo "Done."
