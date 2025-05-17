@@ -39,10 +39,15 @@ const TEAM_LOGOS: Record<string, string> = {
   wsh: 'https://upload.wikimedia.org/wikipedia/en/9/9c/Washington_Nationals_logo.svg',
 };
 
+type Player = {
+  name: string;
+  imgUrl?: string;
+  [key: string]: string | number | undefined;
+};
+
 function App() {
   const [team, setTeam] = useState('nyy');
-  const [players, setPlayers] = useState<any[]>([]);
-  const [statHeaders, setStatHeaders] = useState<string[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -64,7 +69,6 @@ function App() {
       })
       .then((data) => {
         setPlayers(data.players || []);
-        setStatHeaders(data.statHeaders || []);
         setLoading(false);
       })
       .catch(() => {
@@ -73,9 +77,9 @@ function App() {
       });
   }, [team]);
 
-  // Show all stat columns, no filtering
+  // Render a table of all player stats
   return (
-    <div className="App">
+    <div className="app-container">
       <h1>MLB Team Roster & Stats</h1>
       <label>
         Search Team:
@@ -113,28 +117,26 @@ function App() {
       </div>
       {loading && <p>Loading...</p>}
       {error && <p style={{color: 'red'}}>{error}</p>}
-      <table style={{ width: '100%', background: '#111', color: '#00ff00', borderCollapse: 'collapse', fontFamily: 'monospace' }}>
-        <thead>
-          <tr>
-            <th style={{ background: '#222', color: '#00ff00', border: '1px solid #333' }}>Name</th>
-            <th style={{ background: '#222', color: '#00ff00', border: '1px solid #333' }}>Season</th>
-            {statHeaders.map((header, i) => (
-              <th key={i} style={{ background: '#222', color: '#00ff00', border: '1px solid #333' }}>{header}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {players.map((p, i) => (
-            <tr key={i} style={{ background: i % 2 === 0 ? '#181818' : '#222' }}>
-              <td style={{ border: '1px solid #333', color: '#00ff00' }}>{p.name}</td>
-              <td style={{ border: '1px solid #333', color: '#00ff00' }}>{p.season}</td>
-              {p.stats && p.stats.map((stat: string, j: number) => (
-                <td key={j} style={{ border: '1px solid #333', color: '#00ff00' }}>{stat}</td>
+      {players.length > 0 && (
+        <table className="stats-table">
+          <thead>
+            <tr>
+              {Object.keys(players[0]).map((header) => (
+                <th key={header}>{header}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {players.map((player, idx) => (
+              <tr key={idx}>
+                {Object.values(player).map((value, i) => (
+                  <td key={i}>{String(value)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
