@@ -40,3 +40,38 @@
 .read-the-docs {
   color: #888;
 }
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 auto;
+  font-size: 0.95rem;
+}
+.stats-table th, .stats-table td {
+  padding: 6px 8px;
+  text-align: center;
+  color: #00ff00;
+}
+.stats-table th {
+  background: #111;
+  color: #00ff00;
+  font-weight: bold;
+  border-bottom: 2px solid #222;
+}
+.stats-table tr {
+  background: #181818;
+}
+.stats-table tbody tr:nth-child(even) {
+  background: #222;
+}
+/* Alternating column backgrounds */
+.stats-table td:nth-child(odd), .stats-table th:nth-child(odd) {
+  background: #181818;
+}
+.stats-table td:nth-child(even), .stats-table th:nth-child(even) {
+  background: #222;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}

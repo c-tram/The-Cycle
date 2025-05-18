@@ -1,5 +1,9 @@
 #!/bin/zsh
 
+# Dev run script for The Cycle - last updated: 2025-05-17 by coletrammell
+# Use this script to run both backend and frontend in dev mode
+# Update this comment with each commit to track changes
+
 # Exit on error
 set -e
 
@@ -7,7 +11,7 @@ set -e
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Automated CI/CD deploy: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "A lot of changes in this update Front/Backend.: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Pull latest changes from Azure DevOps remote (origin) and merge
 git pull origin main --no-rebase

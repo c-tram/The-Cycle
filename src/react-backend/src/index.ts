@@ -23,6 +23,8 @@ const TEAM_ID_MAP: Record<string, number> = {
 app.get('/api/roster', (req, res) => {
   (async () => {
     const teamAbbr = (req.query.team as string)?.toLowerCase() || 'nyy';
+    const statType = (req.query.type as string)?.toLowerCase() || 'hitting';
+    const season = (req.query.season as string) || '2025';
     const teamId = TEAM_ID_MAP[teamAbbr];
     if (!teamId) {
       res.status(400).json({ error: 'Invalid or unsupported team abbreviation.' });
@@ -43,33 +45,50 @@ app.get('/api/roster', (req, res) => {
         .setChromeService(service)
         .build();
       // Scrape the Baseball Savant team page for the given team
-      const url = `https://baseballsavant.mlb.com/team/${teamId}`;
+      let url = `https://baseballsavant.mlb.com/team/${teamId}`;
+      if (statType === 'pitching') {
+        url = `https://baseballsavant.mlb.com/team/${teamId}?view=statcast&nav=pitching&season=${season}`;
+      } else if (statType === 'hitting') {
+        url = `https://baseballsavant.mlb.com/team/${teamId}?season=${season}`;
+      }
       await driver.get(url);
-      // Get stat headers from the table head
-      const statcastTable = await driver.findElement(By.css('#statcastHitting .table-savant table'));
-      const headerRow = await statcastTable.findElement(By.css('thead tr'));
-      const headerTds = await headerRow.findElements(By.css('th'));
-      // First column is player, second is season, rest are stats
-      const statHeaders = [];
-      for (let i = 2; i < headerTds.length; i++) {
-        statHeaders.push(await headerTds[i].getText());
-      }
-      // Statcast Hitting Table
-      const statcastRows = await driver.findElements(By.css('#statcastHitting .table-savant table tbody tr.statcast-generic'));
-      const statcastData = [];
-      for (const row of statcastRows) {
-        const tds = await row.findElements(By.css('td'));
-        // Player name is in the first td, inside a <b> tag
-        const playerName = await tds[0].findElement(By.css('b')).getText();
-        const season = await tds[1].getText();
-        // Collect all stat columns (PA, AB, H, 2B, 3B, HR, BB, SO, BA, OBP, SLG, WOBA, WOBACON, etc.)
-        const stats = [];
-        for (let i = 2; i < tds.length; i++) {
-          stats.push(await tds[i].getText());
+      try {
+        const tableId = statType === 'pitching' ? '#statcastPitching' : '#statcastHitting';
+        await driver.sleep(2000);
+        const statcastTable = await driver.findElement(By.css(`${tableId} .table-savant table`));
+        const headerRow = await statcastTable.findElement(By.css('thead tr'));
+        const headerTds = await headerRow.findElements(By.css('th'));
+        const statHeaders = [];
+        for (let i = 2; i < headerTds.length; i++) {
+          statHeaders.push(await headerTds[i].getText());
         }
-        statcastData.push({ name: playerName, season, stats });
+        const statcastRows = await statcastTable.findElements(By.css('tbody tr.statcast-generic'));
+        const statcastData = [];
+        for (const row of statcastRows) {
+          const tds = await row.findElements(By.css('td'));
+          const playerName = await tds[0].findElement(By.css('b')).getText();
+          const seasonVal = await tds[1].getText();
+          const stats = [];
+          for (let i = 2; i < tds.length; i++) {
+            stats.push(await tds[i].getText());
+          }
+          statcastData.push({ name: playerName, season: seasonVal, stats });
+        }
+        if (statcastData.length === 0) {
+          res.status(404).json({ error: `No data found for ${statType} in season: ${season}.` });
+          return;
+        }
+        res.json({ statHeaders, players: statcastData });
+      } catch (err) {
+        let errorMsg = '';
+        if (err instanceof Error) {
+          errorMsg = err.message;
+        } else {
+          errorMsg = String(err);
+        }
+        res.status(404).json({ error: `No data found for ${statType} in season: ${season}. Error: ${errorMsg}` });
+        return;
       }
-      res.json({ statHeaders, players: statcastData });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     } finally {

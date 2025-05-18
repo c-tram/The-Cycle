@@ -5,40 +5,6 @@ const ALL_TEAMS = Object.entries({
   ari: 'Arizona Diamondbacks', atl: 'Atlanta Braves', bal: 'Baltimore Orioles', bos: 'Boston Red Sox', chc: 'Chicago Cubs', cin: 'Cincinnati Reds', cle: 'Cleveland Guardians', col: 'Colorado Rockies', det: 'Detroit Tigers', hou: 'Houston Astros', kc: 'Kansas City Royals', ana: 'Los Angeles Angels', laa: 'Los Angeles Angels', lad: 'Los Angeles Dodgers', mia: 'Miami Marlins', mil: 'Milwaukee Brewers', min: 'Minnesota Twins', nym: 'New York Mets', nyy: 'New York Yankees', oak: 'Oakland Athletics', phi: 'Philadelphia Phillies', pit: 'Pittsburgh Pirates', sd: 'San Diego Padres', sea: 'Seattle Mariners', sf: 'San Francisco Giants', stl: 'St. Louis Cardinals', tb: 'Tampa Bay Rays', tex: 'Texas Rangers', tor: 'Toronto Blue Jays', was: 'Washington Nationals', wsh: 'Washington Nationals'
 }).map(([code, name]) => ({ code, name }));
 
-const TEAM_LOGOS: Record<string, string> = {
-  ari: 'https://upload.wikimedia.org/wikipedia/en/8/89/Arizona_Diamondbacks_logo.svg',
-  atl: 'https://upload.wikimedia.org/wikipedia/en/6/6e/Atlanta_Braves.svg',
-  bal: 'https://upload.wikimedia.org/wikipedia/en/7/75/Baltimore_Orioles_cap.svg',
-  bos: 'https://upload.wikimedia.org/wikipedia/en/6/6d/RedSoxPrimary_HangingSocks.svg',
-  chc: 'https://upload.wikimedia.org/wikipedia/commons/8/80/Chicago_Cubs_logo.svg',
-  cin: 'https://upload.wikimedia.org/wikipedia/commons/0/01/Cincinnati_Reds_Logo.svg',
-  cle: 'https://upload.wikimedia.org/wikipedia/en/4/4f/Cleveland_Guardians_logo.svg',
-  col: 'https://upload.wikimedia.org/wikipedia/en/4/45/Colorado_Rockies_logo.svg',
-  det: 'https://upload.wikimedia.org/wikipedia/commons/2/2c/Detroit_Tigers_logo.svg',
-  hou: 'https://upload.wikimedia.org/wikipedia/en/6/6b/Houston_Astros_logo.svg',
-  kc: 'https://upload.wikimedia.org/wikipedia/en/7/7b/Kansas_City_Royals.svg',
-  ana: 'https://upload.wikimedia.org/wikipedia/en/0/0c/Los_Angeles_Angels_logo.svg',
-  laa: 'https://upload.wikimedia.org/wikipedia/en/0/0c/Los_Angeles_Angels_logo.svg',
-  lad: 'https://upload.wikimedia.org/wikipedia/en/0/0e/Los_Angeles_Dodgers_logo.svg',
-  mia: 'https://upload.wikimedia.org/wikipedia/en/f/fd/Miami_Marlins_logo.svg',
-  mil: 'https://upload.wikimedia.org/wikipedia/en/1/11/Milwaukee_Brewers_logo.svg',
-  min: 'https://upload.wikimedia.org/wikipedia/en/3/36/Minnesota_Twins_logo.svg',
-  nym: 'https://upload.wikimedia.org/wikipedia/en/7/7b/New_York_Mets.svg',
-  nyy: 'https://upload.wikimedia.org/wikipedia/commons/2/25/New_York_Yankees_Primary_Logo.svg',
-  oak: 'https://upload.wikimedia.org/wikipedia/en/6/6d/Oakland_A%27s_logo.svg',
-  phi: 'https://upload.wikimedia.org/wikipedia/en/6/6d/Philadelphia_Phillies_%282019%29_logo.svg',
-  pit: 'https://upload.wikimedia.org/wikipedia/en/6/6d/Pittsburgh_Pirates_logo.svg',
-  sd: 'https://upload.wikimedia.org/wikipedia/en/8/81/San_Diego_Padres_logo.svg',
-  sea: 'https://upload.wikimedia.org/wikipedia/en/8/8d/Seattle_Mariners_logo.svg',
-  sf: 'https://upload.wikimedia.org/wikipedia/en/5/58/San_Francisco_Giants_Logo.svg',
-  stl: 'https://upload.wikimedia.org/wikipedia/en/6/6d/St._Louis_Cardinals_logo.svg',
-  tb: 'https://upload.wikimedia.org/wikipedia/en/f/f5/Tampa_Bay_Rays.svg',
-  tex: 'https://upload.wikimedia.org/wikipedia/en/4/41/Texas_Rangers.svg',
-  tor: 'https://upload.wikimedia.org/wikipedia/en/6/6e/Toronto_Blue_Jays_logo.svg',
-  was: 'https://upload.wikimedia.org/wikipedia/en/9/9c/Washington_Nationals_logo.svg',
-  wsh: 'https://upload.wikimedia.org/wikipedia/en/9/9c/Washington_Nationals_logo.svg',
-};
-
 type Player = {
   name: string;
   imgUrl?: string;
@@ -46,23 +12,23 @@ type Player = {
 };
 
 function App() {
+  const [sport, setSport] = useState('mlb');
   const [team, setTeam] = useState('nyy');
+  const [statType, setStatType] = useState<'hitting' | 'pitching'>('hitting');
+  const [season, setSeason] = useState('2025');
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [filteredTeams, setFilteredTeams] = useState(ALL_TEAMS);
-
-  useEffect(() => {
-    setFilteredTeams(
-      ALL_TEAMS.filter(t => t.name.toLowerCase().includes(search.toLowerCase()) || t.code.toLowerCase().includes(search.toLowerCase()))
-    );
-  }, [search]);
+  const [showRegister, setShowRegister] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [registerForm, setRegisterForm] = useState({ username: '', email: '', password: '' });
+  const [sortColumn, setSortColumn] = useState<string>('');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     setLoading(true);
     setError('');
-    fetch(`/api/roster?team=${team}`)
+    fetch(`/api/roster?team=${team}&type=${statType}&season=${season}`)
       .then((res) => {
         if (!res.ok) throw new Error('API error');
         return res.json();
@@ -75,67 +41,202 @@ function App() {
         setError('Failed to fetch roster.');
         setLoading(false);
       });
-  }, [team]);
+  }, [team, statType, season]);
 
-  // Render a table of all player stats
+  const handleSort = (col: string) => {
+    if (sortColumn === col) {
+      setSortDirection(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortColumn(col);
+      setSortDirection('asc');
+    }
+  };
+
+  // Define stat columns for hitting and pitching
+  const HITTING_COLS = [
+    'PA','AB','H','2B','3B','HR','BB','SO','BA','OBP','SLG'
+  ];
+  const PITCHING_COLS = [
+    'PA','AB','H','2B','3B','HR','BB','SO','BA','OBP','SLG','WOBA','WOBACON','Pitches','Batted Balls','Barrels','Barrel %','Hard Hit %','Exit Velocity','Launch Angle','XBA','XSLG','XWOBA','XWOBACON'
+  ];
+
+  const getSortedPlayers = () => {
+    if (!sortColumn) return players;
+    const isStatColumn = sortColumn !== 'name' && sortColumn !== 'season';
+    const statCols = statType === 'hitting' ? HITTING_COLS : PITCHING_COLS;
+    const statIdx = statCols.indexOf(sortColumn);
+    return [...players].sort((a, b) => {
+      let aVal, bVal;
+      if (isStatColumn && statIdx !== -1) {
+        // Get stat value from stats array
+        const aStats = Array.isArray(a.stats) ? a.stats : typeof a.stats === 'string' ? a.stats.split(',') : [];
+        const bStats = Array.isArray(b.stats) ? b.stats : typeof b.stats === 'string' ? b.stats.split(',') : [];
+        aVal = aStats[statIdx];
+        bVal = bStats[statIdx];
+        const aNum = parseFloat(aVal);
+        const bNum = parseFloat(bVal);
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+        }
+        return 0;
+      } else {
+        // Name/Season: string compare
+        aVal = a[sortColumn];
+        bVal = b[sortColumn];
+        if (aVal && bVal) {
+          return sortDirection === 'asc'
+            ? String(aVal).localeCompare(String(bVal))
+            : String(bVal).localeCompare(String(aVal));
+        }
+        return 0;
+      }
+    });
+  };
+
   return (
-    <div className="app-container">
-      <h1>MLB Team Roster & Stats</h1>
-      <label>
-        Search Team:
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Type team name or code..."
-          style={{ marginLeft: 8 }}
-        />
-      </label>
-      <div style={{ margin: '10px 0', display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
-        {filteredTeams.map(t => (
-          <button
-            key={t.code}
-            onClick={() => setTeam(t.code)}
-            style={{
-              margin: 2,
-              background: t.code === team ? '#1976d2' : '#222',
-              color: t.code === team ? '#00ff00' : '#00ff00',
-              border: '1px solid #444',
-              borderRadius: 4,
-              padding: '4px 10px',
-              cursor: 'pointer',
-              fontWeight: t.code === team ? 'bold' : 'normal',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
+    <div className="main-layout">
+      <header className="header">
+        <div className="header-center">
+          <h1 className="app-title">The Cycle - Statcast Web App</h1>
+        </div>
+        <div className="header-right">
+          <form className="login-form" onSubmit={e => { e.preventDefault(); }}>
+            <input
+              type="text"
+              placeholder="Username"
+              value={loginForm.username}
+              onChange={e => setLoginForm(f => ({ ...f, username: e.target.value }))}
+              className="login-input"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={loginForm.password}
+              onChange={e => setLoginForm(f => ({ ...f, password: e.target.value }))}
+              className="login-input"
+            />
+            <button type="submit" className="login-btn">Login</button>
+            <button type="button" className="register-btn" onClick={() => setShowRegister(true)}>Register</button>
+          </form>
+        </div>
+      </header>
+      <div className="content-col">
+        {/* Only keep the dropdowns in the body, not above the header */}
+        <div className="dropdown-row">
+          <select
+            className="sport-dropdown"
+            value={sport}
+            onChange={e => setSport(e.target.value)}
           >
-            <img src={TEAM_LOGOS[t.code]} alt={t.name + ' logo'} style={{ width: 24, height: 24, background: '#fff', borderRadius: 4, marginRight: 4 }} />
-            {t.name}
-          </button>
-        ))}
-      </div>
-      {loading && <p>Loading...</p>}
-      {error && <p style={{color: 'red'}}>{error}</p>}
-      {players.length > 0 && (
-        <table className="stats-table">
-          <thead>
-            <tr>
-              {Object.keys(players[0]).map((header) => (
-                <th key={header}>{header}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((player, idx) => (
-              <tr key={idx}>
-                {Object.values(player).map((value, i) => (
-                  <td key={i}>{String(value)}</td>
-                ))}
-              </tr>
+            <option value="mlb">MLB</option>
+            <option value="nfl">NFL</option>
+          </select>
+          <select
+            className="team-dropdown"
+            value={team}
+            onChange={e => setTeam(e.target.value)}
+          >
+            {ALL_TEAMS.map(t => (
+              <option key={t.code} value={t.code}>{t.name}</option>
             ))}
-          </tbody>
-        </table>
+          </select>
+          <select
+            className="stat-type-dropdown"
+            value={statType}
+            onChange={e => setStatType(e.target.value as 'hitting' | 'pitching')}
+            style={{ marginLeft: 12 }}
+          >
+            <option value="hitting">Hitting</option>
+            <option value="pitching">Pitching</option>
+          </select>
+          <select
+            className="season-dropdown"
+            value={season}
+            onChange={e => setSeason(e.target.value)}
+            style={{ marginLeft: 12 }}
+          >
+            {['2025','2024','2023','2022','2021','2020'].map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+        </div>
+        {loading && <p>Loading...</p>}
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+        {players.length > 0 && (
+          <div className="table-responsive">
+            <table className="stats-table">
+              <thead>
+                <tr>
+                  <th onClick={() => handleSort('name')} style={{cursor:'pointer'}}>
+                    Name{sortColumn === 'name' ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  <th onClick={() => handleSort('season')} style={{cursor:'pointer'}}>
+                    Season{sortColumn === 'season' ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}
+                  </th>
+                  {(statType === 'hitting' ? HITTING_COLS : PITCHING_COLS).map(col => (
+                    <th key={col} onClick={() => handleSort(col)} style={{cursor:'pointer'}}>
+                      {col}{sortColumn === col ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {getSortedPlayers().map((player, idx) => {
+                  let statValues: string[];
+                  if (Array.isArray(player.stats)) {
+                    statValues = player.stats as string[];
+                  } else if (typeof player.stats === 'string') {
+                    statValues = player.stats.split(',');
+                  } else {
+                    statValues = [];
+                  }
+                  const statCols = statType === 'hitting' ? HITTING_COLS : PITCHING_COLS;
+                  return (
+                    <tr key={idx}>
+                      <td>{player.name}</td>
+                      <td>{player.season}</td>
+                      {statCols.map((_, i) => (
+                        <td key={i}>{statValues[i]}</td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      {showRegister && (
+        <div className="modal-overlay" onClick={() => setShowRegister(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <button className="close-btn" onClick={() => setShowRegister(false)}>×</button>
+            <h2>Register</h2>
+            <form className="register-form" onSubmit={e => { e.preventDefault(); }}>
+              <input
+                type="text"
+                placeholder="Username"
+                value={registerForm.username}
+                onChange={e => setRegisterForm(f => ({ ...f, username: e.target.value }))}
+                className="register-input"
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                value={registerForm.email}
+                onChange={e => setRegisterForm(f => ({ ...f, email: e.target.value }))}
+                className="register-input"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={registerForm.password}
+                onChange={e => setRegisterForm(f => ({ ...f, password: e.target.value }))}
+                className="register-input"
+              />
+              <button type="submit" className="register-btn">Register</button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
