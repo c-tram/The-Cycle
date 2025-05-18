@@ -11,7 +11,7 @@ set -e
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "A lot of changes in this update Front/Backend.: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "UPDATE GITHUB W/ AZURE: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Pull latest changes from Azure DevOps remote (origin) and merge
 git pull origin main --no-rebase
@@ -23,5 +23,10 @@ echo "Pushed to main. Azure DevOps pipeline will build and deploy your app."
 
 # 5. (Optional) Restart Azure Web App after deployment
 # az webapp restart --name thecycle-fxfta3e4g2cyg7c6 --resource-group Main
+
+# 6. Push to GitHub remote (github)
+git push github main
+
+echo "Also pushed to GitHub remote."
 
 echo "Done."
