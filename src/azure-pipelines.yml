@@ -1,0 +1,58 @@
+# Docker
+# Build and push an image to Azure Container Registry
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- main
+
+resources:
+- repo: self
+
+variables:
+  # Service connection for Azure Container Registry (set in Azure DevOps UI)
+  dockerRegistryServiceConnection: $(DOCKER_REGISTRY_SERVICE_CONNECTION)
+  # Name of the image repository
+  imageRepository: $(IMAGE_REPOSITORY)
+  # Container registry URL
+  containerRegistry: $(CONTAINER_REGISTRY)
+  # Path to the Dockerfile (corrected path)
+  dockerfilePath: $(Build.SourcesDirectory)/src/Dockerfile
+  # Tag for the image
+  tag: $(IMAGE_TAG)
+
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  displayName: Build and push stage
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+- stage: DeployDev
+  displayName: Deploy to thecycle-dev slot
+  jobs:
+  - job: DeployDev
+    displayName: Deploy to thecycle-dev slot
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: AzureWebAppContainer@1
+      displayName: Deploy to thecycle-dev slot
+      inputs:
+        azureSubscription: $(AZURE_SUBSCRIPTION)
+        appName: TheCycle
+        slotName: thecycle-dev
+        imageName: $(containerRegistry)/$(imageRepository):$(tag)
