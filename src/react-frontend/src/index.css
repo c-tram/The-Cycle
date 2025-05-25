@@ -1,11 +1,23 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --primary-bg: #0a0a0a;
+  --secondary-bg: #111111;
+  --tertiary-bg: #1a1a1a;
+  --primary-text: #00ff00;
+  --secondary-text: #cccccc;
+  --primary-accent: #00cc00;
+  --secondary-accent: #009900;
+  --highlight: #33ff33;
+  --error: #ff3333;
+  --success: #00dd00;
+  --warning: #ffcc00;
+  
+  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: dark;
+  color: var(--secondary-text);
+  background-color: var(--primary-bg);
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -15,39 +27,44 @@
 
 a {
   font-weight: 500;
-  color: #646cff;
+  color: var(--primary-text);
   text-decoration: inherit;
+  transition: all 0.2s ease;
 }
+
 a:hover {
-  color: #535bf2;
+  color: var(--highlight);
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 h1 {
-  font-size: 3.2em;
+  font-size: 2em;
   line-height: 1.1;
+  color: var(--primary-text);
 }
 
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
+  border-radius: 4px;
+  border: 1px solid var(--secondary-accent);
   padding: 0.6em 1.2em;
-  font-size: 1em;
+  font-size: 0.9em;
   font-weight: 500;
   font-family: inherit;
-  background-color: #1a1a1a;
+  background-color: var(--tertiary-bg);
+  color: var(--primary-text);
   cursor: pointer;
-  transition: border-color 0.25s;
+  transition: all 0.2s ease;
 }
+
 button:hover {
-  border-color: #646cff;
+  border-color: var(--primary-accent);
+  background-color: var(--secondary-bg);
 }
 button:focus,
 button:focus-visible {

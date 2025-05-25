@@ -1,69 +1,64 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
+import { LayoutContext, useLayoutProvider } from './hooks/useLayout';
 import './App.css';
+import './styles/Layout.css';
 
-const TEAMS = [
-  { code: 'nyy', name: 'New York Yankees' },
-  { code: 'bos', name: 'Boston Red Sox' },
-  { code: 'hou', name: 'Houston Astros' },
-  { code: 'la', name: 'Los Angeles Angels' },
-  { code: 'chc', name: 'Chicago Cubs' },
-  { code: 'lad', name: 'Los Angeles Dodgers' },
-  // ...add more teams as needed
-];
+// Components
+import Sidebar from './components/Sidebar';
+import Header from './components/Header';
+import Login from './components/Login';
+
+// Pages
+import Overview from './pages/Overview';
+import Teams from './pages/Teams';
+import Standings from './pages/Standings';
+import Trends from './pages/Trends';
+
+const helmetContext = {};
 
 function App() {
-  const [team, setTeam] = useState('nyy');
-  const [players, setPlayers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userName, setUserName] = useState('');
 
-  useEffect(() => {
-    setLoading(true);
-    setError('');
-    fetch(`http://localhost:3000/api/roster?team=${team}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setPlayers(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setError('Failed to fetch roster.');
-        setLoading(false);
-      });
-  }, [team]);
+  const handleLogin = (username: string, password: string) => {
+    if (username && password) {
+      setIsLoggedIn(true);
+      setUserName(username);
+    }
+  };
+
+  const layoutContext = useLayoutProvider();
 
   return (
-    <div className="App">
-      <h1>MLB Team Roster & Stats</h1>
-      <label>
-        Select Team:
-        <select value={team} onChange={e => setTeam(e.target.value)}>
-          {TEAMS.map(t => (
-            <option key={t.code} value={t.code}>{t.name}</option>
-          ))}
-        </select>
-      </label>
-      {loading && <p>Loading...</p>}
-      {error && <p style={{color: 'red'}}>{error}</p>}
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Position</th>
-            <th>Stats</th>
-          </tr>
-        </thead>
-        <tbody>
-          {players.map((p, i) => (
-            <tr key={i}>
-              <td>{p.name}</td>
-              <td>{p.position}</td>
-              <td>{p.stats && p.stats.join(', ')}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <HelmetProvider context={helmetContext}>
+      {!isLoggedIn ? (
+        <div className="auth-container">
+          <Login onLogin={handleLogin} />
+        </div>
+      ) : (
+        <LayoutContext.Provider value={layoutContext}>
+          <Router>
+            <div className="app-container">
+              <Sidebar />
+              <div className={`main-content ${layoutContext.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+                <Header userName={userName} />
+                <div className="content-area">
+                  <Routes>
+                    <Route path="/" element={<Overview />} />
+                    <Route path="/teams" element={<Teams />} />
+                    <Route path="/standings" element={<Standings />} />
+                    <Route path="/trends" element={<Trends />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </div>
+              </div>
+            </div>
+          </Router>
+        </LayoutContext.Provider>
+      )}
+    </HelmetProvider>
   );
 }
 
