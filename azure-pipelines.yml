@@ -9,12 +9,16 @@ resources:
 - repo: self
 
 variables:
-  # Container registry service connection established during pipeline creation
-  dockerRegistryServiceConnection: 'baf5afca-08dd-4fc7-9507-ee43dbd75bc9'
-  imageRepository: 'thecycle'
-  containerRegistry: 'thecycle.azurecr.io'
-  dockerfilePath: '$(Build.SourcesDirectory)/src/Dockerfile'
-  tag: '$(Build.BuildId)'
+  # Service connection for Azure Container Registry (set in Azure DevOps UI)
+  dockerRegistryServiceConnection: $(DOCKER_REGISTRY_SERVICE_CONNECTION)
+  # Name of the image repository
+  imageRepository: $(IMAGE_REPOSITORY)
+  # Container registry URL
+  containerRegistry: $(CONTAINER_REGISTRY)
+  # Path to the Dockerfile
+  dockerfilePath: $(DOCKERFILE_PATH)
+  # Tag for the image
+  tag: $(IMAGE_TAG)
 
   # Agent VM image name
   vmImageName: 'ubuntu-latest'
