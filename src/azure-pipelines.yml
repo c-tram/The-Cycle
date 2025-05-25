@@ -41,8 +41,38 @@ stages:
         containerRegistry: $(dockerRegistryServiceConnection)
         tags: |
           $(tag)
+- stage: Test
+  displayName: Run tests
+  dependsOn: Build
+  condition: succeeded('Build')
+  jobs:
+  - job: Test
+    displayName: Run unit and integration tests
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - script: |
+        npm ci
+        npm run test
+      displayName: Run backend tests
+      workingDirectory: src/react-backend
+    - script: |
+        npm ci
+        npm run test
+      displayName: Run frontend tests
+      workingDirectory: src/react-frontend
+    - script: |
+        npm run build
+        npx serve -s dist -l 5173 &
+        sleep 5
+        npm run selenium-test
+      displayName: Build, serve, and run Selenium E2E tests
+      workingDirectory: src/react-frontend
+
 - stage: DeployDev
   displayName: Deploy to thecycle-dev slot
+  dependsOn: [Build, Test]
+  condition: succeeded('Test')
   jobs:
   - job: DeployDev
     displayName: Deploy to thecycle-dev slot
@@ -56,3 +86,27 @@ stages:
         appName: TheCycle
         slotName: dev
         imageName: $(containerRegistry)/$(imageRepository):$(tag)
+
+- stage: DeployProd
+  displayName: Deploy to production slot
+  dependsOn: DeployDev
+  condition: and(succeeded('DeployDev'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: DeployProd
+    displayName: Deploy to production slot
+    environment: 
+      name: production
+      resourceType: VirtualMachine
+      # This enables manual approval in Azure DevOps for the 'production' environment
+    pool:
+      vmImage: $(vmImageName)
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: AzureWebAppContainer@1
+            displayName: Deploy to production slot
+            inputs:
+              azureSubscription: $(AZURE_SUBSCRIPTION)
+              appName: TheCycle
+              imageName: $(containerRegistry)/$(imageRepository):$(tag)
