@@ -103,10 +103,8 @@ stages:
   jobs:
   - deployment: DeployProd
     displayName: Deploy to production slot
-    environment: 
-      name: production
-      resourceType: VirtualMachine
-      # This enables manual approval in Azure DevOps for the 'production' environment
+    environment: production
+    # Manual approval can be configured in Azure DevOps for this environment
     pool:
       vmImage: $(vmImageName)
     strategy:
