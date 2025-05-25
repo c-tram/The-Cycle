@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "vitest run --coverage",
     "selenium-test": "node ./selenium/run-selenium.js"
   },
   "dependencies": {
@@ -16,17 +17,21 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
+    "@types/jsdom": "^21.1.7",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.4.1",
+    "@vitest/coverage-c8": "^0.33.0",
     "chromedriver": "^124.0.0",
     "eslint": "^9.25.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
+    "jsdom": "^26.1.0",
     "selenium-webdriver": "^4.21.0",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.30.1",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^0.30.1"
   }
 }
