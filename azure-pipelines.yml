@@ -41,3 +41,18 @@ stages:
         containerRegistry: $(dockerRegistryServiceConnection)
         tags: |
           $(tag)
+- stage: DeployDev
+  displayName: Deploy to thecycle-dev slot
+  jobs:
+  - job: DeployDev
+    displayName: Deploy to thecycle-dev slot
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: AzureWebAppContainer@1
+      displayName: Deploy to thecycle-dev slot
+      inputs:
+        azureSubscription: $(AZURE_SUBSCRIPTION)
+        appName: thecycle
+        slotName: thecycle-dev
+        imageName: $(containerRegistry)/$(imageRepository):$(tag)
