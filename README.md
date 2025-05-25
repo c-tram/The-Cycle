@@ -45,6 +45,36 @@ This project is a full-stack web application built with a **React frontend and b
 
 - `GET /api/roster` — Returns MLB Statcast player data for the selected team.
 
+## Running Tests
+
+### Backend (react-backend)
+
+1. Install dependencies:
+   ```sh
+   cd src/react-backend
+   npm install
+   ```
+2. Run tests with coverage:
+   ```sh
+   npm test
+   ```
+   - Uses **Jest** for TypeScript unit tests. All `*.test.ts` files in `src/react-backend/src/` are run.
+   - Coverage report is generated in the `coverage/` folder.
+
+### Frontend (react-frontend)
+
+1. Install dependencies:
+   ```sh
+   cd src/react-frontend
+   npm install
+   ```
+2. Run tests with coverage:
+   ```sh
+   npm test
+   ```
+   - Uses **Vitest** for TypeScript/React unit tests. All `*.test.ts` files in `src/react-frontend/src/` are run.
+   - Coverage report is generated in the `coverage/` folder.
+
 ---
 
 **Built with React, Node.js, TypeScript, Docker, and Azure.**
