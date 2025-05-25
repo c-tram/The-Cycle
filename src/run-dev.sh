@@ -11,7 +11,7 @@ set -e
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "UPDATE GITHUB W/ AZURE: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Pipeline now sends to deployment slot: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Pull latest changes from Azure DevOps remote (origin) and merge
 git pull origin main --no-rebase
