@@ -54,5 +54,5 @@ stages:
       inputs:
         azureSubscription: $(AZURE_SUBSCRIPTION)
         appName: TheCycle
-        slotName: thecycle-dev
+        slotName: dev
         imageName: $(containerRegistry)/$(imageRepository):$(tag)
