@@ -15,8 +15,8 @@ variables:
   imageRepository: $(IMAGE_REPOSITORY)
   # Container registry URL
   containerRegistry: $(CONTAINER_REGISTRY)
-  # Path to the Dockerfile
-  dockerfilePath: $(DOCKERFILE_PATH)
+  # Path to the Dockerfile (corrected path)
+  dockerfilePath: $(Build.SourcesDirectory)/src/Dockerfile
   # Tag for the image
   tag: $(IMAGE_TAG)
 
