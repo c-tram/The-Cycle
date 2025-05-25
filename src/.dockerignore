@@ -1,0 +1,7 @@
+node_modules
+react-backend/node_modules
+react-frontend/node_modules
+coverage
+dist
+build
+*.log
