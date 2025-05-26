@@ -16,8 +16,6 @@ import Teams from './pages/Teams';
 import Standings from './pages/Standings';
 import Trends from './pages/Trends';
 
-const helmetContext = {};
-
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState('');
@@ -32,7 +30,7 @@ function App() {
   const layoutContext = useLayoutProvider();
 
   return (
-    <HelmetProvider context={helmetContext}>
+    <HelmetProvider>
       {!isLoggedIn ? (
         <div className="auth-container">
           <Login onLogin={handleLogin} />
