@@ -1,11 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import Loading from '../components/Loading';
-import ErrorMessage from '../components/Error';
 import '../styles/Standings.css';
 
 // Mock data that would normally come from API
-const STANDINGS = [
+interface Team {
+  team: string;
+  wins: number;
+  losses: number;
+  pct: string;
+  gb: string;
+}
+
+interface Division {
+  division: string;
+  teams: Team[];
+}
+
+const STANDINGS: Division[] = [
   {
     division: 'AL East',
     teams: [
@@ -92,49 +103,46 @@ const Standings = () => {
   }, []);
 
   return (
-    <div className="page-content">
+    <>
       <Helmet>
         <title>MLB Statcast | Standings</title>
       </Helmet>
       <h1>MLB Standings</h1>
       
-      {loading && <Loading message="Loading standings..." />}
-      {error && <ErrorMessage message={error} onRetry={() => { setLoading(true); setError(''); }} />}
-      
       {!loading && !error && (
         <div className="standings-container animate-fade-in">
-          {standings.map((division) => (
-          <div className="division-standings" key={division.division}>
-            <h2>{division.division}</h2>
-            <div className="table-responsive">
-              <table className="stats-table standings-table">
-                <thead>
-                  <tr>
-                    <th>Team</th>
-                    <th>W</th>
-                    <th>L</th>
-                    <th>PCT</th>
-                    <th>GB</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {division.teams.map((team, index) => (
-                    <tr key={index}>
-                      <td>{team.team}</td>
-                      <td>{team.wins}</td>
-                      <td>{team.losses}</td>
-                      <td>{team.pct}</td>
-                      <td>{team.gb}</td>
+          {standings.map((division: Division) => (
+            <div className="division-standings" key={division.division}>
+              <h2>{division.division}</h2>
+              <div className="table-responsive">
+                <table className="stats-table standings-table">
+                  <thead>
+                    <tr>
+                      <th>Team</th>
+                      <th>W</th>
+                      <th>L</th>
+                      <th>PCT</th>
+                      <th>GB</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {division.teams.map((team: Team, index: number) => (
+                      <tr key={index}>
+                        <td>{team.team}</td>
+                        <td>{team.wins}</td>
+                        <td>{team.losses}</td>
+                        <td>{team.pct}</td>
+                        <td>{team.gb}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
         </div>
       )}
-    </div>
+    </>
   );
 };
 
