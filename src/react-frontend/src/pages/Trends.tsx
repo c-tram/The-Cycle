@@ -4,7 +4,7 @@ import Loading from '../components/Loading';
 import ErrorMessage from '../components/Error';
 import '../styles/Trends.css';
 
-const STAT_CATEGORIES: StatCategory[] = [
+const STAT_CATEGORIES = [
   'Batting Average',
   'Home Runs',
   'RBIs',
@@ -14,10 +14,9 @@ const STAT_CATEGORIES: StatCategory[] = [
   'WHIP',
   'Exit Velocity',
   'Launch Angle',
-  'Sprint Speed'
-];
-
-type StatCategory = 'Batting Average' | 'Home Runs' | 'RBIs' | 'OPS' | 'ERA' | 'Strikeouts' | 'WHIP' | 'Exit Velocity' | 'Launch Angle' | 'Sprint Speed';
+  'Sprint Speed',
+] as const;
+type StatCategory = typeof STAT_CATEGORIES[number];
 
 const MOCK_TREND_DATA: Record<StatCategory, number[]> = {
   'Batting Average': [.267, .265, .264, .268, .271, .270, .266],
@@ -35,10 +34,10 @@ const MOCK_TREND_DATA: Record<StatCategory, number[]> = {
 const MONTHS = ['April', 'May', 'June', 'July', 'August', 'September', 'October'];
 
 const Trends = () => {
-  const [selectedStat, setSelectedStat] = useState<StatCategory>('Batting Average');
+  const [selectedStat, setSelectedStat] = useState('Batting Average' as StatCategory);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [trendData, setTrendData] = useState<Record<StatCategory, number[]>>(MOCK_TREND_DATA);
+  const [trendData, setTrendData] = useState(MOCK_TREND_DATA);
   
   useEffect(() => {
     // Simulate API call when changing selected stat
@@ -57,6 +56,7 @@ const Trends = () => {
     
     loadTrendData();
   }, [selectedStat]);
+
   const renderTrendChart = () => {
     const data = trendData[selectedStat];
     const max = Math.max(...data) * 1.1;
@@ -102,7 +102,8 @@ const Trends = () => {
         <div className="trends-container animate-fade-in">
           <div className="trend-selector">
             <h3>Select Statistic:</h3>
-            <div className="stat-buttons">              {STAT_CATEGORIES.map(stat => (
+            <div className="stat-buttons">
+              {STAT_CATEGORIES.map((stat) => (
                 <button 
                   key={stat} 
                   className={selectedStat === stat ? 'active' : ''}
