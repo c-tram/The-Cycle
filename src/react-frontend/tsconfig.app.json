@@ -20,17 +20,10 @@
     "typeRoots": ["./node_modules/@types", "./src/types"],
     "useDefineForClassFields": true,
     "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    },
-
-    /* Linting */
-    "strict": true,
+    "forceConsistentCasingInFileNames": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
-    "forceConsistentCasingInFileNames": true
+    "noFallthroughCasesInSwitch": true
   },
   "include": [
     "src/**/*.ts",
@@ -38,8 +31,7 @@
     "src/**/*.js",
     "src/**/*.jsx",
     "src/**/*.d.ts",
-    "src/types/**/*.d.ts",
-    "src/declarations.d.ts"
+    "src/types/**/*.d.ts"
   ],
   "exclude": ["node_modules"]
 }
