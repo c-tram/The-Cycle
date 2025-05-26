@@ -4,12 +4,38 @@ import path from 'path';
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import { Builder, By } from 'selenium-webdriver';
+import { scrapeStandings } from './scrapers/standingsScraper';
+import { scrapePlayerStats, scrapeTrendData } from './scrapers/playerStatsScraper';
+import { scrapeGames } from './scrapers/gamesScraper';
+import { storeData, retrieveData, calculateDailyTrends } from './services/dataService';
+import schedule from 'node-schedule';
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Enable CORS
+app.use(cors());
+
 // Use absolute path for static files (works in Docker and locally)
 app.use(express.static(path.join(__dirname, '../public')));
+
+// Cache data for performance
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const cache: Record<string, CacheEntry<any>> = {};
+
+// Helper function to check if cache is valid
+function isCacheValid(key: string): boolean {
+  const entry = cache[key];
+  if (!entry) return false;
+  
+  const now = Date.now();
+  return now - entry.timestamp < CACHE_TTL;
+}
 
 // Map team abbreviations to Baseball Savant team IDs
 const TEAM_ID_MAP: Record<string, number> = {
@@ -18,6 +44,98 @@ const TEAM_ID_MAP: Record<string, number> = {
   nyy: 147, oak: 133, phi: 143, pit: 134, sd: 135, sea: 136, sf: 137, stl: 138, tb: 139,
   tex: 140, tor: 141, was: 120, wsh: 120
 };
+
+// API route for standings
+app.get('/api/standings', (req, res) => {
+  (async () => {
+    try {
+      const cacheKey = 'standings';
+      
+      // Check cache first
+      if (isCacheValid(cacheKey)) {
+        return res.json(cache[cacheKey].data);
+      }
+      
+      try {
+        // Fetch fresh data
+        const standings = await scrapeStandings();
+        
+        // Store in cache
+        cache[cacheKey] = {
+          data: standings,
+          timestamp: Date.now()
+        };
+        
+        res.json(standings);
+      } catch (scrapeErr) {
+        console.error('Error scraping standings, using mock data:', scrapeErr);
+        // If the scraper fails, return the mock data from the scraper
+        const mockData = require('./scrapers/standingsScraper').MOCK_STANDINGS;
+        res.json(mockData);
+      }
+    } catch (err: any) {
+      console.error('Error in /api/standings:', err);
+      res.status(500).json({ error: err.message });
+    }
+  })();
+});
+
+// API route for trends data
+app.get('/api/trends', (req, res) => {
+  (async () => {
+    try {
+      const statCategory = req.query.stat as string || 'Batting Average';
+      const cacheKey = `trends-${statCategory}`;
+      
+      // Check cache first
+      if (isCacheValid(cacheKey)) {
+        return res.json(cache[cacheKey].data);
+      }
+      
+      // Fetch fresh data
+      const trendsData = await scrapeTrendData(statCategory);
+      
+      // Store in cache
+      cache[cacheKey] = {
+        data: trendsData,
+        timestamp: Date.now()
+      };
+      
+      res.json(trendsData);
+    } catch (err: any) {
+      console.error('Error in /api/trends:', err);
+      res.status(500).json({ error: err.message });
+    }
+  })();
+});
+
+// API route for games (recent and upcoming)
+app.get('/api/games', (req, res) => {
+  (async () => {
+    try {
+      const cacheKey = 'games';
+      
+      // Check cache first (shorter TTL for games)
+      if (cache[cacheKey] && (Date.now() - cache[cacheKey].timestamp < 30 * 60 * 1000)) { // 30 minutes
+        return res.json(cache[cacheKey].data);
+      }
+      
+      // Fetch fresh data
+      const gamesData = await scrapeGames();
+      
+      // Store in cache
+      cache[cacheKey] = {
+        data: gamesData,
+        timestamp: Date.now()
+      };
+      
+      res.json(gamesData);
+    } catch (err: any) {
+      console.error('Error in /api/games:', err);
+      res.status(500).json({ error: err.message });
+    }
+  })();
+});
 
 // Example: /api/roster?team=nyy
 app.get('/api/roster', (req, res) => {
@@ -97,11 +215,53 @@ app.get('/api/roster', (req, res) => {
   })();
 });
 
-// Serve index.html for all non-API routes (for React Router support)
-app.get(/^\/(?!api).*/, (req, res) => {
+// Schedule daily data updates
+schedule.scheduleJob('0 5 * * *', async () => { // Run at 5:00 AM every day
+  console.log('Running scheduled data update...');
+  
+  try {
+    // Fetch all player stats
+    const allStats = await scrapePlayerStats();
+    
+    // Store the raw data
+    storeData('player-stats.json', allStats);
+    
+    // Calculate and store trends
+    await calculateDailyTrends(allStats);
+    
+    // Update standings
+    const standings = await scrapeStandings();
+    storeData('standings.json', standings);
+    
+    // Update games
+    const games = await scrapeGames();
+    storeData('games.json', games);
+    
+    console.log('Daily data update completed successfully');
+  } catch (err) {
+    console.error('Error during scheduled data update:', err);
+  }
+});
+
+// Serve index.html for non-API routes (for React Router support)
+app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../public', 'index.html'));
+});
+
+// Fallback route for any non-API paths
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile(path.join(__dirname, '../public', 'index.html'));
+  } else {
+    next();
+  }
 });
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+  console.log(`API endpoints available at:`);
+  console.log(` - /api/roster`);
+  console.log(` - /api/standings`);
+  console.log(` - /api/trends`);
+  console.log(` - /api/games`);
 });

@@ -1,16 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { getTeamRoster, Player } from '../services/api';
 import '../styles/Teams.css';
 import Loading from '../components/Loading';
 import ErrorMessage from '../components/Error';
-
-interface Player {
-  name: string;
-  position: string;
-  batting_avg?: string;
-  hr?: string;
-  rbi?: string;
-}
 
 const TEAMS = [
   { code: 'nyy', name: 'New York Yankees', division: 'AL East' },
@@ -26,7 +19,7 @@ const TEAMS = [
   { code: 'hou', name: 'Houston Astros', division: 'AL West' },
   { code: 'sea', name: 'Seattle Mariners', division: 'AL West' },
   { code: 'tex', name: 'Texas Rangers', division: 'AL West' },
-  { code: 'la', name: 'Los Angeles Angels', division: 'AL West' },
+  { code: 'laa', name: 'Los Angeles Angels', division: 'AL West' },
   { code: 'oak', name: 'Oakland Athletics', division: 'AL West' },
   { code: 'atl', name: 'Atlanta Braves', division: 'NL East' },
   { code: 'phi', name: 'Philadelphia Phillies', division: 'NL East' },
@@ -52,18 +45,26 @@ const Teams = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    setLoading(true);
-    setError('');
-    fetch(`http://localhost:3000/api/roster?team=${team}`)
-      .then((res) => res.json())
-      .then((data) => {
-        setPlayers(data);
+    const fetchTeamRoster = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const teamData = await getTeamRoster(team);
+        if (teamData && teamData.length > 0 && teamData[0].players) {
+          setPlayers(teamData[0].players);
+        } else {
+          setPlayers([]);
+        }
         setLoading(false);
-      })
-      .catch(() => {
-        setError('Failed to fetch roster.');
+      } catch (err) {
+        console.error('Error fetching team roster:', err);
+        setError('Failed to fetch roster data.');
+        setPlayers([]);
         setLoading(false);
-      });
+      }
+    };
+    
+    fetchTeamRoster();
   }, [team]);
 
   // Group teams by division
@@ -109,18 +110,28 @@ const Teams = () => {
                     <th>Batting Avg</th>
                     <th>HR</th>
                     <th>RBI</th>
+                    <th>Runs</th>
+                    {players.some((p: Player) => p.era) && <th>ERA</th>}
+                    {players.some((p: Player) => p.whip) && <th>WHIP</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {players.map((p: Player, i: number) => (
+                  {players.length > 0 ? players.map((p: Player, i: number) => (
                     <tr key={i}>
                       <td>{p.name}</td>
-                      <td>{p.position}</td>
-                      <td>{p.batting_avg || '.000'}</td>
+                      <td>{p.position || 'N/A'}</td>
+                      <td>{p.avg || '.000'}</td>
                       <td>{p.hr || '0'}</td>
                       <td>{p.rbi || '0'}</td>
+                      <td>{p.runs || '0'}</td>
+                      {players.some((p: Player) => p.era) && <td>{p.era || '-'}</td>}
+                      {players.some((p: Player) => p.whip) && <td>{p.whip || '-'}</td>}
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan={8} style={{textAlign: 'center'}}>No player data available</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

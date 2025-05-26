@@ -1,22 +1,13 @@
+// filepath: /Users/coletrammell/Documents/GitHub/The Cycle/src/react-frontend/src/pages/Standings.tsx
 import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { getStandings, Division, TeamStanding } from '../services/api';
+import Loading from '../components/Loading';
+import ErrorMessage from '../components/Error';
 import '../styles/Standings.css';
 
-// Mock data that would normally come from API
-interface Team {
-  team: string;
-  wins: number;
-  losses: number;
-  pct: string;
-  gb: string;
-}
-
-interface Division {
-  division: string;
-  teams: Team[];
-}
-
-const STANDINGS: Division[] = [
+// Fallback data in case API fails
+const FALLBACK_STANDINGS: Division[] = [
   {
     division: 'AL East',
     teams: [
@@ -51,10 +42,10 @@ const STANDINGS: Division[] = [
     division: 'NL East',
     teams: [
       { team: 'Atlanta Braves', wins: 96, losses: 66, pct: '.593', gb: '-' },
-      { team: 'Philadelphia Phillies', wins: 91, losses: 71, pct: '.562', gb: '5.0' },
+      { team: 'Philadelphia Phillies', wins: 90, losses: 72, pct: '.556', gb: '6.0' },
       { team: 'New York Mets', wins: 84, losses: 78, pct: '.519', gb: '12.0' },
-      { team: 'Miami Marlins', wins: 76, losses: 86, pct: '.469', gb: '20.0' },
-      { team: 'Washington Nationals', wins: 71, losses: 91, pct: '.438', gb: '25.0' }
+      { team: 'Miami Marlins', wins: 71, losses: 91, pct: '.438', gb: '25.0' },
+      { team: 'Washington Nationals', wins: 65, losses: 97, pct: '.401', gb: '31.0' }
     ]
   },
   {
@@ -63,8 +54,8 @@ const STANDINGS: Division[] = [
       { team: 'Milwaukee Brewers', wins: 93, losses: 69, pct: '.574', gb: '-' },
       { team: 'Chicago Cubs', wins: 83, losses: 79, pct: '.512', gb: '10.0' },
       { team: 'St. Louis Cardinals', wins: 81, losses: 81, pct: '.500', gb: '12.0' },
-      { team: 'Cincinnati Reds', wins: 79, losses: 83, pct: '.488', gb: '14.0' },
-      { team: 'Pittsburgh Pirates', wins: 76, losses: 86, pct: '.469', gb: '17.0' }
+      { team: 'Cincinnati Reds', wins: 78, losses: 84, pct: '.481', gb: '15.0' },
+      { team: 'Pittsburgh Pirates', wins: 74, losses: 88, pct: '.457', gb: '19.0' }
     ]
   },
   {
@@ -72,77 +63,112 @@ const STANDINGS: Division[] = [
     teams: [
       { team: 'Los Angeles Dodgers', wins: 98, losses: 64, pct: '.605', gb: '-' },
       { team: 'San Diego Padres', wins: 89, losses: 73, pct: '.549', gb: '9.0' },
-      { team: 'Arizona Diamondbacks', wins: 87, losses: 75, pct: '.537', gb: '11.0' },
-      { team: 'San Francisco Giants', wins: 80, losses: 82, pct: '.494', gb: '18.0' },
-      { team: 'Colorado Rockies', wins: 68, losses: 94, pct: '.420', gb: '30.0' }
+      { team: 'Arizona Diamondbacks', wins: 84, losses: 78, pct: '.519', gb: '14.0' },
+      { team: 'San Francisco Giants', wins: 79, losses: 83, pct: '.488', gb: '19.0' },
+      { team: 'Colorado Rockies', wins: 65, losses: 97, pct: '.401', gb: '33.0' }
     ]
   }
 ];
 
 const Standings = () => {
-  const [standings, setStandings] = useState(STANDINGS);
+  const [standings, setStandings] = useState([] as Division[]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeLeague, setActiveLeague] = useState('all');
 
-  // Simulate API loading
   useEffect(() => {
-    const loadStandings = async () => {
+    const fetchStandings = async () => {
       try {
         setLoading(true);
-        // In a real app, this would be an API call
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setStandings(STANDINGS);
+        const data = await getStandings();
+        if (data && data.length > 0) {
+          setStandings(data);
+        } else {
+          // Fall back to mock data if API returns empty
+          console.warn('API returned empty standings data, using fallback');
+          setStandings(FALLBACK_STANDINGS);
+        }
         setLoading(false);
       } catch (err) {
-        setError('Failed to load standings data.');
+        console.error('Error fetching standings:', err);
+        setError('Failed to load standings data. Using fallback data.');
+        setStandings(FALLBACK_STANDINGS);
         setLoading(false);
       }
     };
-    
-    loadStandings();
+
+    fetchStandings();
   }, []);
 
+  const filteredStandings = activeLeague === 'all' 
+    ? standings
+    : standings.filter((division: Division) => division.division.startsWith(activeLeague));
+
   return (
-    <>
+    <div className="page-content">
       <Helmet>
         <title>MLB Statcast | Standings</title>
       </Helmet>
       <h1>MLB Standings</h1>
       
-      {!loading && !error && (
-        <div className="standings-container animate-fade-in">
-          {standings.map((division: Division) => (
-            <div className="division-standings" key={division.division}>
-              <h2>{division.division}</h2>
-              <div className="table-responsive">
-                <table className="stats-table standings-table">
-                  <thead>
-                    <tr>
-                      <th>Team</th>
-                      <th>W</th>
-                      <th>L</th>
-                      <th>PCT</th>
-                      <th>GB</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {division.teams.map((team: Team, index: number) => (
-                      <tr key={index}>
-                        <td>{team.team}</td>
-                        <td>{team.wins}</td>
-                        <td>{team.losses}</td>
-                        <td>{team.pct}</td>
-                        <td>{team.gb}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
+      <div className="standings-controls">
+        <button 
+          className={activeLeague === 'all' ? 'active' : ''} 
+          onClick={() => setActiveLeague('all')}>
+          All
+        </button>
+        <button 
+          className={activeLeague === 'AL' ? 'active' : ''} 
+          onClick={() => setActiveLeague('AL')}>
+          American League
+        </button>
+        <button 
+          className={activeLeague === 'NL' ? 'active' : ''} 
+          onClick={() => setActiveLeague('NL')}>
+          National League
+        </button>
+      </div>
+      
+      {loading && <Loading message="Loading standings..." />}
+      {error && <ErrorMessage message={error} onRetry={() => setError('')} />}
+      
+      {!loading && filteredStandings.map((division: Division, idx: number) => (
+        <div className="standings-division animate-fade-in" 
+          key={division.division}
+          style={{animationDelay: `${idx * 0.1}s`}}
+        >
+          <h2>{division.division}</h2>
+          <div className="table-responsive">
+            <table className="standings-table">
+              <thead>
+                <tr>
+                  <th>Team</th>
+                  <th>W</th>
+                  <th>L</th>
+                  <th>PCT</th>
+                  <th>GB</th>
+                  {division.teams[0].last10 && <th>L10</th>}
+                  {division.teams[0].streak && <th>Streak</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {division.teams.map((team: TeamStanding) => (
+                  <tr key={team.team}>
+                    <td className="team-name">{team.team}</td>
+                    <td>{team.wins}</td>
+                    <td>{team.losses}</td>
+                    <td>{team.pct}</td>
+                    <td>{team.gb}</td>
+                    {team.last10 && <td>{team.last10}</td>}
+                    {team.streak && <td>{team.streak}</td>}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      )}
-    </>
+      ))}
+    </div>
   );
 };
 

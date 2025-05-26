@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import Loading from '../components/Loading';
 import ErrorMessage from '../components/Error';
+import { getTrends } from '../services/api';
 import '../styles/Trends.css';
 
 const STAT_CATEGORIES = [
@@ -18,7 +19,8 @@ const STAT_CATEGORIES = [
 ] as const;
 type StatCategory = typeof STAT_CATEGORIES[number];
 
-const MOCK_TREND_DATA: Record<StatCategory, number[]> = {
+// Fallback data in case API fails
+const FALLBACK_TREND_DATA: Record<StatCategory, number[]> = {
   'Batting Average': [.267, .265, .264, .268, .271, .270, .266],
   'Home Runs': [1.18, 1.21, 1.25, 1.31, 1.27, 1.22, 1.19],
   'RBIs': [4.12, 4.21, 4.35, 4.41, 4.32, 4.22, 4.18],
@@ -37,19 +39,49 @@ const Trends = () => {
   const [selectedStat, setSelectedStat] = useState('Batting Average' as StatCategory);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [trendData, setTrendData] = useState(MOCK_TREND_DATA);
+  const [trendData, setTrendData] = useState(FALLBACK_TREND_DATA);
   
   useEffect(() => {
-    // Simulate API call when changing selected stat
+    // Load trend data from API when the selected stat changes
     const loadTrendData = async () => {
       try {
         setLoading(true);
-        // In a real app, this would be an API call with the selected stat parameter
-        await new Promise(resolve => setTimeout(resolve, 600));
-        setTrendData(MOCK_TREND_DATA);
+        setError(''); // Clear any previous errors
+        
+        // Get data from API
+        const apiData = await getTrends(selectedStat);
+        
+        // Check if API returned data for the selected stat
+        if (apiData && apiData[selectedStat] && apiData[selectedStat].length > 0) {
+          // Create a new object with the updated data
+          setTrendData((prevData: Record<StatCategory, number[]>) => {
+            const newData = { ...prevData };
+            const statKey = selectedStat as StatCategory;
+            newData[statKey] = apiData[selectedStat] as number[];
+            return newData;
+          });
+        } else {
+          // If API didn't return usable data, fall back to mock data
+          console.warn('API returned empty data, using fallback');
+          setTrendData((prevData: Record<StatCategory, number[]>) => {
+            const newData = { ...prevData };
+            const statKey = selectedStat as StatCategory;
+            newData[statKey] = FALLBACK_TREND_DATA[statKey];
+            return newData;
+          });
+        }
+        
         setLoading(false);
       } catch (err) {
-        setError('Failed to load trend data.');
+        console.error('Error loading trend data:', err);
+        setError('Failed to load trend data from API. Using fallback data.');
+        // Use fallback data if API fails
+        setTrendData((prevData: Record<StatCategory, number[]>) => {
+          const newData = { ...prevData };
+          const statKey = selectedStat as StatCategory;
+          newData[statKey] = FALLBACK_TREND_DATA[statKey];
+          return newData;
+        });
         setLoading(false);
       }
     };
@@ -129,7 +161,7 @@ const Trends = () => {
               {selectedStat === 'Batting Average' && 'Batting averages peaked in August at .271, likely due to warmer weather conditions.'}
               {selectedStat === 'Home Runs' && 'Home run rates were highest in July, averaging 1.31 per game.'}
               {selectedStat === 'ERA' && 'Pitcher ERA was lowest in June and July, before rising during the later months of the season.'}
-              {selectedStat === 'Exit Velocity' && 'Exit velocity peaked in July at 89.3 mph, correlating with the increase in home runs.'}
+              {selectedStat === 'Exit Velocity' && 'Exit velocity peaked in July at 89.4 mph, correlating with the increase in home runs.'}
             </p>
           </div>
         </div>
