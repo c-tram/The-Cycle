@@ -3,9 +3,10 @@
 }
 
 .trend-selector {
-  background-color: #ffffff;
+  background-color: #1a1a1a;
+  border: 1px solid #333333;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 20px;
   margin-bottom: 20px;
 }
@@ -13,7 +14,7 @@
 .trend-selector h3 {
   margin-top: 0;
   margin-bottom: 15px;
-  color: #13294b;
+  color: #00ff00;
 }
 
 .stat-buttons {
@@ -23,8 +24,8 @@
 }
 
 .stat-buttons button {
-  background-color: #f4f4f4;
-  border: 1px solid #ddd;
+  background-color: #2a2a2a;
+  border: 1px solid #444444;
   border-radius: 20px;
   padding: 8px 16px;
   cursor: pointer;
@@ -32,16 +33,18 @@
   font-size: 0.9rem;
   animation: fadeIn 0.5s ease-in forwards;
   opacity: 0;
+  color: #cccccc;
 }
 
 .stat-buttons button.active {
-  background-color: #13294b;
-  color: white;
-  border-color: #13294b;
+  background-color: #00ff00;
+  color: #0a0a0a;
+  border-color: #00ff00;
 }
 
 .stat-buttons button:hover:not(.active) {
-  background-color: #e4e4e4;
+  background-color: #3a3a3a;
+  border-color: #555555;
 }
 
 .trend-visualization {
@@ -53,9 +56,10 @@
 .trend-chart {
   flex: 1;
   min-width: 300px;
-  background-color: #ffffff;
+  background-color: #1a1a1a;
+  border: 1px solid #333333;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 20px;
   height: 400px;
   display: flex;
@@ -66,7 +70,7 @@
   text-align: center;
   font-weight: bold;
   margin-bottom: 15px;
-  color: #13294b;
+  color: #00ff00;
 }
 
 .chart-container {
@@ -88,7 +92,7 @@
 .chart-bar {
   width: 30px;
   max-width: 80%;
-  background-color: #13294b;
+  background-color: #00ff00;
   transition: height 1s ease-out;
   border-radius: 3px 3px 0 0;
 }
@@ -96,7 +100,7 @@
 .chart-label {
   margin-top: 8px;
   font-size: 0.8rem;
-  color: #666;
+  color: #cccccc;
 }
 
 .chart-values {
@@ -111,7 +115,7 @@
   position: absolute;
   right: 100%;
   font-size: 0.7rem;
-  color: #666;
+  color: #cccccc;
   transform: translateY(-50%);
 }
 
@@ -131,17 +135,18 @@
 .trend-analysis {
   flex: 1;
   min-width: 300px;
-  background-color: #ffffff;
+  background-color: #1a1a1a;
+  border: 1px solid #333333;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 20px;
 }
 
 .trend-analysis h3 {
   margin-top: 0;
   margin-bottom: 15px;
-  color: #13294b;
-  border-bottom: 2px solid #13294b;
+  color: #00ff00;
+  border-bottom: 2px solid #00ff00;
   padding-bottom: 8px;
 }
 

@@ -6,9 +6,9 @@
   padding: 40px;
   margin: 20px auto;
   text-align: center;
-  background-color: #fff3f3;
+  background-color: #2a1a1a;
   border-radius: 8px;
-  border: 1px solid #ffe0e0;
+  border: 1px solid #ff3333;
 }
 
 .error-icon {
@@ -24,8 +24,8 @@
 }
 
 .retry-button {
-  background-color: #13294b;
-  color: white;
+  background-color: #00ff00;
+  color: #0a0a0a;
   border: none;
   border-radius: 4px;
   padding: 8px 16px;
@@ -35,5 +35,5 @@
 }
 
 .retry-button:hover {
-  background-color: #0c1c33;
+  background-color: #00cc00;
 }

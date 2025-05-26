@@ -10,11 +10,11 @@
 
 .loading-spinner {
   font-size: 2rem;
-  color: #13294b;
+  color: #00ff00;
   margin-bottom: 15px;
 }
 
 .loading-message {
   font-size: 1rem;
-  color: #666;
+  color: #cccccc;
 }

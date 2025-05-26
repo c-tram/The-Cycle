@@ -19,7 +19,9 @@
   margin-left: 10px;
   padding: 8px 12px;
   border-radius: 4px;
-  border: 1px solid #ddd;
+  border: 1px solid #333333;
+  background-color: #1a1a1a;
+  color: #cccccc;
   font-size: 16px;
   min-width: 200px;
 }
@@ -27,17 +29,18 @@
 .team-roster {
   flex: 2;
   min-width: 300px;
-  background-color: #ffffff;
+  background-color: #1a1a1a;
+  border: 1px solid #333333;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 20px;
   animation: fadeIn 0.5s ease-in;
 }
 
 .team-roster h2 {
   margin-top: 0;
-  color: #13294b;
-  border-bottom: 2px solid #13294b;
+  color: #00ff00;
+  border-bottom: 2px solid #00ff00;
   padding-bottom: 8px;
   margin-bottom: 15px;
 }
@@ -45,9 +48,10 @@
 .team-divisions {
   flex: 1;
   min-width: 250px;
-  background-color: #ffffff;
+  background-color: #1a1a1a;
+  border: 1px solid #333333;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 20px;
   animation: fadeIn 0.5s ease-in;
   animation-delay: 0.1s;
@@ -57,8 +61,8 @@
 
 .team-divisions h2 {
   margin-top: 0;
-  color: #13294b;
-  border-bottom: 2px solid #13294b;
+  color: #00ff00;
+  border-bottom: 2px solid #00ff00;
   padding-bottom: 8px;
   margin-bottom: 15px;
 }
@@ -89,12 +93,12 @@
 }
 
 .team-list li:hover {
-  background-color: #f5f5f5;
+  background-color: #2a2a2a;
 }
 
 .team-list li.active {
-  background-color: #13294b;
-  color: white;
+  background-color: #00ff00;
+  color: #0a0a0a;
 }
 
 .stats-table {
@@ -106,12 +110,12 @@
 .stats-table th,
 .stats-table td {
   padding: 10px;
-  border-bottom: 1px solid #eaeaea;
+  border-bottom: 1px solid #333333;
 }
 
 .stats-table th {
   font-weight: 600;
-  color: #333;
+  color: #00ff00;
 }
 
 .table-responsive {
