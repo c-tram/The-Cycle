@@ -2,19 +2,99 @@
   margin-top: 20px;
 }
 
-.trend-selector {
+.trend-controls {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.trend-selector, .team-selector, .period-selector {
   background-color: #1a1a1a;
   border: 1px solid #333333;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   padding: 20px;
-  margin-bottom: 20px;
 }
 
-.trend-selector h3 {
+.trend-selector h3, .team-selector h3, .period-selector h3 {
   margin-top: 0;
   margin-bottom: 15px;
   color: #00ff00;
+}
+
+.selector-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.team-dropdown {
+  background-color: #2a2a2a;
+  border: 1px solid #444444;
+  border-radius: 6px;
+  color: #ccc;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  flex: 1;
+  cursor: pointer;
+}
+
+.team-dropdown:focus {
+  outline: none;
+  border-color: #00ff00;
+  box-shadow: 0 0 5px rgba(0, 255, 0, 0.3);
+}
+
+.comparison-toggle {
+  background-color: #2a2a2a;
+  border: 1px solid #444444;
+  border-radius: 6px;
+  color: #ccc;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.comparison-toggle.active {
+  background-color: #00ff00;
+  color: #0a0a0a;
+  border-color: #00ff00;
+}
+
+.comparison-toggle:hover:not(.active) {
+  background-color: #3a3a3a;
+  border-color: #555555;
+}
+
+.period-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.period-buttons button {
+  background-color: #2a2a2a;
+  border: 1px solid #444444;
+  border-radius: 6px;
+  color: #ccc;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.85rem;
+  flex: 1;
+}
+
+.period-buttons button.active {
+  background-color: #00ff00;
+  color: #0a0a0a;
+  border-color: #00ff00;
+}
+
+.period-buttons button:hover:not(.active) {
+  background-color: #3a3a3a;
+  border-color: #555555;
 }
 
 .stat-buttons {
@@ -150,7 +230,50 @@
   padding-bottom: 8px;
 }
 
+.analysis-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.comparison-insights {
+  background: rgba(0, 255, 0, 0.1);
+  border: 1px solid rgba(0, 255, 0, 0.3);
+  border-radius: 6px;
+  padding: 15px;
+}
+
+.comparison-insights h4 {
+  margin: 0 0 10px 0;
+  color: #00ff00;
+  font-size: 1.1rem;
+}
+
+.comparison-insights p {
+  margin: 0;
+  color: #ccc;
+  font-size: 0.9rem;
+}
+
+.trend-insights {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 15px;
+}
+
+.trend-insights p {
+  margin: 0;
+  color: #ccc;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
 @media (max-width: 768px) {
+  .trend-controls {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  
   .trend-visualization {
     flex-direction: column;
   }
@@ -161,5 +284,14 @@
   
   .stat-buttons {
     justify-content: center;
+  }
+  
+  .selector-controls {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .period-buttons {
+    flex-direction: column;
   }
 }

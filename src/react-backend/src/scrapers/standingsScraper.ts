@@ -1,5 +1,5 @@
-import { Builder, By, until, WebDriver } from 'selenium-webdriver';
-import chrome from 'selenium-webdriver/chrome';
+import fetch from 'node-fetch';
+import * as cheerio from 'cheerio';
 
 interface TeamStanding {
   team: string;
@@ -80,97 +80,102 @@ export const MOCK_STANDINGS: DivisionStanding[] = [
   }
 ];
 
-interface DivisionStanding {
-  division: string;
-  teams: TeamStanding[];
-}
-
 /**
- * Scrapes current MLB standings data using Selenium
+ * Scrapes current MLB standings data using HTTP requests and cheerio
  * @returns Promise containing division standings
  */
 export async function scrapeStandings(): Promise<DivisionStanding[]> {
-  let driver: WebDriver | null = null;
   try {
-    console.log("Starting standings scraper...");
-    // Set up headless Chrome for scraping
-    const options = new chrome.Options();
-    options.addArguments('--headless', '--no-sandbox', '--disable-dev-shm-usage');
+    console.log("Starting HTTP-based standings scraper...");
     
-    driver = await new Builder()
-      .forBrowser('chrome')
-      .setChromeOptions(options)
-      .build();
+    // Try to fetch from MLB standings page
+    const response = await fetch('https://www.mlb.com/standings', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
 
-    // Navigate to MLB standings page
-    await driver.get('https://www.mlb.com/standings');
-    console.log("Navigated to MLB standings page");
-    
-    // Wait for standings tables to load
-    await driver.wait(until.elementsLocated(By.css('.standings-table')), 10000);
-    
-    // Find all division containers
-    const standingsTables = await driver.findElements(By.css('.standings-table'));
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    const allDivisionStandings: DivisionStanding[] = [];
+
+    // Try to find standings tables
+    const standingsTables = $('.standings-table');
     console.log(`Found ${standingsTables.length} division tables`);
-    
-    // If no tables found, fall back to mock data
+
     if (standingsTables.length === 0) {
       console.log("No division tables found, using mock data");
       return MOCK_STANDINGS;
     }
-    
-    const allDivisionStandings: DivisionStanding[] = [];
 
     // Process each division table
-    for (const table of standingsTables) {
+    standingsTables.each((i, table) => {
       try {
         // Get division name
-        const divisionElement = await table.findElement(By.css('.standings-table-wrapper__headline'));
-        const divisionName = await divisionElement.getText();
+        const divisionElement = $(table).find('.standings-table-wrapper__headline');
+        const divisionName = divisionElement.text().trim();
         
+        if (!divisionName) {
+          return; // Skip if no division name found
+        }
+
         // Find all team rows
-        const teamRows = await table.findElements(By.css('tbody tr'));
-        
+        const teamRows = $(table).find('tbody tr');
         const divisionTeams: TeamStanding[] = [];
-        
+
         // Process each team
-        for (const row of teamRows) {
+        teamRows.each((j, row) => {
           try {
-            const cells = await row.findElements(By.css('td'));
+            const cells = $(row).find('td');
             
-            // Get team name
-            const teamNameEl = await cells[0].findElement(By.css('.standings-table-team__name a'));
-            const teamName = await teamNameEl.getText();
-            
-            // Get W-L record and other stats
-            const wins = parseInt(await cells[1].getText(), 10);
-            const losses = parseInt(await cells[2].getText(), 10);
-            const pct = await cells[3].getText();
-            const gb = await cells[4].getText();
-            
-            let last10 = '';
-            let streak = '';
-            
-            // Some standings tables include L10 and Streak
-            if (cells.length > 7) {
-              last10 = await cells[6].getText();
-              streak = await cells[7].getText();
+            if (cells.length >= 5) {
+              // Get team name
+              const teamNameEl = $(cells[0]).find('.standings-table-team__name a');
+              let teamName = teamNameEl.text().trim();
+              
+              // Fallback if the specific selector doesn't work
+              if (!teamName) {
+                teamName = $(cells[0]).text().trim();
+              }
+              
+              if (!teamName) return; // Skip if no team name
+
+              // Get W-L record and other stats
+              const wins = parseInt($(cells[1]).text().trim(), 10);
+              const losses = parseInt($(cells[2]).text().trim(), 10);
+              const pct = $(cells[3]).text().trim();
+              const gb = $(cells[4]).text().trim();
+              
+              let last10 = '';
+              let streak = '';
+              
+              // Some standings tables include L10 and Streak
+              if (cells.length > 7) {
+                last10 = $(cells[6]).text().trim();
+                streak = $(cells[7]).text().trim();
+              }
+              
+              if (!isNaN(wins) && !isNaN(losses)) {
+                divisionTeams.push({
+                  team: teamName,
+                  wins,
+                  losses,
+                  pct,
+                  gb,
+                  ...(last10 ? { last10 } : {}),
+                  ...(streak ? { streak } : {})
+                });
+              }
             }
-            
-            divisionTeams.push({
-              team: teamName,
-              wins,
-              losses,
-              pct,
-              gb,
-              ...(last10 ? { last10 } : {}),
-              ...(streak ? { streak } : {})
-            });
           } catch (rowError) {
             console.error('Error processing team row:', rowError);
-            continue;
           }
-        }
+        });
         
         if (divisionTeams.length > 0) {
           allDivisionStandings.push({
@@ -180,29 +185,21 @@ export async function scrapeStandings(): Promise<DivisionStanding[]> {
         }
       } catch (tableError) {
         console.error('Error processing division table:', tableError);
-        continue;
       }
-    }
-    
+    });
+
     // If no valid data was scraped, return mock data
     if (allDivisionStandings.length === 0) {
       console.log("No valid standings data scraped, using mock data");
       return MOCK_STANDINGS;
     }
-    
+
+    console.log(`Successfully scraped ${allDivisionStandings.length} divisions`);
     return allDivisionStandings;
     
   } catch (error) {
     console.error('Error scraping standings:', error);
     console.log("Returning mock standings data due to error");
     return MOCK_STANDINGS;
-  } finally {
-    if (driver) {
-      try {
-        await driver.quit();
-      } catch (e) {
-        console.error('Error closing WebDriver:', e);
-      }
-    }
   }
 }

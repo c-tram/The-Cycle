@@ -1,43 +1,57 @@
 import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { getGames, Game, GamesData, getTeamRoster, Player } from '../services/api';
+import { getGames, Game, GamesData, getTrends } from '../services/api';
 import Loading from '../components/Loading';
 import ErrorMessage from '../components/Error';
+import WidgetCustomizer from '../components/WidgetCustomizer';
 import '../styles/Dashboard.css';
 
-// Fallback data in case API fails
-const FALLBACK_GAMES: GamesData = {
-  recent: [
-    { homeTeam: 'New York Yankees', homeTeamCode: 'nyy', homeScore: 5, awayTeam: 'Boston Red Sox', awayTeamCode: 'bos', awayScore: 3, date: '2023-09-14', status: 'completed' as const },
-    { homeTeam: 'Los Angeles Dodgers', homeTeamCode: 'lad', homeScore: 2, awayTeam: 'San Francisco Giants', awayTeamCode: 'sf', awayScore: 1, date: '2023-09-14', status: 'completed' as const },
-    { homeTeam: 'Chicago Cubs', homeTeamCode: 'chc', homeScore: 7, awayTeam: 'St. Louis Cardinals', awayTeamCode: 'stl', awayScore: 4, date: '2023-09-14', status: 'completed' as const },
-    { homeTeam: 'Houston Astros', homeTeamCode: 'hou', homeScore: 8, awayTeam: 'Texas Rangers', awayTeamCode: 'tex', awayScore: 2, date: '2023-09-14', status: 'completed' as const },
-  ],
-  upcoming: [
-    { homeTeam: 'New York Yankees', homeTeamCode: 'nyy', awayTeam: 'Boston Red Sox', awayTeamCode: 'bos', date: '2023-09-15', time: '7:05 PM', status: 'scheduled' as const },
-    { homeTeam: 'Los Angeles Dodgers', homeTeamCode: 'lad', awayTeam: 'San Francisco Giants', awayTeamCode: 'sf', date: '2023-09-15', time: '10:10 PM', status: 'scheduled' as const },
-    { homeTeam: 'Chicago Cubs', homeTeamCode: 'chc', awayTeam: 'St. Louis Cardinals', awayTeamCode: 'stl', date: '2023-09-15', time: '8:15 PM', status: 'scheduled' as const },
-    { homeTeam: 'Houston Astros', homeTeamCode: 'hou', awayTeam: 'Texas Rangers', awayTeamCode: 'tex', date: '2023-09-15', time: '8:05 PM', status: 'scheduled' as const },
-  ]
+// Mock player data for league leaders until roster API is fixed
+const MOCK_LEAGUE_LEADERS = {
+  AL: {
+    battingAvg: { name: 'Aaron Judge', team: 'NYY', value: '.321' },
+    homeRuns: { name: 'Aaron Judge', team: 'NYY', value: '32' },
+    rbi: { name: 'José Altuve', team: 'HOU', value: '78' },
+    era: { name: 'Gerrit Cole', team: 'NYY', value: '2.45' },
+    strikeouts: { name: 'Shane Bieber', team: 'CLE', value: '145' },
+    steals: { name: 'Cedric Mullins', team: 'BAL', value: '24' }
+  },
+  NL: {
+    battingAvg: { name: 'Shohei Ohtani', team: 'LAD', value: '.335' },
+    homeRuns: { name: 'Shohei Ohtani', team: 'LAD', value: '28' },
+    rbi: { name: 'Mookie Betts', team: 'LAD', value: '82' },
+    era: { name: 'Spencer Strider', team: 'ATL', value: '2.78' },
+    strikeouts: { name: 'Spencer Strider', team: 'ATL', value: '142' },
+    steals: { name: 'Ronald Acuña Jr.', team: 'ATL', value: '31' }
+  }
 };
 
-const FALLBACK_LEADERS = {
-  'Batting Average': { name: 'Player Name', value: '.342' },
-  'Home Runs': { name: 'Player Name', value: '37' },
-  'RBIs': { name: 'Player Name', value: '112' },
-  'ERA': { name: 'Player Name', value: '1.89' },
-};
+// Widget configuration for future customization
+interface WidgetConfig {
+  id: string;
+  title: string;
+  type: 'games' | 'leaders' | 'trends' | 'standings' | 'news';
+  size: 'small' | 'medium' | 'large';
+  position: number;
+  enabled: boolean;
+}
+
+const DEFAULT_WIDGETS: WidgetConfig[] = [
+  { id: 'recent-games', title: 'Recent Games', type: 'games', size: 'medium', position: 1, enabled: true },
+  { id: 'upcoming-games', title: 'Upcoming Games', type: 'games', size: 'medium', position: 2, enabled: true },
+  { id: 'league-leaders', title: 'League Leaders', type: 'leaders', size: 'medium', position: 3, enabled: true },
+  { id: 'trending-stats', title: 'League Trends', type: 'trends', size: 'large', position: 4, enabled: true },
+  { id: 'hot-teams', title: 'Hot Teams', type: 'standings', size: 'small', position: 5, enabled: true }
+];
 
 const Overview = () => {
-  const [games, setGames] = useState(FALLBACK_GAMES);
-  const [leaders, setLeaders] = useState({
-    battingAvg: FALLBACK_LEADERS['Batting Average'],
-    homeRuns: FALLBACK_LEADERS['Home Runs'],
-    rbi: FALLBACK_LEADERS['RBIs'],
-    era: FALLBACK_LEADERS['ERA']
-  });
+  const [games, setGames] = useState({ recent: [], upcoming: [] });
+  const [trends, setTrends] = useState({});
+  const [widgets, setWidgets] = useState(DEFAULT_WIDGETS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeLeague, setActiveLeague] = useState('AL');
+  const [showCustomizer, setShowCustomizer] = useState(false);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -46,136 +60,290 @@ const Overview = () => {
         setError('');
         
         // Fetch games data
-        const gamesData = await getGames();
-        if (gamesData && gamesData.recent && gamesData.upcoming) {
+        const [gamesData, battingTrends, eraTrends] = await Promise.all([
+          getGames(),
+          getTrends('Batting Average'),
+          getTrends('ERA')
+        ]);
+        
+        if (gamesData?.recent && gamesData?.upcoming) {
           setGames(gamesData);
-        } else {
-          // Fall back to mock data if API returns empty
-          console.warn('API returned empty games data, using fallback');
-          setGames(FALLBACK_GAMES);
         }
         
-        // Fetch player stats for leaders
-        try {
-          // Get all players from the API (no team filter)
-          const playerData = await getTeamRoster('');
-          if (playerData && playerData.length > 0) {
-            // Extract all players from all teams
-            const allPlayers: Player[] = playerData.reduce((acc: Player[], team) => 
-              [...acc, ...team.players], []);
-            
-            // Find leaders
-            if (allPlayers.length > 0) {
-              // Find batting average leader
-              const battingLeader = allPlayers
-                .filter(p => p.avg && !isNaN(parseFloat(p.avg.replace('.', ''))))
-                .sort((a, b) => parseFloat((b.avg || '0').replace('.', '')) - 
-                               parseFloat((a.avg || '0').replace('.', '')))[0];
-              
-              // Find home run leader
-              const hrLeader = allPlayers
-                .filter(p => p.hr && !isNaN(parseInt(p.hr)))
-                .sort((a, b) => parseInt(b.hr || '0') - parseInt(a.hr || '0'))[0];
-              
-              // Find RBI leader
-              const rbiLeader = allPlayers
-                .filter(p => p.rbi && !isNaN(parseInt(p.rbi)))
-                .sort((a, b) => parseInt(b.rbi || '0') - parseInt(a.rbi || '0'))[0];
-              
-              // Find ERA leader (lower is better)
-              const eraLeader = allPlayers
-                .filter(p => p.era && !isNaN(parseFloat(p.era)) && p.position === 'P')
-                .sort((a, b) => parseFloat(a.era || '99.99') - parseFloat(b.era || '99.99'))[0];
-              
-              setLeaders({
-                battingAvg: battingLeader ? { name: battingLeader.name, value: battingLeader.avg || '---' } : 
-                  FALLBACK_LEADERS['Batting Average'],
-                homeRuns: hrLeader ? { name: hrLeader.name, value: hrLeader.hr || '---' } :
-                  FALLBACK_LEADERS['Home Runs'],
-                rbi: rbiLeader ? { name: rbiLeader.name, value: rbiLeader.rbi || '---' } :
-                  FALLBACK_LEADERS['RBIs'],
-                era: eraLeader ? { name: eraLeader.name, value: eraLeader.era || '---' } :
-                  FALLBACK_LEADERS['ERA']
-              });
-            }
-          }
-        } catch (playerErr) {
-          console.error('Error fetching player leaders:', playerErr);
-          // Keep using fallback leaders
-        }
+        setTrends({
+          battingAverage: battingTrends?.['Batting Average'] || [],
+          era: eraTrends?.['ERA'] || []
+        });
         
         setLoading(false);
       } catch (err) {
         console.error('Error fetching overview data:', err);
-        setError('Failed to load overview data. Using fallback data.');
-        setGames(FALLBACK_GAMES);
+        setError('Failed to load some data. Some widgets may show cached information.');
         setLoading(false);
       }
     };
     
     fetchData();
   }, []);
-  
-  // Format the game score for display
-  const formatGameResult = (game: Game) => {
-    return `${game.awayTeamCode} ${game.awayScore} - ${game.homeTeamCode} ${game.homeScore}`;
+
+  const renderGameWidget = (widgetId: string, title: string) => {
+    const isRecent = widgetId.includes('recent');
+    const gamesList = isRecent ? games.recent : games.upcoming;
+    
+    return (
+      <div className="widget-card medium">
+        <div className="widget-header">
+          <h3>{title}</h3>
+          <span className="widget-count">{gamesList.length}</span>
+        </div>
+        <div className="widget-content">
+          {gamesList.length > 0 ? (
+            gamesList.slice(0, 4).map((game: Game, i: number) => (
+              <div key={`${widgetId}-${i}`} className="game-item">
+                <div className="game-teams">
+                  <span className="away-team">{game.awayTeamCode.toUpperCase()}</span>
+                  <span className="vs">@</span>
+                  <span className="home-team">{game.homeTeamCode.toUpperCase()}</span>
+                </div>
+                <div className="game-details">
+                  {isRecent ? (
+                    <span className="score">{game.awayScore}-{game.homeScore}</span>
+                  ) : (
+                    <span className="time">{game.time || 'TBD'}</span>
+                  )}
+                  <span className={`status ${game.status}`}>{game.status}</span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="no-data">No games available</div>
+          )}
+        </div>
+      </div>
+    );
   };
-  
-  // Format the upcoming game for display
-  const formatUpcomingGame = (game: Game) => {
-    return `${game.awayTeamCode} @ ${game.homeTeamCode} - ${game.time || 'TBD'}`;
+
+  const renderLeadersWidget = (league: 'AL' | 'NL') => {
+    const leaders = MOCK_LEAGUE_LEADERS[league];
+    const isActiveLeague = league === activeLeague;
+    
+    return (
+      <div className="widget-card medium">
+        <div className="widget-header">
+          <h3>League Leaders</h3>
+          <div className="league-toggle">
+            <button 
+              className={activeLeague === 'AL' ? 'active' : ''}
+              onClick={() => setActiveLeague('AL')}
+            >
+              AL
+            </button>
+            <button 
+              className={activeLeague === 'NL' ? 'active' : ''}
+              onClick={() => setActiveLeague('NL')}
+            >
+              NL
+            </button>
+          </div>
+        </div>
+        {isActiveLeague && (
+          <div className="widget-content">
+            <div className="leader-stat">
+              <span className="stat-label">AVG</span>
+              <span className="stat-value">{leaders.battingAvg.value}</span>
+              <div className="player-info">
+                <span className="player-name">{leaders.battingAvg.name}</span>
+                <span className="team-code">{leaders.battingAvg.team}</span>
+              </div>
+            </div>
+            <div className="leader-stat">
+              <span className="stat-label">HR</span>
+              <span className="stat-value">{leaders.homeRuns.value}</span>
+              <div className="player-info">
+                <span className="player-name">{leaders.homeRuns.name}</span>
+                <span className="team-code">{leaders.homeRuns.team}</span>
+              </div>
+            </div>
+            <div className="leader-stat">
+              <span className="stat-label">RBI</span>
+              <span className="stat-value">{leaders.rbi.value}</span>
+              <div className="player-info">
+                <span className="player-name">{leaders.rbi.name}</span>
+                <span className="team-code">{leaders.rbi.team}</span>
+              </div>
+            </div>
+            <div className="leader-stat">
+              <span className="stat-label">ERA</span>
+              <span className="stat-value">{leaders.era.value}</span>
+              <div className="player-info">
+                <span className="player-name">{leaders.era.name}</span>
+                <span className="team-code">{leaders.era.team}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
-  
+
+  const renderTrendsWidget = () => {
+    return (
+      <div className="widget-card large">
+        <div className="widget-header">
+          <h3>League Trends</h3>
+          <span className="trend-period">Last 7 days</span>
+        </div>
+        <div className="widget-content">
+          <div className="trends-grid">
+            <div className="trend-item">
+              <h4>League Batting Average</h4>
+              <div className="trend-value">.264</div>
+              <div className="trend-change positive">↑ 0.003</div>
+              <div className="mini-chart">
+                {trends.battingAverage?.slice(-7).map((value: number, i: number) => (
+                  <div key={i} className="chart-bar" style={{height: `${value * 300}%`}}></div>
+                )) || Array(7).fill(0).map((_, i) => (
+                  <div key={i} className="chart-bar" style={{height: '20%'}}></div>
+                ))}
+              </div>
+            </div>
+            <div className="trend-item">
+              <h4>League ERA</h4>
+              <div className="trend-value">4.12</div>
+              <div className="trend-change negative">↓ 0.08</div>
+              <div className="mini-chart">
+                {trends.era?.slice(-7).map((value: number, i: number) => (
+                  <div key={i} className="chart-bar" style={{height: `${(6-value) * 20}%`}}></div>
+                )) || Array(7).fill(0).map((_, i) => (
+                  <div key={i} className="chart-bar" style={{height: '20%'}}></div>
+                ))}
+              </div>
+            </div>
+            <div className="trend-item">
+              <h4>Home Runs/Game</h4>
+              <div className="trend-value">2.31</div>
+              <div className="trend-change positive">↑ 0.12</div>
+            </div>
+            <div className="trend-item">
+              <h4>Strikeouts/Game</h4>
+              <div className="trend-value">8.94</div>
+              <div className="trend-change negative">↓ 0.24</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderHotTeamsWidget = () => {
+    // Mock hot teams data until standings API is implemented
+    const hotTeams = [
+      { name: 'LAD', record: '84-54', streak: 'W7', trend: '+12' },
+      { name: 'BAL', record: '82-56', streak: 'W5', trend: '+9' },
+      { name: 'HOU', record: '81-57', streak: 'W3', trend: '+7' },
+      { name: 'ATL', record: '80-58', streak: 'W4', trend: '+6' },
+      { name: 'NYY', record: '79-59', streak: 'L2', trend: '+5' }
+    ];
+
+    return (
+      <div className="widget-card small">
+        <div className="widget-header">
+          <h3>Hot Teams</h3>
+          <span className="trend-period">Last 10 games</span>
+        </div>
+        <div className="widget-content">
+          {hotTeams.map((team, i) => (
+            <div key={team.name} className="hot-team-item">
+              <div className="team-rank">#{i + 1}</div>
+              <div className="team-details">
+                <span className="team-name">{team.name}</span>
+                <span className="team-record">{team.record}</span>
+              </div>
+              <div className="team-stats">
+                <span className={`streak ${team.streak.startsWith('W') ? 'win' : 'loss'}`}>
+                  {team.streak}
+                </span>
+                <span className="trend-indicator">{team.trend}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const enabledWidgets = widgets.filter((w: WidgetConfig) => w.enabled).sort((a: WidgetConfig, b: WidgetConfig) => a.position - b.position);
+
+  const handleWidgetSave = (newWidgets: WidgetConfig[]) => {
+    setWidgets(newWidgets);
+    // Save to localStorage for persistence
+    localStorage.setItem('dashboardWidgets', JSON.stringify(newWidgets));
+  };
+
+  // Load saved widget configuration on mount
+  useEffect(() => {
+    const savedWidgets = localStorage.getItem('dashboardWidgets');
+    if (savedWidgets) {
+      try {
+        const parsedWidgets = JSON.parse(savedWidgets);
+        setWidgets(parsedWidgets);
+      } catch (err) {
+        console.error('Failed to parse saved widgets:', err);
+      }
+    }
+  }, []);
+
   return (
     <div className="page-content">
       <Helmet>
         <title>MLB Statcast | Overview</title>
       </Helmet>
-      <h1>Overview</h1>
       
-      {loading && <Loading message="Loading overview data..." />}
+      <div className="page-header">
+        <h1>Overview</h1>
+        <div className="header-actions">
+          <button 
+            className="customize-btn" 
+            title="Customize Dashboard"
+            onClick={() => setShowCustomizer(true)}
+          >
+            ⚙️ Customize
+          </button>
+          <span className="last-updated">
+            Updated: {new Date().toLocaleTimeString()}
+          </span>
+        </div>
+      </div>
+      
+      {loading && <Loading message="Loading dashboard..." />}
       {error && <ErrorMessage message={error} onRetry={() => setError('')} />}
       
       {!loading && (
-        <div className="dashboard-grid">
-          <div className="dashboard-card animate-fade-in" style={{animationDelay: '0.1s'}}>
-            <h3>League Leaders</h3>
-            <div className="card-content">
-              <p>Batting Average: {leaders.battingAvg.value} - {leaders.battingAvg.name}</p>
-              <p>Home Runs: {leaders.homeRuns.value} - {leaders.homeRuns.name}</p>
-              <p>RBIs: {leaders.rbi.value} - {leaders.rbi.name}</p>
-              <p>ERA: {leaders.era.value} - {leaders.era.name}</p>
-            </div>
-          </div>
-          
-          <div className="dashboard-card animate-fade-in" style={{animationDelay: '0.2s'}}>
-            <h3>Recent Games</h3>
-            <div className="card-content">
-              {games.recent.map((game: Game, i: number) => (
-                <p key={`recent-${i}`}>{formatGameResult(game)}</p>
-              ))}
-            </div>
-          </div>
-          
-          <div className="dashboard-card animate-fade-in" style={{animationDelay: '0.3s'}}>
-            <h3>Upcoming Games</h3>
-            <div className="card-content">
-              {games.upcoming.map((game: Game, i: number) => (
-                <p key={`upcoming-${i}`}>{formatUpcomingGame(game)}</p>
-              ))}
-            </div>
-          </div>
-          
-          <div className="dashboard-card animate-fade-in" style={{animationDelay: '0.4s'}}>
-            <h3>Trending Stats</h3>
-            <div className="card-content">
-              <p>Average Exit Velocity: 92.3 mph</p>
-              <p>Average Launch Angle: 12.5°</p>
-              <p>Average Fastball Velocity: 94.7 mph</p>
-              <p className="trend-note">Last updated: {new Date().toLocaleDateString()}</p>
-            </div>
-          </div>
+        <div className="dashboard-container">              {enabledWidgets.map((widget: WidgetConfig, index: number) => {
+                const animationDelay = (index * 0.1).toFixed(1);
+                
+                return (
+                  <div 
+                    key={widget.id} 
+                    className="widget-wrapper animate-fade-in"
+                    style={{animationDelay: `${animationDelay}s`}}
+                  >
+                    {widget.type === 'games' && renderGameWidget(widget.id, widget.title)}
+                    {widget.type === 'leaders' && renderLeadersWidget(activeLeague)}
+                    {widget.type === 'trends' && renderTrendsWidget()}
+                    {widget.type === 'standings' && renderHotTeamsWidget()}
+                  </div>
+                );
+              })}
         </div>
+      )}
+      
+      {showCustomizer && (
+        <WidgetCustomizer
+          widgets={widgets}
+          onSave={handleWidgetSave}
+          onClose={() => setShowCustomizer(false)}
+        />
       )}
     </div>
   );

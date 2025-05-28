@@ -19,6 +19,22 @@ const STAT_CATEGORIES = [
 ] as const;
 type StatCategory = typeof STAT_CATEGORIES[number];
 
+const TIME_PERIODS = ['7 days', '30 days', 'Season'] as const;
+type TimePeriod = typeof TIME_PERIODS[number];
+
+// Team list for comparison
+const MLB_TEAMS = [
+  'All Teams',
+  'Arizona Diamondbacks', 'Atlanta Braves', 'Baltimore Orioles', 'Boston Red Sox',
+  'Chicago Cubs', 'Chicago White Sox', 'Cincinnati Reds', 'Cleveland Guardians',
+  'Colorado Rockies', 'Detroit Tigers', 'Houston Astros', 'Kansas City Royals',
+  'Los Angeles Angels', 'Los Angeles Dodgers', 'Miami Marlins', 'Milwaukee Brewers',
+  'Minnesota Twins', 'New York Mets', 'New York Yankees', 'Oakland Athletics',
+  'Philadelphia Phillies', 'Pittsburgh Pirates', 'San Diego Padres', 'San Francisco Giants',
+  'Seattle Mariners', 'St. Louis Cardinals', 'Tampa Bay Rays', 'Texas Rangers',
+  'Toronto Blue Jays', 'Washington Nationals'
+] as const;
+
 // Fallback data in case API fails
 const FALLBACK_TREND_DATA: Record<StatCategory, number[]> = {
   'Batting Average': [.267, .265, .264, .268, .271, .270, .266],
@@ -37,9 +53,12 @@ const MONTHS = ['April', 'May', 'June', 'July', 'August', 'September', 'October'
 
 const Trends = () => {
   const [selectedStat, setSelectedStat] = useState('Batting Average' as StatCategory);
+  const [selectedTeam, setSelectedTeam] = useState('All Teams');
+  const [selectedPeriod, setSelectedPeriod] = useState('7 days');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [trendData, setTrendData] = useState(FALLBACK_TREND_DATA);
+  const [comparisonMode, setComparisonMode] = useState(false);
   
   useEffect(() => {
     // Load trend data from API when the selected stat changes
@@ -132,19 +151,58 @@ const Trends = () => {
       
       {!loading && !error && (
         <div className="trends-container animate-fade-in">
-          <div className="trend-selector">
-            <h3>Select Statistic:</h3>
-            <div className="stat-buttons">
-              {STAT_CATEGORIES.map((stat) => (
-                <button 
-                  key={stat} 
-                  className={selectedStat === stat ? 'active' : ''}
-                  onClick={() => setSelectedStat(stat)}
-                  style={{animationDelay: `${STAT_CATEGORIES.indexOf(stat) * 0.05}s`}}
+          <div className="trend-controls">
+            <div className="trend-selector">
+              <h3>Select Statistic:</h3>
+              <div className="stat-buttons">
+                {STAT_CATEGORIES.map((stat) => (
+                  <button 
+                    key={stat} 
+                    className={selectedStat === stat ? 'active' : ''}
+                    onClick={() => setSelectedStat(stat)}
+                    style={{animationDelay: `${STAT_CATEGORIES.indexOf(stat) * 0.05}s`}}
+                  >
+                    {stat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="team-selector">
+              <h3>Compare Teams:</h3>
+              <div className="selector-controls">
+                <select 
+                  value={selectedTeam} 
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="team-dropdown"
                 >
-                  {stat}
+                  {MLB_TEAMS.map((team) => (
+                    <option key={team} value={team}>{team}</option>
+                  ))}
+                </select>
+                <button 
+                  className={`comparison-toggle ${comparisonMode ? 'active' : ''}`}
+                  onClick={() => setComparisonMode(!comparisonMode)}
+                  title="Toggle comparison mode"
+                >
+                  {comparisonMode ? '📊 Compare' : '📈 Single'}
                 </button>
-              ))}
+              </div>
+            </div>
+
+            <div className="period-selector">
+              <h3>Time Period:</h3>
+              <div className="period-buttons">
+                {TIME_PERIODS.map((period) => (
+                  <button 
+                    key={period} 
+                    className={selectedPeriod === period ? 'active' : ''}
+                    onClick={() => setSelectedPeriod(period)}
+                  >
+                    {period}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         
@@ -153,16 +211,28 @@ const Trends = () => {
           
           <div className="trend-analysis">
             <h3>Analysis: {selectedStat}</h3>
-            <p>
-              This visualization shows the league-wide trends for {selectedStat} throughout 
-              the 2023 MLB season. The data represents monthly averages across all teams.
-            </p>
-            <p>
-              {selectedStat === 'Batting Average' && 'Batting averages peaked in August at .271, likely due to warmer weather conditions.'}
-              {selectedStat === 'Home Runs' && 'Home run rates were highest in July, averaging 1.31 per game.'}
-              {selectedStat === 'ERA' && 'Pitcher ERA was lowest in June and July, before rising during the later months of the season.'}
-              {selectedStat === 'Exit Velocity' && 'Exit velocity peaked in July at 89.4 mph, correlating with the increase in home runs.'}
-            </p>
+            <div className="analysis-content">
+              <p>
+                {selectedTeam === 'All Teams' 
+                  ? `League-wide trends for ${selectedStat} over the last ${selectedPeriod.toLowerCase()}.`
+                  : `${selectedTeam} trends for ${selectedStat} compared to league average.`
+                }
+              </p>
+              {comparisonMode && (
+                <div className="comparison-insights">
+                  <h4>Team vs League Comparison</h4>
+                  <p>Compare how {selectedTeam} performs relative to the league average in {selectedStat}.</p>
+                </div>
+              )}
+              <div className="trend-insights">
+                <p>
+                  {selectedStat === 'Batting Average' && 'Batting averages tend to improve during warmer months, peaking in mid-summer.'}
+                  {selectedStat === 'Home Runs' && 'Home run rates typically increase with temperature and decrease as seasons progress.'}
+                  {selectedStat === 'ERA' && 'Pitcher performance often improves as the season progresses and conditions stabilize.'}
+                  {selectedStat === 'Exit Velocity' && 'Exit velocity correlates with offensive performance and weather conditions.'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>

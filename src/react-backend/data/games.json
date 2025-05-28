@@ -1,0 +1,63 @@
+{
+  "recent": [
+    {
+      "homeTeam": "New York Yankees",
+      "homeTeamCode": "nyy",
+      "homeScore": 5,
+      "awayTeam": "Boston Red Sox",
+      "awayTeamCode": "bos",
+      "awayScore": 3,
+      "date": "2025-05-28",
+      "status": "completed"
+    },
+    {
+      "homeTeam": "Los Angeles Dodgers",
+      "homeTeamCode": "lad",
+      "homeScore": 2,
+      "awayTeam": "San Francisco Giants",
+      "awayTeamCode": "sf",
+      "awayScore": 1,
+      "date": "2025-05-28",
+      "status": "completed"
+    },
+    {
+      "homeTeam": "Chicago Cubs",
+      "homeTeamCode": "chc",
+      "homeScore": 7,
+      "awayTeam": "St. Louis Cardinals",
+      "awayTeamCode": "stl",
+      "awayScore": 4,
+      "date": "2025-05-28",
+      "status": "completed"
+    }
+  ],
+  "upcoming": [
+    {
+      "homeTeam": "New York Yankees",
+      "homeTeamCode": "nyy",
+      "awayTeam": "Boston Red Sox",
+      "awayTeamCode": "bos",
+      "date": "2025-05-28",
+      "time": "7:05 PM",
+      "status": "scheduled"
+    },
+    {
+      "homeTeam": "Los Angeles Dodgers",
+      "homeTeamCode": "lad",
+      "awayTeam": "San Francisco Giants",
+      "awayTeamCode": "sf",
+      "date": "2025-05-28",
+      "time": "10:10 PM",
+      "status": "scheduled"
+    },
+    {
+      "homeTeam": "Chicago Cubs",
+      "homeTeamCode": "chc",
+      "awayTeam": "St. Louis Cardinals",
+      "awayTeamCode": "stl",
+      "date": "2025-05-28",
+      "time": "8:15 PM",
+      "status": "scheduled"
+    }
+  ]
+}

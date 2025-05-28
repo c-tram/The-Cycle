@@ -1,0 +1,57 @@
+[
+  {
+    "teamName": "Yankees",
+    "teamCode": "nyy",
+    "players": [
+      {
+        "name": "Aaron Judge",
+        "team": "Yankees",
+        "position": "RF",
+        "avg": ".310",
+        "hr": "32",
+        "rbi": "74",
+        "runs": "65",
+        "sb": "8",
+        "statDate": "2025-05-28"
+      },
+      {
+        "name": "Gerrit Cole",
+        "team": "Yankees",
+        "position": "P",
+        "era": "2.78",
+        "wins": "8",
+        "so": "112",
+        "whip": "1.02",
+        "statDate": "2025-05-28"
+      }
+    ]
+  },
+  {
+    "teamName": "Dodgers",
+    "teamCode": "lad",
+    "players": [
+      {
+        "name": "Shohei Ohtani",
+        "team": "Dodgers",
+        "position": "DH",
+        "avg": ".321",
+        "hr": "28",
+        "rbi": "68",
+        "runs": "71",
+        "sb": "12",
+        "statDate": "2025-05-28"
+      },
+      {
+        "name": "Mookie Betts",
+        "team": "Dodgers",
+        "position": "RF",
+        "avg": ".302",
+        "hr": "18",
+        "rbi": "56",
+        "runs": "61",
+        "sb": "7",
+        "statDate": "2025-05-28"
+      }
+    ]
+  }
+]

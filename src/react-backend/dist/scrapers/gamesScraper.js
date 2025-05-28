@@ -1,11 +1,44 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scrapeGames = scrapeGames;
-const selenium_webdriver_1 = require("selenium-webdriver");
-const chrome_1 = __importDefault(require("selenium-webdriver/chrome"));
+const node_fetch_1 = __importDefault(require("node-fetch"));
+const cheerio = __importStar(require("cheerio"));
 // Add mock data for when scraping fails
 const MOCK_GAMES = {
     recent: [
@@ -20,27 +53,19 @@ const MOCK_GAMES = {
     ]
 };
 /**
- * Scrapes recent and upcoming MLB games using Selenium
+ * Scrapes recent and upcoming MLB games using HTTP requests and cheerio
  * @returns Promise containing game data
  */
 async function scrapeGames() {
-    let driver = null;
     try {
-        console.log("Starting game scraper...");
-        // Fix Chrome options
-        const options = new chrome_1.default.Options();
-        options.addArguments('--headless', '--no-sandbox', '--disable-dev-shm-usage');
-        driver = await new selenium_webdriver_1.Builder()
-            .forBrowser('chrome')
-            .setChromeOptions(options)
-            .build();
+        console.log("Starting HTTP-based game scraper...");
         console.log("Scraping recent games...");
         // Scrape completed games
-        const recentGames = await scrapeRecentGames(driver);
+        const recentGames = await scrapeRecentGames();
         console.log(`Found ${recentGames.length} recent games`);
         console.log("Scraping upcoming games...");
         // Scrape upcoming games
-        const upcomingGames = await scrapeUpcomingGames(driver);
+        const upcomingGames = await scrapeUpcomingGames();
         console.log(`Found ${upcomingGames.length} upcoming games`);
         // Return mock data if no real data was found
         if (recentGames.length === 0 && upcomingGames.length === 0) {
@@ -58,68 +83,62 @@ async function scrapeGames() {
         console.log("Returning mock game data due to error");
         return MOCK_GAMES;
     }
-    finally {
-        if (driver) {
-            try {
-                await driver.quit();
-            }
-            catch (e) {
-                console.error('Error closing WebDriver:', e);
-            }
-        }
-    }
 }
 /**
- * Scrapes completed games from MLB scoreboard
+ * Scrapes completed games from MLB scoreboard using HTTP
  */
-async function scrapeRecentGames(driver) {
+async function scrapeRecentGames() {
     try {
         // Navigate to MLB scoreboard page
-        await driver.get('https://www.mlb.com/scores/');
-        // Wait for games to load
-        await driver.wait(selenium_webdriver_1.until.elementsLocated(selenium_webdriver_1.By.css('.EventCard')), 15000);
-        const gameCards = await driver.findElements(selenium_webdriver_1.By.css('.EventCard'));
+        const response = await (0, node_fetch_1.default)('https://www.mlb.com/scores/', {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const html = await response.text();
+        const $ = cheerio.load(html);
         const games = [];
-        for (const card of gameCards) {
+        // Look for game cards
+        const gameCards = $('.EventCard, .schedule-item, .p-schedule__game');
+        gameCards.each((i, card) => {
             try {
                 // Get status
                 let status = 'scheduled';
                 let statusText = '';
-                try {
-                    const statusElem = await card.findElement(selenium_webdriver_1.By.css('.EventCard-statusText'));
-                    statusText = await statusElem.getText();
-                    if (statusText.toLowerCase().includes('final'))
-                        status = 'completed';
-                    else if (statusText.match(/top|bottom|\d+(st|nd|rd|th)/i))
-                        status = 'live';
-                }
-                catch { }
+                const statusElem = $(card).find('.EventCard-statusText, .schedule-status, .p-schedule__status');
+                statusText = statusElem.text().trim().toLowerCase();
+                if (statusText.includes('final'))
+                    status = 'completed';
+                else if (statusText.match(/top|bottom|\d+(st|nd|rd|th)/i))
+                    status = 'live';
                 // Only completed games
                 if (status !== 'completed')
-                    continue;
+                    return;
                 // Get team names
-                const teamElems = await card.findElements(selenium_webdriver_1.By.css('.EventCard-matchupTeamName'));
+                const teamElems = $(card).find('.EventCard-matchupTeamName, .schedule-team__name, .p-schedule__team-name');
                 if (teamElems.length !== 2)
-                    continue;
-                const awayTeam = await teamElems[0].getText();
-                const homeTeam = await teamElems[1].getText();
+                    return;
+                const awayTeam = $(teamElems[0]).text().trim();
+                const homeTeam = $(teamElems[1]).text().trim();
+                if (!awayTeam || !homeTeam)
+                    return;
                 // Get scores
                 let awayScore, homeScore;
-                try {
-                    const scoreElems = await card.findElements(selenium_webdriver_1.By.css('.EventCard-score'));
-                    if (scoreElems.length === 2) {
-                        awayScore = parseInt(await scoreElems[0].getText(), 10);
-                        homeScore = parseInt(await scoreElems[1].getText(), 10);
-                    }
+                const scoreElems = $(card).find('.EventCard-score, .schedule-score, .p-schedule__score');
+                if (scoreElems.length === 2) {
+                    awayScore = parseInt($(scoreElems[0]).text().trim(), 10);
+                    homeScore = parseInt($(scoreElems[1]).text().trim(), 10);
                 }
-                catch { }
                 // Get date (from status or fallback to yesterday)
                 let date = new Date();
                 if (statusText.match(/yesterday/i)) {
                     date.setDate(date.getDate() - 1);
                 }
                 const dateStr = date.toISOString().split('T')[0];
-                if (awayScore !== undefined && homeScore !== undefined) {
+                if (awayScore !== undefined && homeScore !== undefined && !isNaN(awayScore) && !isNaN(homeScore)) {
                     games.push({
                         awayTeam,
                         homeTeam,
@@ -132,12 +151,12 @@ async function scrapeRecentGames(driver) {
                     });
                 }
                 if (games.length >= 5)
-                    break;
+                    return false; // Break out of each loop
             }
             catch (e) {
                 console.error('Error processing game card', e);
             }
-        }
+        });
         return games;
     }
     catch (error) {
@@ -146,52 +165,50 @@ async function scrapeRecentGames(driver) {
     }
 }
 /**
- * Scrapes upcoming games from MLB schedule
+ * Scrapes upcoming games from MLB schedule using HTTP
  */
-async function scrapeUpcomingGames(driver) {
+async function scrapeUpcomingGames() {
     try {
         // Navigate to MLB schedule page for today/tomorrow
-        await driver.get('https://www.mlb.com/schedule/');
-        // Wait for schedule to load
-        await driver.wait(selenium_webdriver_1.until.elementsLocated(selenium_webdriver_1.By.css('.p-schedule__date, .schedule-item, .p-schedule__game')), 15000);
-        // Try multiple selectors for robustness
-        let gameEntries = await driver.findElements(selenium_webdriver_1.By.css('.schedule-item'));
-        if (gameEntries.length === 0) {
-            gameEntries = await driver.findElements(selenium_webdriver_1.By.css('.p-schedule__game'));
+        const response = await (0, node_fetch_1.default)('https://www.mlb.com/schedule/', {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        const html = await response.text();
+        const $ = cheerio.load(html);
         const games = [];
         const today = new Date();
         const todayStr = today.toISOString().split('T')[0];
-        for (const entry of gameEntries) {
+        // Try multiple selectors for robustness
+        const gameEntries = $('.schedule-item, .p-schedule__game, .EventCard');
+        gameEntries.each((i, entry) => {
             try {
                 // Get team names
                 let awayTeam = '', homeTeam = '';
-                try {
-                    const teamElems = await entry.findElements(selenium_webdriver_1.By.css('.schedule-team__name'));
-                    if (teamElems.length === 2) {
-                        awayTeam = await teamElems[0].getText();
-                        homeTeam = await teamElems[1].getText();
-                    }
-                    else {
-                        // Fallback for alternate markup
-                        const teams = await entry.getText();
-                        const parts = teams.split(' at ');
-                        if (parts.length === 2) {
-                            awayTeam = parts[0].trim();
-                            homeTeam = parts[1].trim();
-                        }
+                const teamElems = $(entry).find('.schedule-team__name, .p-schedule__team-name, .EventCard-matchupTeamName');
+                if (teamElems.length === 2) {
+                    awayTeam = $(teamElems[0]).text().trim();
+                    homeTeam = $(teamElems[1]).text().trim();
+                }
+                else {
+                    // Fallback for alternate markup
+                    const teams = $(entry).text();
+                    const parts = teams.split(' at ');
+                    if (parts.length === 2) {
+                        awayTeam = parts[0].trim();
+                        homeTeam = parts[1].trim();
                     }
                 }
-                catch { }
                 if (!awayTeam || !homeTeam)
-                    continue;
+                    return;
                 // Get game time
                 let time = '';
-                try {
-                    const timeElem = await entry.findElement(selenium_webdriver_1.By.css('.schedule-time, .p-schedule__time'));
-                    time = await timeElem.getText();
-                }
-                catch { }
+                const timeElem = $(entry).find('.schedule-time, .p-schedule__time, .EventCard-statusText');
+                time = timeElem.text().trim();
                 games.push({
                     awayTeam,
                     homeTeam,
@@ -202,12 +219,12 @@ async function scrapeUpcomingGames(driver) {
                     status: 'scheduled'
                 });
                 if (games.length >= 5)
-                    break;
+                    return false; // Break out of each loop
             }
             catch (e) {
                 console.error('Error processing game entry', e);
             }
-        }
+        });
         return games;
     }
     catch (error) {
@@ -219,21 +236,37 @@ async function scrapeUpcomingGames(driver) {
  * Helper function to convert team name to team code
  */
 function getTeamCodeFromName(teamName) {
-    const teamMapping = {
-        'Yankees': 'nyy', 'Red Sox': 'bos', 'Blue Jays': 'tor', 'Orioles': 'bal', 'Rays': 'tb',
-        'Guardians': 'cle', 'Twins': 'min', 'Royals': 'kc', 'Tigers': 'det', 'White Sox': 'cws',
-        'Astros': 'hou', 'Mariners': 'sea', 'Rangers': 'tex', 'Angels': 'laa', 'Athletics': 'oak',
-        'Braves': 'atl', 'Phillies': 'phi', 'Mets': 'nym', 'Marlins': 'mia', 'Nationals': 'wsh',
-        'Brewers': 'mil', 'Cubs': 'chc', 'Cardinals': 'stl', 'Reds': 'cin', 'Pirates': 'pit',
-        'Dodgers': 'lad', 'Padres': 'sd', 'Giants': 'sf', 'Diamondbacks': 'ari', 'Rockies': 'col'
+    const teamCodes = {
+        'New York Yankees': 'nyy',
+        'Boston Red Sox': 'bos',
+        'Tampa Bay Rays': 'tb',
+        'Toronto Blue Jays': 'tor',
+        'Baltimore Orioles': 'bal',
+        'Houston Astros': 'hou',
+        'Seattle Mariners': 'sea',
+        'Los Angeles Angels': 'laa',
+        'Oakland Athletics': 'oak',
+        'Texas Rangers': 'tex',
+        'Cleveland Guardians': 'cle',
+        'Minnesota Twins': 'min',
+        'Chicago White Sox': 'cws',
+        'Detroit Tigers': 'det',
+        'Kansas City Royals': 'kc',
+        'Los Angeles Dodgers': 'lad',
+        'San Diego Padres': 'sd',
+        'San Francisco Giants': 'sf',
+        'Colorado Rockies': 'col',
+        'Arizona Diamondbacks': 'ari',
+        'Atlanta Braves': 'atl',
+        'New York Mets': 'nym',
+        'Philadelphia Phillies': 'phi',
+        'Miami Marlins': 'mia',
+        'Washington Nationals': 'was',
+        'Milwaukee Brewers': 'mil',
+        'Chicago Cubs': 'chc',
+        'St. Louis Cardinals': 'stl',
+        'Pittsburgh Pirates': 'pit',
+        'Cincinnati Reds': 'cin'
     };
-    // Try to match by full or partial name
-    for (const [key, value] of Object.entries(teamMapping)) {
-        if (teamName.toLowerCase().includes(key.toLowerCase()))
-            return value;
-    }
-    // Try to match by abbreviation (3-letter code in uppercase)
-    if (teamName.length === 3)
-        return teamName.toLowerCase();
-    return '';
+    return teamCodes[teamName] || teamName.toLowerCase().replace(/\s+/g, '').substring(0, 3);
 }

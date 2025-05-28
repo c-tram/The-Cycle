@@ -4,6 +4,9 @@ FROM node:18
 # Set working directory
 WORKDIR /usr/src/app
 
+# Install curl for health checks (optional)
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Copy root package files and install root dependencies (if any)
 COPY package*.json ./
 RUN npm install || true
@@ -27,6 +30,10 @@ RUN cd react-backend && npm run build
 
 # Expose port
 EXPOSE 3000
+
+# Add health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:3000/api/standings || exit 1
 
 # Start the backend (which will serve frontend static files)
 CMD ["node", "react-backend/dist/index.js"]

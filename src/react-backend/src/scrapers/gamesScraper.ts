@@ -1,5 +1,5 @@
-import { Builder, By, until, WebDriver } from 'selenium-webdriver';
-import chrome from 'selenium-webdriver/chrome';
+import fetch from 'node-fetch';
+import * as cheerio from 'cheerio';
 
 // Add mock data for when scraping fails
 const MOCK_GAMES = {
@@ -28,30 +28,21 @@ interface Game {
 }
 
 /**
- * Scrapes recent and upcoming MLB games using Selenium
+ * Scrapes recent and upcoming MLB games using HTTP requests and cheerio
  * @returns Promise containing game data
  */
 export async function scrapeGames(): Promise<{ recent: Game[], upcoming: Game[] }> {
-  let driver: WebDriver | null = null;
   try {
-    console.log("Starting game scraper...");
-    // Fix Chrome options
-    const options = new chrome.Options();
-    options.addArguments('--headless', '--no-sandbox', '--disable-dev-shm-usage');
-    
-    driver = await new Builder()
-      .forBrowser('chrome')
-      .setChromeOptions(options)
-      .build();
+    console.log("Starting HTTP-based game scraper...");
     
     console.log("Scraping recent games...");
     // Scrape completed games
-    const recentGames = await scrapeRecentGames(driver);
+    const recentGames = await scrapeRecentGames();
     console.log(`Found ${recentGames.length} recent games`);
     
     console.log("Scraping upcoming games...");
     // Scrape upcoming games
-    const upcomingGames = await scrapeUpcomingGames(driver);
+    const upcomingGames = await scrapeUpcomingGames();
     console.log(`Found ${upcomingGames.length} upcoming games`);
     
     // Return mock data if no real data was found
@@ -69,62 +60,73 @@ export async function scrapeGames(): Promise<{ recent: Game[], upcoming: Game[] 
     // Fallback to mock data on error
     console.log("Returning mock game data due to error");
     return MOCK_GAMES;
-  } finally {
-    if (driver) {
-      try {
-        await driver.quit();
-      } catch (e) {
-        console.error('Error closing WebDriver:', e);
-      }
-    }
   }
 }
 
 /**
- * Scrapes completed games from MLB scoreboard
+ * Scrapes completed games from MLB scoreboard using HTTP
  */
-async function scrapeRecentGames(driver: WebDriver): Promise<Game[]> {
+async function scrapeRecentGames(): Promise<Game[]> {
   try {
     // Navigate to MLB scoreboard page
-    await driver.get('https://www.mlb.com/scores/');
-    // Wait for games to load
-    await driver.wait(until.elementsLocated(By.css('.EventCard')), 15000);
-    const gameCards = await driver.findElements(By.css('.EventCard'));
+    const response = await fetch('https://www.mlb.com/scores/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
     const games: Game[] = [];
-    for (const card of gameCards) {
+    
+    // Look for game cards
+    const gameCards = $('.EventCard, .schedule-item, .p-schedule__game');
+    
+    gameCards.each((i, card) => {
       try {
         // Get status
         let status: 'completed' | 'scheduled' | 'live' = 'scheduled';
         let statusText = '';
-        try {
-          const statusElem = await card.findElement(By.css('.EventCard-statusText'));
-          statusText = await statusElem.getText();
-          if (statusText.toLowerCase().includes('final')) status = 'completed';
-          else if (statusText.match(/top|bottom|\d+(st|nd|rd|th)/i)) status = 'live';
-        } catch {}
+        
+        const statusElem = $(card).find('.EventCard-statusText, .schedule-status, .p-schedule__status');
+        statusText = statusElem.text().trim().toLowerCase();
+        
+        if (statusText.includes('final')) status = 'completed';
+        else if (statusText.match(/top|bottom|\d+(st|nd|rd|th)/i)) status = 'live';
+        
         // Only completed games
-        if (status !== 'completed') continue;
+        if (status !== 'completed') return;
+        
         // Get team names
-        const teamElems = await card.findElements(By.css('.EventCard-matchupTeamName'));
-        if (teamElems.length !== 2) continue;
-        const awayTeam = await teamElems[0].getText();
-        const homeTeam = await teamElems[1].getText();
+        const teamElems = $(card).find('.EventCard-matchupTeamName, .schedule-team__name, .p-schedule__team-name');
+        if (teamElems.length !== 2) return;
+        
+        const awayTeam = $(teamElems[0]).text().trim();
+        const homeTeam = $(teamElems[1]).text().trim();
+        
+        if (!awayTeam || !homeTeam) return;
+        
         // Get scores
         let awayScore: number | undefined, homeScore: number | undefined;
-        try {
-          const scoreElems = await card.findElements(By.css('.EventCard-score'));
-          if (scoreElems.length === 2) {
-            awayScore = parseInt(await scoreElems[0].getText(), 10);
-            homeScore = parseInt(await scoreElems[1].getText(), 10);
-          }
-        } catch {}
+        const scoreElems = $(card).find('.EventCard-score, .schedule-score, .p-schedule__score');
+        if (scoreElems.length === 2) {
+          awayScore = parseInt($(scoreElems[0]).text().trim(), 10);
+          homeScore = parseInt($(scoreElems[1]).text().trim(), 10);
+        }
+        
         // Get date (from status or fallback to yesterday)
         let date = new Date();
         if (statusText.match(/yesterday/i)) {
           date.setDate(date.getDate() - 1);
         }
         const dateStr = date.toISOString().split('T')[0];
-        if (awayScore !== undefined && homeScore !== undefined) {
+        
+        if (awayScore !== undefined && homeScore !== undefined && !isNaN(awayScore) && !isNaN(homeScore)) {
           games.push({
             awayTeam,
             homeTeam,
@@ -136,11 +138,13 @@ async function scrapeRecentGames(driver: WebDriver): Promise<Game[]> {
             status
           });
         }
-        if (games.length >= 5) break;
+        
+        if (games.length >= 5) return false; // Break out of each loop
       } catch (e) {
         console.error('Error processing game card', e);
       }
-    }
+    });
+    
     return games;
   } catch (error) {
     console.error('Error scraping recent games:', error);
@@ -149,48 +153,57 @@ async function scrapeRecentGames(driver: WebDriver): Promise<Game[]> {
 }
 
 /**
- * Scrapes upcoming games from MLB schedule
+ * Scrapes upcoming games from MLB schedule using HTTP
  */
-async function scrapeUpcomingGames(driver: WebDriver): Promise<Game[]> {
+async function scrapeUpcomingGames(): Promise<Game[]> {
   try {
     // Navigate to MLB schedule page for today/tomorrow
-    await driver.get('https://www.mlb.com/schedule/');
-    // Wait for schedule to load
-    await driver.wait(until.elementsLocated(By.css('.p-schedule__date, .schedule-item, .p-schedule__game')), 15000);
-    // Try multiple selectors for robustness
-    let gameEntries = await driver.findElements(By.css('.schedule-item'));
-    if (gameEntries.length === 0) {
-      gameEntries = await driver.findElements(By.css('.p-schedule__game'));
+    const response = await fetch('https://www.mlb.com/schedule/', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
     const games: Game[] = [];
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
-    for (const entry of gameEntries) {
+    
+    // Try multiple selectors for robustness
+    const gameEntries = $('.schedule-item, .p-schedule__game, .EventCard');
+    
+    gameEntries.each((i, entry) => {
       try {
         // Get team names
         let awayTeam = '', homeTeam = '';
-        try {
-          const teamElems = await entry.findElements(By.css('.schedule-team__name'));
-          if (teamElems.length === 2) {
-            awayTeam = await teamElems[0].getText();
-            homeTeam = await teamElems[1].getText();
-          } else {
-            // Fallback for alternate markup
-            const teams = await entry.getText();
-            const parts = teams.split(' at ');
-            if (parts.length === 2) {
-              awayTeam = parts[0].trim();
-              homeTeam = parts[1].trim();
-            }
+        
+        const teamElems = $(entry).find('.schedule-team__name, .p-schedule__team-name, .EventCard-matchupTeamName');
+        if (teamElems.length === 2) {
+          awayTeam = $(teamElems[0]).text().trim();
+          homeTeam = $(teamElems[1]).text().trim();
+        } else {
+          // Fallback for alternate markup
+          const teams = $(entry).text();
+          const parts = teams.split(' at ');
+          if (parts.length === 2) {
+            awayTeam = parts[0].trim();
+            homeTeam = parts[1].trim();
           }
-        } catch {}
-        if (!awayTeam || !homeTeam) continue;
+        }
+        
+        if (!awayTeam || !homeTeam) return;
+        
         // Get game time
         let time = '';
-        try {
-          const timeElem = await entry.findElement(By.css('.schedule-time, .p-schedule__time'));
-          time = await timeElem.getText();
-        } catch {}
+        const timeElem = $(entry).find('.schedule-time, .p-schedule__time, .EventCard-statusText');
+        time = timeElem.text().trim();
+        
         games.push({
           awayTeam,
           homeTeam,
@@ -200,11 +213,13 @@ async function scrapeUpcomingGames(driver: WebDriver): Promise<Game[]> {
           time,
           status: 'scheduled'
         });
-        if (games.length >= 5) break;
+        
+        if (games.length >= 5) return false; // Break out of each loop
       } catch (e) {
         console.error('Error processing game entry', e);
       }
-    }
+    });
+    
     return games;
   } catch (error) {
     console.error('Error scraping upcoming games:', error);
@@ -216,19 +231,38 @@ async function scrapeUpcomingGames(driver: WebDriver): Promise<Game[]> {
  * Helper function to convert team name to team code
  */
 function getTeamCodeFromName(teamName: string): string {
-  const teamMapping: Record<string, string> = {
-    'Yankees': 'nyy', 'Red Sox': 'bos', 'Blue Jays': 'tor', 'Orioles': 'bal', 'Rays': 'tb',
-    'Guardians': 'cle', 'Twins': 'min', 'Royals': 'kc', 'Tigers': 'det', 'White Sox': 'cws',
-    'Astros': 'hou', 'Mariners': 'sea', 'Rangers': 'tex', 'Angels': 'laa', 'Athletics': 'oak',
-    'Braves': 'atl', 'Phillies': 'phi', 'Mets': 'nym', 'Marlins': 'mia', 'Nationals': 'wsh',
-    'Brewers': 'mil', 'Cubs': 'chc', 'Cardinals': 'stl', 'Reds': 'cin', 'Pirates': 'pit',
-    'Dodgers': 'lad', 'Padres': 'sd', 'Giants': 'sf', 'Diamondbacks': 'ari', 'Rockies': 'col'
+  const teamCodes: { [key: string]: string } = {
+    'New York Yankees': 'nyy',
+    'Boston Red Sox': 'bos',
+    'Tampa Bay Rays': 'tb',
+    'Toronto Blue Jays': 'tor',
+    'Baltimore Orioles': 'bal',
+    'Houston Astros': 'hou',
+    'Seattle Mariners': 'sea',
+    'Los Angeles Angels': 'laa',
+    'Oakland Athletics': 'oak',
+    'Texas Rangers': 'tex',
+    'Cleveland Guardians': 'cle',
+    'Minnesota Twins': 'min',
+    'Chicago White Sox': 'cws',
+    'Detroit Tigers': 'det',
+    'Kansas City Royals': 'kc',
+    'Los Angeles Dodgers': 'lad',
+    'San Diego Padres': 'sd',
+    'San Francisco Giants': 'sf',
+    'Colorado Rockies': 'col',
+    'Arizona Diamondbacks': 'ari',
+    'Atlanta Braves': 'atl',
+    'New York Mets': 'nym',
+    'Philadelphia Phillies': 'phi',
+    'Miami Marlins': 'mia',
+    'Washington Nationals': 'was',
+    'Milwaukee Brewers': 'mil',
+    'Chicago Cubs': 'chc',
+    'St. Louis Cardinals': 'stl',
+    'Pittsburgh Pirates': 'pit',
+    'Cincinnati Reds': 'cin'
   };
-  // Try to match by full or partial name
-  for (const [key, value] of Object.entries(teamMapping)) {
-    if (teamName.toLowerCase().includes(key.toLowerCase())) return value;
-  }
-  // Try to match by abbreviation (3-letter code in uppercase)
-  if (teamName.length === 3) return teamName.toLowerCase();
-  return '';
+  
+  return teamCodes[teamName] || teamName.toLowerCase().replace(/\s+/g, '').substring(0, 3);
 }
