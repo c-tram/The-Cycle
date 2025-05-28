@@ -7,6 +7,7 @@ import { Builder, By } from 'selenium-webdriver';
 import { scrapeStandings } from './scrapers/standingsScraper';
 import { scrapePlayerStats, scrapeTrendData } from './scrapers/playerStatsScraper';
 import { scrapeGames } from './scrapers/gamesScraper';
+import { fetchStandingsFromAPI, fetchGamesFromAPI } from './scrapers/mlbStatsApiService';
 import { storeData, retrieveData, calculateDailyTrends } from './services/dataService';
 import schedule from 'node-schedule';
 
@@ -57,8 +58,8 @@ app.get('/api/standings', (req, res) => {
       }
       
       try {
-        // Fetch fresh data
-        const standings = await scrapeStandings();
+        // Fetch fresh data from MLB Stats API
+        const standings = await fetchStandingsFromAPI();
         
         // Store in cache
         cache[cacheKey] = {
@@ -67,11 +68,24 @@ app.get('/api/standings', (req, res) => {
         };
         
         res.json(standings);
-      } catch (scrapeErr) {
-        console.error('Error scraping standings, using mock data:', scrapeErr);
-        // If the scraper fails, return the mock data from the scraper
-        const mockData = require('./scrapers/standingsScraper').MOCK_STANDINGS;
-        res.json(mockData);
+      } catch (apiErr) {
+        console.error('Error fetching standings from API, falling back to scraper:', apiErr);
+        try {
+          // Fallback to web scraping if API fails
+          const standings = await scrapeStandings();
+          
+          cache[cacheKey] = {
+            data: standings,
+            timestamp: Date.now()
+          };
+          
+          res.json(standings);
+        } catch (scrapeErr) {
+          console.error('Error scraping standings, using mock data:', scrapeErr);
+          // If both API and scraper fail, return mock data
+          const mockData = require('./scrapers/standingsScraper').MOCK_STANDINGS;
+          res.json(mockData);
+        }
       }
     } catch (err: any) {
       console.error('Error in /api/standings:', err);
@@ -120,16 +134,43 @@ app.get('/api/games', (req, res) => {
         return res.json(cache[cacheKey].data);
       }
       
-      // Fetch fresh data
-      const gamesData = await scrapeGames();
-      
-      // Store in cache
-      cache[cacheKey] = {
-        data: gamesData,
-        timestamp: Date.now()
-      };
-      
-      res.json(gamesData);
+      try {
+        // Fetch fresh data from MLB Stats API
+        const gamesData = await fetchGamesFromAPI();
+        
+        // Store in cache
+        cache[cacheKey] = {
+          data: gamesData,
+          timestamp: Date.now()
+        };
+        
+        res.json(gamesData);
+      } catch (apiErr) {
+        console.error('Error fetching games from API, falling back to scraper:', apiErr);
+        try {
+          // Fallback to web scraping if API fails
+          const gamesData = await scrapeGames();
+          
+          cache[cacheKey] = {
+            data: gamesData,
+            timestamp: Date.now()
+          };
+          
+          res.json(gamesData);
+        } catch (scrapeErr) {
+          console.error('Error scraping games, using mock data:', scrapeErr);
+          // If both fail, return basic mock data
+          const mockGamesData = {
+            recent: [
+              { homeTeam: "New York Yankees", homeTeamCode: "nyy", homeScore: 5, awayTeam: "Boston Red Sox", awayTeamCode: "bos", awayScore: 3, date: "2025-05-27", status: "completed" }
+            ],
+            upcoming: [
+              { homeTeam: "Los Angeles Dodgers", homeTeamCode: "lad", awayTeam: "San Francisco Giants", awayTeamCode: "sf", date: "2025-05-28", time: "7:05 PM", status: "scheduled" }
+            ]
+          };
+          res.json(mockGamesData);
+        }
+      }
     } catch (err: any) {
       console.error('Error in /api/games:', err);
       res.status(500).json({ error: err.message });
