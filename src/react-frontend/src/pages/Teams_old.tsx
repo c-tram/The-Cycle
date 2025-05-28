@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { getTeamRoster, Player } from '../services/api';
 import '../styles/Teams.css';
@@ -79,16 +79,6 @@ const Teams = () => {
     teamsByDivision[team.division].push(team);
   });
 
-  const getTimePeriodLabel = (period: TimePeriod): string => {
-    switch (period) {
-      case '1day': return 'Last 1 Day';
-      case '7day': return 'Last 7 Days';
-      case '30day': return 'Last 30 Days';
-      case 'season': return 'Full Season';
-      default: return 'Full Season';
-    }
-  };
-
   return (
     <div className="page-content">
       <Helmet>
@@ -96,34 +86,15 @@ const Teams = () => {
       </Helmet>
       <h1>MLB Teams</h1>
       
-      <div className="team-controls">
-        <div className="team-selector">
-          <label>
-            Select Team:
-            <select value={team} onChange={e => setTeam(e.target.value)}>
-              {TEAMS.map(t => (
-                <option key={t.code} value={t.code}>{t.name}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        
-        <div className="time-period-selector">
-          <label>
-            Time Period:
-            <div className="time-period-buttons">
-              {(['1day', '7day', '30day', 'season'] as TimePeriod[]).map(period => (
-                <button
-                  key={period}
-                  className={`time-period-btn ${timePeriod === period ? 'active' : ''}`}
-                  onClick={() => setTimePeriod(period)}
-                >
-                  {getTimePeriodLabel(period)}
-                </button>
-              ))}
-            </div>
-          </label>
-        </div>
+      <div className="team-selector">
+        <label>
+          Select Team:
+          <select value={team} onChange={e => setTeam(e.target.value)}>
+            {TEAMS.map(t => (
+              <option key={t.code} value={t.code}>{t.name}</option>
+            ))}
+          </select>
+        </label>
       </div>
       
       <div className="team-content">
@@ -132,7 +103,7 @@ const Teams = () => {
         
         {!loading && !error && (
           <div className="team-roster">
-            <h2>Team Roster - {getTimePeriodLabel(timePeriod)}</h2>
+            <h2>Team Roster</h2>
             <div className="table-responsive">
               <table className="stats-table">
                 <thead>

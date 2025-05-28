@@ -1,22 +1,58 @@
 :root {
-  --primary-bg: #0a0a0a;
-  --secondary-bg: #111111;
-  --tertiary-bg: #1a1a1a;
-  --primary-text: #00ff00;
-  --secondary-text: #cccccc;
-  --primary-accent: #00cc00;
-  --secondary-accent: #009900;
-  --highlight: #33ff33;
-  --error: #ff3333;
-  --success: #00dd00;
-  --warning: #ffcc00;
+  /* MLB-inspired color palette */
+  --primary-bg: #0f1419;           /* Deep navy blue */
+  --secondary-bg: #1a2332;         /* Medium navy */
+  --tertiary-bg: #243142;          /* Light navy */
+  --card-bg: #ffffff;              /* Clean white for cards */
+  
+  /* Primary colors - MLB red */
+  --primary-text: #d50000;         /* MLB red */
+  --secondary-text: #2c3e50;       /* Dark blue-gray for readability */
+  --tertiary-text: #7f8c8d;       /* Light gray for subtle text */
+  
+  /* Accent colors */
+  --primary-accent: #c62828;       /* Darker red */
+  --secondary-accent: #1976d2;     /* MLB blue */
+  --highlight: #ff1744;            /* Bright red for highlights */
+  
+  /* Extended MLB colors */
+  --mlb-red: #d50000;              /* Primary MLB red */
+  --mlb-red-light: #ff5252;        /* Light red */
+  --mlb-red-dark: #b71c1c;         /* Dark red */
+  --mlb-red-alpha: rgba(213, 0, 0, 0.1);     /* Transparent red */
+  --mlb-red-light-alpha: rgba(255, 82, 82, 0.1); /* Transparent light red */
+  
+  /* Navy variations */
+  --navy-dark: #0f1419;            /* Primary dark navy */
+  --navy-darker: #0a0f14;          /* Darker navy */
+  
+  /* Common colors */
+  --white: #ffffff;
+  --black: #000000;
+  --border: #2c3e50;
+  --text-primary: #ffffff;
+  --text-secondary: #b0bec5;
+  --text-muted: #78909c;
+  --card-bg-alt: #f8f9fa;
+  
+  /* Success variations */
+  --success-dark: #388e3c;
+  
+  /* Status colors */
+  --error: #f44336;
+  --success: #4caf50;
+  --warning: #ff9800;
+  
+  /* Text colors for different backgrounds */
+  --text-on-dark: #ffffff;         /* White text on dark backgrounds */
+  --text-on-light: #2c3e50;       /* Dark text on light backgrounds */
   
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
   color-scheme: dark;
-  color: var(--secondary-text);
+  color: var(--text-on-dark);
   background-color: var(--primary-bg);
 
   font-synthesis: none;
@@ -41,12 +77,94 @@ body {
   min-width: 320px;
   min-height: 100vh;
   overflow-x: hidden;
+  background: linear-gradient(135deg, var(--primary-bg) 0%, var(--secondary-bg) 100%);
 }
 
 h1 {
   font-size: 2em;
   line-height: 1.1;
   color: var(--primary-text);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+h2 {
+  color: var(--primary-text);
+  border-bottom: 2px solid var(--primary-text);
+  padding-bottom: 8px;
+}
+
+h3 {
+  color: var(--secondary-accent);
+}
+
+/* Enhanced button styles with MLB theme */
+button {
+  border-radius: 8px;
+  border: 2px solid var(--primary-accent);
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: var(--primary-accent);
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+button:hover {
+  background-color: var(--highlight);
+  border-color: var(--highlight);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+button:focus,
+button:focus-visible {
+  outline: 2px solid var(--secondary-accent);
+  outline-offset: 2px;
+}
+
+/* Card styling for better visual separation */
+.card {
+  background-color: var(--card-bg);
+  color: var(--text-on-light);
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(213, 0, 0, 0.1);
+  padding: 20px;
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15), 0 3px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Table enhancements */
+table {
+  background-color: var(--card-bg);
+  color: var(--text-on-light);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+th {
+  background-color: var(--primary-text);
+  color: white;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.85em;
+  letter-spacing: 0.5px;
+}
+
+tr:nth-child(even) {
+  background-color: rgba(213, 0, 0, 0.05);
+}
+
+tr:hover {
+  background-color: rgba(25, 118, 210, 0.1);
 }
 
 button {

@@ -1,18 +1,23 @@
-/* Enhanced Dashboard Styles */
+/* Enhanced Dashboard Styles with MLB Theme */
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 30px;
   padding-bottom: 20px;
-  border-bottom: 2px solid #333;
+  border-bottom: 2px solid var(--mlb-red);
+  background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy-darker) 100%);
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .page-header h1 {
   margin: 0;
-  color: #00ff00;
+  color: var(--white);
   font-size: 2.5rem;
-  text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  font-weight: 700;
 }
 
 .header-actions {
@@ -22,24 +27,26 @@
 }
 
 .customize-btn {
-  background: linear-gradient(135deg, #333, #555);
-  border: 1px solid #00ff00;
-  color: #00ff00;
-  padding: 8px 16px;
-  border-radius: 6px;
+  background: linear-gradient(135deg, var(--mlb-red) 0%, var(--mlb-red-dark) 100%);
+  border: 1px solid var(--mlb-red-light);
+  color: var(--white);
+  padding: 10px 20px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 0.9rem;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .customize-btn:hover {
-  background: linear-gradient(135deg, #00ff00, #00cc00);
-  color: #000;
-  box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+  background: linear-gradient(135deg, var(--mlb-red-light) 0%, var(--mlb-red) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(213, 0, 0, 0.4);
 }
 
 .last-updated {
-  color: #888;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
@@ -49,6 +56,57 @@
   grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
   gap: 25px;
   margin-top: 20px;
+}
+
+/* Edit Mode Styles */
+.widget-card.edit-mode {
+  border: 2px dashed var(--mlb-red);
+  position: relative;
+}
+
+.widget-card.edit-mode::after {
+  content: 'Edit Mode';
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  background: var(--mlb-red);
+  color: var(--white);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.widget-resize-controls {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.resize-btn {
+  background: var(--mlb-red);
+  border: none;
+  color: var(--white);
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.resize-btn:hover {
+  background: var(--mlb-red-light);
+  transform: scale(1.1);
+}
+
+.customize-btn.active {
+  background: linear-gradient(135deg, var(--success) 0%, var(--success-dark) 100%);
+  border-color: var(--success);
 }
 
 /* Widget Wrapper and Cards */

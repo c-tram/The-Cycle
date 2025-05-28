@@ -183,6 +183,7 @@ app.get('/api/roster', (req, res) => {
     const teamAbbr = (req.query.team as string)?.toLowerCase() || 'nyy';
     const statType = (req.query.type as string)?.toLowerCase() || 'hitting';
     const season = (req.query.season as string) || '2025';
+    const period = (req.query.period as string)?.toLowerCase() || 'season';
     const teamId = TEAM_ID_MAP[teamAbbr];
     
     if (!teamId) {
@@ -198,12 +199,36 @@ app.get('/api/roster', (req, res) => {
         'Accept-Language': 'en-US,en;q=0.5',
       };
 
-      // Fetch from Baseball Savant team page
+      // Build URL based on time period
       let url = `https://baseballsavant.mlb.com/team/${teamId}`;
+      const urlParams = new URLSearchParams();
+      
+      // Add time period parameter
+      const currentDate = new Date();
+      if (period === '1day') {
+        const yesterday = new Date(currentDate);
+        yesterday.setDate(currentDate.getDate() - 1);
+        urlParams.append('startDate', yesterday.toISOString().split('T')[0]);
+        urlParams.append('endDate', currentDate.toISOString().split('T')[0]);
+      } else if (period === '7day') {
+        const weekAgo = new Date(currentDate);
+        weekAgo.setDate(currentDate.getDate() - 7);
+        urlParams.append('startDate', weekAgo.toISOString().split('T')[0]);
+        urlParams.append('endDate', currentDate.toISOString().split('T')[0]);
+      } else if (period === '30day') {
+        const monthAgo = new Date(currentDate);
+        monthAgo.setDate(currentDate.getDate() - 30);
+        urlParams.append('startDate', monthAgo.toISOString().split('T')[0]);
+        urlParams.append('endDate', currentDate.toISOString().split('T')[0]);
+      } else {
+        // season - use full season
+        urlParams.append('season', season);
+      }
+      
       if (statType === 'pitching') {
-        url = `https://baseballsavant.mlb.com/team/${teamId}?view=statcast&nav=pitching&season=${season}`;
+        url = `https://baseballsavant.mlb.com/team/${teamId}?view=statcast&nav=pitching&${urlParams.toString()}`;
       } else if (statType === 'hitting') {
-        url = `https://baseballsavant.mlb.com/team/${teamId}?season=${season}`;
+        url = `https://baseballsavant.mlb.com/team/${teamId}?${urlParams.toString()}`;
       }
 
       const response = await fetch(url, { headers, timeout: 15000 });

@@ -52,6 +52,7 @@ const Overview = () => {
   const [error, setError] = useState('');
   const [activeLeague, setActiveLeague] = useState('AL');
   const [showCustomizer, setShowCustomizer] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -86,19 +87,39 @@ const Overview = () => {
     fetchData();
   }, []);
 
+  const toggleWidgetSize = (widgetId: string) => {
+    setWidgets(prev => prev.map(widget => 
+      widget.id === widgetId 
+        ? { ...widget, size: widget.size === 'medium' ? 'large' : 'medium' as 'medium' | 'large' }
+        : widget
+    ));
+  };
+
   const renderGameWidget = (widgetId: string, title: string) => {
     const isRecent = widgetId.includes('recent');
     const gamesList = isRecent ? games.recent : games.upcoming;
+    const maxGames = editMode ? 8 : 4; // Show more games in edit mode
     
     return (
-      <div className="widget-card medium">
+      <div className={`widget-card medium ${editMode ? 'edit-mode' : ''}`}>
         <div className="widget-header">
           <h3>{title}</h3>
           <span className="widget-count">{gamesList.length}</span>
+          {editMode && (
+            <div className="widget-resize-controls">
+              <button 
+                className="resize-btn"
+                onClick={() => toggleWidgetSize(widgetId)}
+                title="Resize widget"
+              >
+                ⤢
+              </button>
+            </div>
+          )}
         </div>
         <div className="widget-content">
           {gamesList.length > 0 ? (
-            gamesList.slice(0, 4).map((game: Game, i: number) => (
+            gamesList.slice(0, maxGames).map((game: Game, i: number) => (
               <div key={`${widgetId}-${i}`} className="game-item">
                 <div className="game-teams">
                   <span className="away-team">{game.awayTeamCode.toUpperCase()}</span>
@@ -302,6 +323,13 @@ const Overview = () => {
       <div className="page-header">
         <h1>Overview</h1>
         <div className="header-actions">
+          <button 
+            className={`customize-btn ${editMode ? 'active' : ''}`}
+            title="Toggle Edit Mode"
+            onClick={() => setEditMode(!editMode)}
+          >
+            {editMode ? '✓ Save' : '✏️ Edit'}
+          </button>
           <button 
             className="customize-btn" 
             title="Customize Dashboard"

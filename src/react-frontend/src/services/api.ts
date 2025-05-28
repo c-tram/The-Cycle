@@ -64,9 +64,9 @@ export interface TrendData {
 /**
  * Get team roster/stats
  */
-export async function getTeamRoster(teamCode: string): Promise<TeamStats[]> {
+export async function getTeamRoster(teamCode: string, timePeriod: string = 'season'): Promise<TeamStats[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/roster?team=${teamCode}`);
+    const response = await fetch(`${API_BASE_URL}/roster?team=${teamCode}&period=${timePeriod}`);
     
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);

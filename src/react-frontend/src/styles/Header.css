@@ -1,8 +1,9 @@
 .main-header {
-  background-color: #111;
-  border-bottom: 1px solid #333;
+  background: linear-gradient(135deg, var(--primary-bg) 0%, var(--secondary-bg) 100%);
+  border-bottom: 2px solid var(--primary-text);
   padding: 15px 30px;
-  color: #00ff00;
+  color: var(--text-on-dark);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .header-content {
@@ -15,6 +16,8 @@
   margin: 0;
   font-size: 20px;
   letter-spacing: 1px;
+  color: var(--primary-text);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .user-controls {

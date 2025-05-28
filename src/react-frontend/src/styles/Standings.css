@@ -1,52 +1,63 @@
+/* Standings with MLB Theme */
 .standings-container {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
-  gap: 20px;
+  gap: 25px;
+  padding: 20px 0;
 }
 
 .division-standings {
-  background-color: #111;
-  border: 1px solid #333;
-  border-radius: 5px;
-  padding: 20px;
+  background: linear-gradient(145deg, var(--card-bg) 0%, var(--card-bg-alt) 100%);
+  border: 2px solid var(--mlb-red-alpha);
+  border-radius: 12px;
+  padding: 24px;
   margin-bottom: 20px;
   transition: all 0.3s ease;
   animation: fadeIn 0.5s ease forwards;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .division-standings:hover {
-  box-shadow: 0 0 15px rgba(0, 255, 0, 0.1);
-  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(213, 0, 0, 0.15);
+  transform: translateY(-3px);
+  border-color: var(--mlb-red);
 }
 
 .division-standings h2 {
-  color: #00ff00;
+  color: var(--white);
   margin-top: 0;
-  margin-bottom: 15px;
-  border-bottom: 1px solid #333;
-  padding-bottom: 10px;
+  margin-bottom: 18px;
+  border-bottom: 2px solid var(--mlb-red);
+  padding-bottom: 12px;
+  font-weight: 700;
+  font-size: 1.4rem;
 }
 
 .standings-table {
   width: 100%;
   border-collapse: collapse;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .standings-table th,
 .standings-table td {
-  padding: 10px;
+  padding: 12px;
   text-align: center;
-  border-bottom: 1px solid #222;
+  border-bottom: 1px solid var(--border);
 }
 
 .standings-table th {
-  color: #00ff00;
+  color: var(--white);
   font-weight: 600;
-  background-color: rgba(0, 255, 0, 0.05);
+  background: linear-gradient(135deg, var(--mlb-red) 0%, var(--mlb-red-dark) 100%);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .standings-table tr:hover {
-  background-color: #1a1a1a;
+  background: linear-gradient(135deg, var(--mlb-red-alpha) 0%, transparent 100%);
 }
 
 .standings-table tr td:first-child {
