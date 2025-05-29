@@ -3,7 +3,7 @@
   display: flex;
   min-height: 100vh;
   background-color: #0a0a0a;
-  color: #00ff00;
+  color: var(--primary-text);
   position: relative;
 }
 
@@ -46,7 +46,7 @@
   justify-content: center;
   min-height: 100vh;
   background-color: #0a0a0a;
-  color: #00ff00;
+  color: var(--primary-text);
 }
 
 /* Main colors */
@@ -54,8 +54,8 @@
   --primary-bg: #0a0a0a;
   --secondary-bg: #111111;
   --tertiary-bg: #1a1a1a;
-  --primary-text: #00ff00;
-  --primary-accent: #00cc00;
+  --primary-text: #ffffff;
+  --primary-accent: #d50000;
   --secondary-accent: #009900;
   --highlight: #33ff33;
   --error: #ff3333;

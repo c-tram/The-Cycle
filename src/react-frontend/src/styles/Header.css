@@ -34,17 +34,17 @@
 .search-box input {
   width: 100%;
   padding: 8px 12px 8px 35px;
-  border: 1px solid #333;
+  border: 1px solid var(--border);
   border-radius: 20px;
-  background-color: #1a1a1a;
-  color: #ccc;
+  background-color: var(--card-bg);
+  color: var(--text-on-light);
   font-size: 14px;
 }
 
 .search-box input:focus {
   outline: none;
-  border-color: #00ff00;
-  box-shadow: 0 0 0 2px rgba(0, 255, 0, 0.1);
+  border-color: var(--mlb-red);
+  box-shadow: 0 0 0 2px rgba(213, 0, 0, 0.1);
 }
 
 .search-icon {
@@ -52,27 +52,27 @@
   left: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #666;
+  color: var(--text-secondary);
 }
 
 .notifications {
   position: relative;
   font-size: 18px;
-  color: #ccc;
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 5px;
 }
 
 .notifications:hover {
-  color: #00ff00;
+  color: var(--mlb-red);
 }
 
 .notification-badge {
   position: absolute;
   top: -5px;
   right: -5px;
-  background-color: #00ff00;
-  color: #000;
+  background-color: var(--mlb-red);
+  color: var(--white);
   border-radius: 50%;
   width: 16px;
   height: 16px;
@@ -85,7 +85,7 @@
 
 .mobile-icon {
   font-size: 18px;
-  color: #ccc;
+  color: var(--text-secondary);
   cursor: pointer;
   padding: 8px;
   margin-left: 10px;
@@ -93,7 +93,7 @@
 }
 
 .mobile-icon:hover {
-  color: #00ff00;
+  color: var(--mlb-red);
 }
 
 .mobile-search {
@@ -111,13 +111,13 @@
   align-items: center;
   cursor: pointer;
   padding: 8px 15px;
-  border: 1px solid #333;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background-color: #1a1a1a;
+  background-color: var(--card-bg);
 }
 
 .user-dropdown:hover {
-  background-color: #222;
+  background-color: var(--hover-bg);
 }
 
 .user-avatar {
@@ -127,9 +127,9 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background-color: #333;
+  background-color: var(--border);
   margin-right: 10px;
-  color: #ccc;
+  color: var(--text-secondary);
 }
 
 .user-name {
@@ -139,7 +139,7 @@
 
 .dropdown-icon {
   font-size: 14px;
-  color: #666;
+  color: var(--text-secondary);
   transition: transform 0.2s ease;
 }
 
@@ -152,8 +152,8 @@
   top: 100%;
   right: 0;
   width: 180px;
-  background-color: #222;
-  border: 1px solid #333;
+  background-color: var(--secondary-bg);
+  border: 1px solid var(--border);
   margin-top: 5px;
   border-radius: 4px;
   overflow: hidden;
@@ -169,7 +169,7 @@
 
 .dropdown-menu li {
   padding: 10px 15px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--border);
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
@@ -180,8 +180,8 @@
 }
 
 .dropdown-menu li:hover {
-  background-color: #2a2a2a;
-  color: #00ff00;
+  background-color: var(--hover-bg);
+  color: var(--mlb-red);
 }
 
 .menu-icon {
@@ -192,7 +192,7 @@
 /* Menu toggle button */
 .menu-toggle {
   font-size: 18px;
-  color: #00ff00;
+  color: var(--mlb-red);
   margin-right: 15px;
   cursor: pointer;
   width: 36px;
@@ -206,8 +206,8 @@
 }
 
 .menu-toggle:hover {
-  background-color: rgba(0, 255, 0, 0.1);
-  border-color: rgba(0, 255, 0, 0.3);
+  background-color: rgba(213, 0, 0, 0.1);
+  border-color: rgba(213, 0, 0, 0.3);
 }
 
 /* Media queries for responsive design */

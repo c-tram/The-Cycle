@@ -42,8 +42,42 @@ const TEAM_ID_MAP: Record<string, number> = {
   ari: 109, atl: 144, bal: 110, bos: 111, chc: 112, cin: 113, cle: 114, col: 115, det: 116,
   hou: 117, kc: 118, ana: 108, laa: 108, lad: 119, mia: 146, mil: 158, min: 142, nym: 121,
   nyy: 147, oak: 133, phi: 143, pit: 134, sd: 135, sea: 136, sf: 137, stl: 138, tb: 139,
-  tex: 140, tor: 141, was: 120, wsh: 120
+  tex: 140, tor: 141, was: 120, wsh: 120, cws: 145, chw: 145  // Chicago White Sox
 };
+
+// Team names mapping
+const TEAMS = [
+  { code: 'nyy', name: 'New York Yankees' },
+  { code: 'bos', name: 'Boston Red Sox' },
+  { code: 'tor', name: 'Toronto Blue Jays' },
+  { code: 'bal', name: 'Baltimore Orioles' },
+  { code: 'tb', name: 'Tampa Bay Rays' },
+  { code: 'cle', name: 'Cleveland Guardians' },
+  { code: 'min', name: 'Minnesota Twins' },
+  { code: 'kc', name: 'Kansas City Royals' },
+  { code: 'det', name: 'Detroit Tigers' },
+  { code: 'cws', name: 'Chicago White Sox' },
+  { code: 'hou', name: 'Houston Astros' },
+  { code: 'sea', name: 'Seattle Mariners' },
+  { code: 'tex', name: 'Texas Rangers' },
+  { code: 'laa', name: 'Los Angeles Angels' },
+  { code: 'oak', name: 'Oakland Athletics' },
+  { code: 'atl', name: 'Atlanta Braves' },
+  { code: 'phi', name: 'Philadelphia Phillies' },
+  { code: 'nym', name: 'New York Mets' },
+  { code: 'mia', name: 'Miami Marlins' },
+  { code: 'wsh', name: 'Washington Nationals' },
+  { code: 'mil', name: 'Milwaukee Brewers' },
+  { code: 'chc', name: 'Chicago Cubs' },
+  { code: 'stl', name: 'St. Louis Cardinals' },
+  { code: 'cin', name: 'Cincinnati Reds' },
+  { code: 'pit', name: 'Pittsburgh Pirates' },
+  { code: 'lad', name: 'Los Angeles Dodgers' },
+  { code: 'sd', name: 'San Diego Padres' },
+  { code: 'sf', name: 'San Francisco Giants' },
+  { code: 'ari', name: 'Arizona Diamondbacks' },
+  { code: 'col', name: 'Colorado Rockies' }
+];
 
 // API route for standings
 app.get('/api/standings', (req, res) => {
@@ -177,21 +211,46 @@ app.get('/api/games', (req, res) => {
   })();
 });
 
-// Example: /api/roster?team=nyy
+// Example: /api/roster?team=nyy&statType=hitting&period=season
 app.get('/api/roster', (req, res) => {
   (async () => {
     const teamAbbr = (req.query.team as string)?.toLowerCase() || 'nyy';
-    const statType = (req.query.type as string)?.toLowerCase() || 'hitting';
+    const requestedStatType = (req.query.statType as string)?.toLowerCase() || 'hitting';
     const season = (req.query.season as string) || '2025';
     const period = (req.query.period as string)?.toLowerCase() || 'season';
+    
+    // Normalize statType - 'batting' should be treated as 'hitting' for MLB API
+    const statType = requestedStatType === 'batting' ? 'hitting' : requestedStatType;
+    
     const teamId = TEAM_ID_MAP[teamAbbr];
     
+    console.log(`API Request - Team: ${teamAbbr}, RequestedStatType: ${requestedStatType}, NormalizedStatType: ${statType}, Period: ${period}, TeamId: ${teamId}`);
+    
     if (!teamId) {
-      res.status(400).json({ error: 'Invalid or unsupported team abbreviation.' });
+      console.error(`Invalid team abbreviation: ${teamAbbr}`);
+      res.status(400).json({ error: `Invalid or unsupported team abbreviation: ${teamAbbr}` });
       return;
     }
 
     try {
+      // First try the new MLB Stats API approach for more reliable data
+      console.log(`Attempting to fetch data via MLB Stats API for ${teamAbbr.toUpperCase()}...`);
+      
+      try {
+        const apiData = await fetchTeamRosterFromAPI(teamAbbr, period, statType as 'hitting' | 'pitching');
+        console.log(`✅ Successfully fetched data via MLB Stats API for ${teamAbbr.toUpperCase()}`);
+        console.log(`✅ API Data sample:`, apiData[0]?.players?.slice(0, 2));
+        res.json(apiData);
+        return;
+      } catch (apiError: any) {
+        console.error(`❌ MLB Stats API failed for ${teamAbbr}:`, apiError.message);
+        console.error(`❌ Full API error:`, apiError);
+        console.log(`🔄 Falling back to Baseball Savant scraping...`);
+        // Continue to fallback scraping method
+      }
+
+      // Fallback to original Baseball Savant scraping method
+      console.log(`Falling back to Baseball Savant scraping for ${teamAbbr.toUpperCase()}...`);
       // Use HTTP-based scraping for roster data instead of Selenium
       const headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -231,10 +290,19 @@ app.get('/api/roster', (req, res) => {
         url = `https://baseballsavant.mlb.com/team/${teamId}?${urlParams.toString()}`;
       }
 
-      const response = await fetch(url, { headers, timeout: 15000 });
+      console.log(`Fetching data from URL: ${url}`);
+
+      const response = await fetch(url, { headers });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.warn(`Baseball Savant returned ${response.status} for team ${teamAbbr}.`);
+        res.status(response.status).json({ 
+          error: `Data not available for ${TEAMS.find(t => t.code === teamAbbr)?.name || teamAbbr.toUpperCase()} (${period}). Please try a different time period or team.`,
+          team: teamAbbr,
+          period: period,
+          httpStatus: response.status
+        });
+        return;
       }
 
       const html = await response.text();
@@ -245,24 +313,17 @@ app.get('/api/roster', (req, res) => {
       const table = $(`${tableId} .table-savant table`);
       
       if (table.length === 0) {
-        // Fallback to mock data if table not found
-        const mockData = {
-          statHeaders: statType === 'pitching' ? 
-            ['ERA', 'WHIP', 'K/9', 'BB/9', 'FIP'] : 
-            ['AVG', 'OBP', 'SLG', 'OPS', 'wOBA'],
-          players: [
-            {
-              name: 'Sample Player',
-              season: season,
-              stats: statType === 'pitching' ? 
-                ['3.25', '1.15', '9.2', '2.8', '3.45'] :
-                ['.285', '.350', '.475', '.825', '.340']
-            }
-          ]
-        };
-        res.json(mockData);
+        // No table found - data not available
+        res.status(404).json({ 
+          error: `Statistical data not available for ${TEAMS.find(t => t.code === teamAbbr)?.name || teamAbbr.toUpperCase()} (${period}, ${statType}). The team may not have played during this period or data may not be updated yet.`,
+          team: teamAbbr,
+          period: period,
+          statType: statType
+        });
         return;
       }
+
+      console.log(`Found table for ${statType}, extracting player data...`);
 
       // Extract headers
       const statHeaders: string[] = [];
@@ -275,44 +336,254 @@ app.get('/api/roster', (req, res) => {
         }
       });
 
-      // Extract player data
+      console.log(`Headers found: ${statHeaders.join(', ')}`);
+
+      // Extract player data - be more selective about which rows to include
       const statcastData: any[] = [];
-      table.find('tbody tr.statcast-generic').each((i, row) => {
+      const playerNames = new Set(); // Track unique player names to avoid duplicates
+      
+      table.find('tbody tr').each((i, row) => {
         const $row = $(row);
         const cells = $row.find('td');
         
-        if (cells.length >= 3) {
+        // More strict filtering: check if row has proper structure and is not a header or summary row
+        if (cells.length >= 8) { // Ensure minimum number of stat columns
           const playerName = cells.eq(0).find('b').text().trim() || cells.eq(0).text().trim();
           const seasonVal = cells.eq(1).text().trim();
-          const stats: string[] = [];
           
-          for (let j = 2; j < cells.length; j++) {
-            stats.push(cells.eq(j).text().trim());
+          // Skip rows without proper player names or that look like headers/summaries
+          if (!playerName || 
+              playerName.toLowerCase().includes('total') || 
+              playerName.toLowerCase().includes('average') ||
+              playerName.toLowerCase().includes('team') ||
+              playerName.length < 3 ||
+              /^\d+$/.test(playerName) || // Skip numeric-only "names"
+              /^[A-Z]{2,}$/.test(playerName) || // Skip all-caps abbreviations
+              seasonVal === '' || 
+              seasonVal === '-' ||
+              playerNames.has(playerName)) { // Skip duplicates
+            return; // Skip this row
           }
           
-          if (playerName) {
+          const stats: string[] = [];
+          for (let j = 2; j < Math.min(cells.length, 15); j++) { // Limit to reasonable number of columns
+            const statValue = cells.eq(j).text().trim();
+            stats.push(statValue);
+          }
+          
+          // Only add if we have a reasonable number of stats and valid season
+          if (stats.length >= 8 && seasonVal.match(/^\d{4}$/)) {
+            playerNames.add(playerName); // Track this player name
             statcastData.push({
               name: playerName,
               season: seasonVal,
               stats: stats
             });
+            console.log(`Added player: ${playerName} with ${stats.length} stats: [${stats.slice(0, 5).join(', ')}...]`);
           }
         }
       });
 
+      console.log(`Total unique players extracted: ${statcastData.length}`);
+
       if (statcastData.length === 0) {
-        res.status(404).json({ error: `No data found for ${statType} in season: ${season}.` });
+        res.status(404).json({ 
+          error: `No ${statType} data found for ${TEAMS.find(t => t.code === teamAbbr)?.name || teamAbbr.toUpperCase()} in season: ${season}.`,
+          team: teamAbbr,
+          period: period,
+          statType: statType
+        });
         return;
       }
 
-      res.json({ statHeaders, players: statcastData });
+      // Map the stats array to meaningful property names
+      const mappedPlayers = statcastData.map(player => {
+        const stats = player.stats || [];
+        
+        console.log(`Mapping stats for ${player.name}: [${stats.slice(0, 8).join(', ')}...]`);
+        
+        // For hitting stats (default), map common stats
+        if (statType === 'hitting') {
+          return {
+            name: player.name,
+            team: teamAbbr.toUpperCase(),
+            position: 'N/A', // Baseball Savant doesn't provide position in this table
+            avg: stats[0] || '.000',    // Batting average (usually first stat column)
+            hr: stats[1] || '0',        // Home runs  
+            rbi: stats[2] || '0',       // RBIs
+            runs: stats[3] || '0',      // Runs
+            sb: stats[4] || '0',        // Stolen bases
+            obp: stats[5] || '.000',    // On-base percentage
+            slg: stats[6] || '.000',    // Slugging percentage
+            ops: stats[7] || '.000',    // OPS
+            season: player.season,
+            statType: 'hitting'
+          };
+        } else {
+          // For pitching stats - correct column mapping for Baseball Savant table structure
+          // Table structure: Player(0), Season(1), Team(2), G(3), GS(4), W(5), L(6), SV(7), IP(8), H(9), ER(10), HR(11), BB(12), SO(13), ERA(14), WHIP(15), ...
+          // stats array starts from column 2, so: stats[0]=Team, stats[1]=G, stats[2]=GS, stats[3]=W, etc.
+          return {
+            name: player.name,
+            team: teamAbbr.toUpperCase(),
+            position: 'P',
+            era: stats[12] || '0.00',   // ERA is at column 14, so stats[12] (14-2)
+            whip: stats[13] || '0.00',  // WHIP is at column 15, so stats[13] (15-2)
+            wins: stats[3] || '0',      // Wins is at column 5, so stats[3] (5-2)
+            so: stats[11] || '0',       // Strikeouts is at column 13, so stats[11] (13-2)
+            season: player.season,
+            statType: 'pitching'
+          };
+        }
+      });
+
+      // Format response to match frontend expectations
+      const formattedResponse = [{
+        teamName: TEAMS.find(t => t.code === teamAbbr)?.name || teamAbbr.toUpperCase(),
+        teamCode: teamAbbr.toUpperCase(),
+        players: mappedPlayers
+      }];
+
+      res.json(formattedResponse);
       
     } catch (err: any) {
-      console.error('Error fetching roster data:', err);
-      res.status(500).json({ error: err.message });
+      console.error(`Error fetching roster data for team ${teamAbbr} (${teamId}):`, err);
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        teamAbbr,
+        teamId,
+        period,
+        statType
+      });
+      
+      res.status(500).json({ 
+        error: `Unable to fetch roster data for ${TEAMS.find(t => t.code === teamAbbr)?.name || teamAbbr.toUpperCase()}. Please try again later or contact support if the issue persists.`,
+        team: teamAbbr,
+        period: period,
+        details: err.message
+      });
     }
   })();
 });
+
+// New function to fetch team roster using MLB Stats API - more reliable than scraping
+async function fetchTeamRosterFromAPI(teamAbbr: string, period: string, statType: 'hitting' | 'pitching') {
+  try {
+    const teamId = TEAM_ID_MAP[teamAbbr.toLowerCase()];
+    if (!teamId) {
+      throw new Error(`Unknown team abbreviation: ${teamAbbr}`);
+    }
+
+    const currentYear = new Date().getFullYear();
+    console.log(`Fetching ${statType} stats for ${teamAbbr.toUpperCase()} (${teamId}) via MLB Stats API...`);
+
+    // Get team roster
+    const rosterUrl = `https://statsapi.mlb.com/api/v1/teams/${teamId}/roster?season=${currentYear}`;
+    console.log(`📋 Fetching roster from: ${rosterUrl}`);
+    const rosterResponse = await fetch(rosterUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+      }
+    });
+
+    if (!rosterResponse.ok) {
+      throw new Error(`Roster API failed: ${rosterResponse.status} - ${rosterResponse.statusText}`);
+    }
+
+    const rosterData = await rosterResponse.json();
+    console.log(`📋 Roster data received, ${rosterData.roster?.length || 0} players found`);
+    
+    if (!rosterData.roster || rosterData.roster.length === 0) {
+      throw new Error('No roster data found');
+    }
+
+    const players = [];
+    
+    // Process each player on the roster
+    for (const player of rosterData.roster) {
+      const playerId = player.person.id;
+      const playerName = player.person.fullName;
+      const position = player.position.abbreviation;
+      
+      // Skip players based on stat type and position
+      if (statType === 'pitching' && position !== 'P') continue;
+      if (statType === 'hitting' && position === 'P') continue;
+
+      try {
+        // Get player season stats
+        const playerStatsUrl = `https://statsapi.mlb.com/api/v1/people/${playerId}/stats?stats=season&season=${currentYear}&group=${statType}`;
+        
+        const playerResponse = await fetch(playerStatsUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+          }
+        });
+
+        if (playerResponse.ok) {
+          const playerData = await playerResponse.json();
+          
+          // Find the correct stat group
+          const statGroup = playerData.stats?.find((s: any) => 
+            s.group?.displayName === statType || s.type?.displayName === statType
+          );
+
+          if (statGroup?.splits?.[0]?.stat) {
+            const stats = statGroup.splits[0].stat;
+            console.log(`📊 Found stats for ${playerName}:`, statType === 'pitching' ? 
+              `ERA=${stats.era}, WHIP=${stats.whip}, W=${stats.wins}, SO=${stats.strikeOuts}` :
+              `AVG=${stats.avg}, HR=${stats.homeRuns}, RBI=${stats.rbi}`);
+            
+            if (statType === 'hitting') {
+              players.push({
+                name: playerName,
+                team: teamAbbr.toUpperCase(),
+                position: position,
+                avg: stats.avg || '.000',
+                hr: stats.homeRuns?.toString() || '0',
+                rbi: stats.rbi?.toString() || '0',
+                runs: stats.runs?.toString() || '0',
+                sb: stats.stolenBases?.toString() || '0',
+                obp: stats.obp || '.000',
+                slg: stats.slg || '.000',
+                ops: stats.ops || '.000',
+                season: currentYear.toString(),
+                statType: 'hitting'
+              });
+            } else {
+              players.push({
+                name: playerName,
+                team: teamAbbr.toUpperCase(),
+                position: position,
+                era: stats.era || '0.00',
+                whip: stats.whip || '0.00',
+                wins: stats.wins?.toString() || '0',
+                so: stats.strikeOuts?.toString() || '0',
+                season: currentYear.toString(),
+                statType: 'pitching'
+              });
+            }
+          }
+        }
+      } catch (playerError: any) {
+        console.warn(`Failed to get stats for ${playerName}:`, playerError.message);
+        // Continue with other players
+      }
+    }
+
+    console.log(`Successfully fetched ${players.length} ${statType} players for ${teamAbbr.toUpperCase()}`);
+    
+    return [{
+      teamName: TEAMS.find(t => t.code === teamAbbr)?.name || teamAbbr.toUpperCase(),
+      teamCode: teamAbbr.toUpperCase(),
+      players: players
+    }];
+
+  } catch (error: any) {
+    console.error(`Error fetching team roster via API for ${teamAbbr}:`, error.message);
+    throw error;
+  }
+}
 
 // Schedule daily data updates
 schedule.scheduleJob('0 5 * * *', async () => { // Run at 5:00 AM every day

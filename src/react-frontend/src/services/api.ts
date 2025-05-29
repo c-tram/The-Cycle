@@ -26,11 +26,15 @@ export interface Player {
   rbi?: string;
   runs?: string;
   sb?: string;
+  obp?: string;
+  slg?: string;
+  ops?: string;
   era?: string;
   wins?: string;
   so?: string;
   whip?: string;
   statDate?: string;
+  statType?: 'hitting' | 'pitching';
   stats?: string[]; // For compatibility with existing code
 }
 
@@ -64,9 +68,9 @@ export interface TrendData {
 /**
  * Get team roster/stats
  */
-export async function getTeamRoster(teamCode: string, timePeriod: string = 'season'): Promise<TeamStats[]> {
+export async function getTeamRoster(teamCode: string, timePeriod: string = 'season', statType: 'hitting' | 'pitching' = 'hitting'): Promise<TeamStats[]> {
   try {
-    const response = await fetch(`${API_BASE_URL}/roster?team=${teamCode}&period=${timePeriod}`);
+    const response = await fetch(`${API_BASE_URL}/roster?team=${teamCode}&period=${timePeriod}&statType=${statType}`);
     
     if (!response.ok) {
       throw new Error(`API error: ${response.status}`);

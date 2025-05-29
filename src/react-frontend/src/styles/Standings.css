@@ -24,7 +24,7 @@
 }
 
 .division-standings h2 {
-  color: var(--white);
+  color: var(--text-on-light);
   margin-top: 0;
   margin-bottom: 18px;
   border-bottom: 2px solid var(--mlb-red);
@@ -64,6 +64,12 @@
   text-align: left;
 }
 
+.team-name {
+  background-color: var(--light-grey) !important;
+  color: var(--text-on-light) !important;
+  font-weight: 600;
+}
+
 .table-responsive {
   overflow-x: auto;
   width: 100%;
@@ -78,9 +84,9 @@
 }
 
 .loading {
-  background-color: rgba(0, 255, 0, 0.05);
-  color: #00ff00;
-  border: 1px solid rgba(0, 255, 0, 0.2);
+  background-color: rgba(213, 0, 0, 0.05);
+  color: var(--mlb-red);
+  border: 1px solid rgba(213, 0, 0, 0.2);
 }
 
 .error {

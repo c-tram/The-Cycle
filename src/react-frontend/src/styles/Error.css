@@ -24,8 +24,8 @@
 }
 
 .retry-button {
-  background-color: #00ff00;
-  color: #0a0a0a;
+  background-color: #4caf50;
+  color: #ffffff;
   border: none;
   border-radius: 4px;
   padding: 8px 16px;
@@ -35,5 +35,5 @@
 }
 
 .retry-button:hover {
-  background-color: #00cc00;
+  background-color: #388e3c;
 }

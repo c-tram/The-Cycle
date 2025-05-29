@@ -135,7 +135,7 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #00ff00, #00cc00, #00ff00);
+  background: linear-gradient(90deg, var(--mlb-red), var(--mlb-red-dark), var(--mlb-red));
   opacity: 0;
   transition: opacity 0.3s;
 }
@@ -143,9 +143,9 @@
 .widget-card:hover {
   transform: translateY(-3px);
   box-shadow: 
-    0 8px 25px rgba(0, 255, 0, 0.15),
+    0 8px 25px rgba(213, 0, 0, 0.15),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  border-color: #00ff00;
+  border-color: var(--mlb-red);
 }
 
 .widget-card:hover::before {
@@ -177,14 +177,14 @@
 
 .widget-header h3 {
   margin: 0;
-  color: #00ff00;
+  color: var(--mlb-red);
   font-size: 1.4rem;
   font-weight: 600;
 }
 
 .widget-count {
-  background: rgba(0, 255, 0, 0.2);
-  color: #00ff00;
+  background: rgba(213, 0, 0, 0.2);
+  color: var(--mlb-red);
   padding: 4px 8px;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -209,7 +209,7 @@
 }
 
 .league-toggle button.active {
-  background: #00ff00;
+  background: var(--mlb-red);
   color: #000;
   font-weight: bold;
 }
@@ -246,15 +246,15 @@
 }
 
 .leader-stat:hover {
-  background: rgba(0, 255, 0, 0.05);
+  background: rgba(213, 0, 0, 0.05);
   border-radius: 6px;
   padding-left: 8px;
   padding-right: 8px;
 }
 
 .stat-label {
-  background: rgba(0, 255, 0, 0.2);
-  color: #00ff00;
+  background: rgba(213, 0, 0, 0.2);
+  color: var(--mlb-red);
   padding: 4px 8px;
   border-radius: 4px;
   font-weight: bold;
@@ -264,7 +264,7 @@
 }
 
 .stat-value {
-  color: #00ff00;
+  color: var(--mlb-red);
   font-weight: bold;
   font-size: 1.1rem;
 }
@@ -303,7 +303,7 @@
 }
 
 .game-item:hover {
-  background: rgba(0, 255, 0, 0.05);
+  background: rgba(213, 0, 0, 0.05);
   border-radius: 6px;
   padding-left: 8px;
   padding-right: 8px;
@@ -334,7 +334,7 @@
 }
 
 .score {
-  color: #00ff00;
+  color: var(--mlb-red);
   font-weight: bold;
   font-size: 1.1rem;
 }
@@ -353,8 +353,8 @@
 }
 
 .status.completed {
-  background: rgba(0, 255, 0, 0.2);
-  color: #00ff00;
+  background: rgba(213, 0, 0, 0.2);
+  color: var(--mlb-red);
 }
 
 .status.live {
@@ -384,14 +384,14 @@
 }
 
 .leader-stat:hover {
-  background: rgba(0, 255, 0, 0.05);
+  background: rgba(213, 0, 0, 0.05);
   border-radius: 6px;
   padding-left: 8px;
   padding-right: 8px;
 }
 
 .stat-label {
-  color: #00ff00;
+  color: var(--mlb-red);
   font-weight: bold;
   font-size: 0.9rem;
 }
@@ -430,8 +430,8 @@
 }
 
 .trend-item:hover {
-  border-color: #00ff00;
-  background: rgba(0, 255, 0, 0.05);
+  border-color: var(--mlb-red);
+  background: rgba(213, 0, 0, 0.05);
 }
 
 .trend-item h4 {
@@ -442,7 +442,7 @@
 }
 
 .trend-value {
-  color: #00ff00;
+  color: var(--mlb-red);
   font-size: 1.8rem;
   font-weight: bold;
   margin-bottom: 8px;
@@ -455,7 +455,7 @@
 }
 
 .trend-change.positive {
-  color: #00ff00;
+  color: var(--mlb-red);
 }
 
 .trend-change.negative {
@@ -472,7 +472,7 @@
 
 .chart-bar {
   width: 4px;
-  background: linear-gradient(to top, #00ff00, #00cc00);
+  background: linear-gradient(to top, var(--mlb-red), var(--mlb-red-dark));
   border-radius: 2px;
   min-height: 2px;
   opacity: 0.8;
@@ -498,15 +498,15 @@
 }
 
 .hot-team-item:hover {
-  background: rgba(0, 255, 0, 0.05);
+  background: rgba(213, 0, 0, 0.05);
   border-radius: 6px;
   padding-left: 8px;
   padding-right: 8px;
 }
 
 .team-rank {
-  background: rgba(0, 255, 0, 0.2);
-  color: #00ff00;
+  background: rgba(213, 0, 0, 0.2);
+  color: var(--mlb-red);
   width: 25px;
   height: 25px;
   border-radius: 50%;
@@ -550,8 +550,8 @@
 }
 
 .streak.win {
-  background: rgba(0, 255, 0, 0.2);
-  color: #00ff00;
+  background: rgba(213, 0, 0, 0.2);
+  color: var(--mlb-red);
 }
 
 .streak.loss {
@@ -560,7 +560,7 @@
 }
 
 .trend-indicator {
-  color: #00ff00;
+  color: var(--mlb-red);
   font-size: 0.8rem;
   font-weight: bold;
 }
@@ -642,15 +642,15 @@
 
 .dashboard-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0, 255, 0, 0.1);
+  box-shadow: 0 5px 15px rgba(213, 0, 0, 0.1);
 }
 
 .dashboard-card h3 {
   margin-top: 0;
   margin-bottom: 15px;
-  color: #00ff00;
+  color: var(--mlb-red);
   font-size: 1.3rem;
-  border-bottom: 2px solid #00ff00;
+  border-bottom: 2px solid var(--mlb-red);
   padding-bottom: 8px;
 }
 

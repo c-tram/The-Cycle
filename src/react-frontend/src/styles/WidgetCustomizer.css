@@ -48,7 +48,7 @@
 
 .customizer-header h2 {
   margin: 0;
-  color: #00ff00;
+  color: #4caf50;
   font-size: 1.5rem;
 }
 
@@ -65,7 +65,7 @@
 
 .close-btn:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: #00ff00;
+  color: #4caf50;
 }
 
 /* Content */
@@ -90,8 +90,8 @@
 }
 
 .widget-item.enabled {
-  border-color: #00ff00;
-  background: rgba(0, 255, 0, 0.05);
+  border-color: #4caf50;
+  background: rgba(76, 175, 80, 0.05);
 }
 
 .widget-item.disabled {
@@ -151,7 +151,7 @@
 
 .size-selector select:focus {
   outline: none;
-  border-color: #00ff00;
+  border-color: #4caf50;
 }
 
 .size-selector select:disabled {
@@ -178,9 +178,9 @@
 }
 
 .position-controls button:hover:not(:disabled) {
-  background: #00ff00;
-  color: #000;
-  border-color: #00ff00;
+  background: #4caf50;
+  color: #fff;
+  border-color: #4caf50;
 }
 
 .position-controls button:disabled {
@@ -220,7 +220,7 @@
 }
 
 .toggle-switch input:checked + .switch {
-  background: #00ff00;
+  background: #4caf50;
 }
 
 .toggle-switch input:checked + .switch .slider {
@@ -274,15 +274,15 @@
 }
 
 .save-btn {
-  background: linear-gradient(135deg, #00cc00, #00ff00);
-  border-color: #00ff00;
-  color: #000;
+  background: linear-gradient(135deg, #388e3c, #4caf50);
+  border-color: #4caf50;
+  color: #fff;
   font-weight: bold;
 }
 
 .save-btn:hover {
-  background: linear-gradient(135deg, #00ff00, #33ff33);
-  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+  background: linear-gradient(135deg, #4caf50, #66bb6a);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.3);
 }
 
 /* Responsive Design */

@@ -169,13 +169,13 @@
 .sidebar.collapsed .nav-menu a:hover {
   padding-left: 0;
   border-left: none;
-  border-right: 4px solid #00ff00;
+  border-right: 4px solid #4caf50;
 }
 
 .sidebar.collapsed .nav-menu a.active {
   padding-left: 0;
   border-left: none;
-  border-right: 4px solid #00ff00;
+  border-right: 4px solid #4caf50;
 }
 
 .sidebar-footer {

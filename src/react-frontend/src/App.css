@@ -17,7 +17,7 @@ body {
 }
 
 a {
-  color: #00ff00;
+  color: var(--mlb-red);
   text-decoration: none;
 }
 
@@ -30,7 +30,7 @@ a:hover {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  color: #00ff00;
+  color: var(--primary-text);
   margin-bottom: 1rem;
 }
 
@@ -40,7 +40,7 @@ h1, h2, h3, h4, h5, h6 {
   border-collapse: collapse;
   margin: 0 auto;
   font-size: 0.95rem;
-  border: 1px solid #333;
+  border: 1px solid var(--border);
 }
 
 .stats-table th, .stats-table td {
@@ -49,34 +49,34 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .stats-table th {
-  background: #111;
-  color: #00ff00;
+  background: var(--primary-bg);
+  color: var(--primary-text);
   font-weight: bold;
-  border-bottom: 2px solid #222;
+  border-bottom: 2px solid var(--border);
 }
 
 .stats-table tr {
-  background: #181818;
+  background: var(--card-bg);
 }
 
 .stats-table tbody tr:nth-child(even) {
-  background: #222;
+  background: var(--secondary-bg);
 }
 
 /* Alternating column backgrounds */
 .stats-table td:nth-child(odd), .stats-table th:nth-child(odd) {
-  background: #181818;
+  background: var(--card-bg);
 }
 
 .stats-table td:nth-child(even), .stats-table th:nth-child(even) {
-  background: #222;
+  background: var(--secondary-bg);
 }
 
 .table-responsive {
   overflow-x: auto;
   margin: 1rem 0;
   border-radius: 4px;
-  border: 1px solid #333;
+  border: 1px solid var(--border);
 }
 
 /* Utility Classes */
@@ -85,7 +85,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .text-primary {
-  color: #00ff00;
+  color: var(--primary-text);
 }
 
 .mt-1 {
@@ -185,14 +185,14 @@ button, a, .nav-menu a, .dropdown-menu li {
 }
 
 ::-webkit-scrollbar-track {
-  background: #111;
+  background: var(--primary-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #333;
+  background: var(--border);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #00cc00;
+  background: var(--mlb-red);
 }

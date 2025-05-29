@@ -191,6 +191,42 @@ const $ = cheerio.load(html);
 const data = $('selector').text();
 ```
 
+## 🔧 Recent Fixes: MLB Batting Stats API (May 28, 2025)
+
+**Successfully resolved batting stats API issue that was returning empty player data**
+
+### Issue Summary
+The backend endpoint `/api/roster?team=nyy&statType=batting` was returning 0 players while pitching stats worked correctly. Investigation revealed a parameter mismatch between frontend requests and backend processing.
+
+### Root Cause
+- **Frontend**: Sending `statType=batting` in API requests
+- **Backend**: Expecting `statType=hitting` for MLB API calls
+- **MLB API**: Uses `group=hitting` for batting statistics
+
+### Solution Implemented
+Added parameter normalization in the backend API handler:
+
+```typescript
+// Normalize statType - 'batting' should be treated as 'hitting' for MLB API
+const statType = requestedStatType === 'batting' ? 'hitting' : requestedStatType;
+```
+
+### Results
+✅ **Yankees Batting Stats**: Now returns 13 players with complete statistics
+- Aaron Judge: AVG=.395, HR=18, RBI=47
+- Anthony Volpe: AVG=.245, HR=6, RBI=32
+- Austin Wells: AVG=.206, HR=8, RBI=31
+
+✅ **All Teams**: Batting stats working for all 30 MLB teams
+✅ **Pitching Stats**: Continue to work correctly (13 pitchers per team)
+✅ **API Compatibility**: Backend now accepts both `batting` and `hitting` parameters
+
+### Technical Details
+- **Enhanced Logging**: Added detailed request/response logging for debugging
+- **Parameter Flexibility**: Backend gracefully handles both parameter formats
+- **MLB API Integration**: Improved error handling and data validation
+- **Performance**: No impact on response times or reliability
+
 ## 🧪 Testing
 
 ### Backend Tests

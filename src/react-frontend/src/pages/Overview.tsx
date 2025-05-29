@@ -6,23 +6,23 @@ import ErrorMessage from '../components/Error';
 import WidgetCustomizer from '../components/WidgetCustomizer';
 import '../styles/Dashboard.css';
 
-// Mock player data for league leaders until roster API is fixed
-const MOCK_LEAGUE_LEADERS = {
+// League leaders data with zeros instead of mock data
+const LEAGUE_LEADERS = {
   AL: {
-    battingAvg: { name: 'Aaron Judge', team: 'NYY', value: '.321' },
-    homeRuns: { name: 'Aaron Judge', team: 'NYY', value: '32' },
-    rbi: { name: 'José Altuve', team: 'HOU', value: '78' },
-    era: { name: 'Gerrit Cole', team: 'NYY', value: '2.45' },
-    strikeouts: { name: 'Shane Bieber', team: 'CLE', value: '145' },
-    steals: { name: 'Cedric Mullins', team: 'BAL', value: '24' }
+    battingAvg: { name: 'No Data', team: '---', value: '.000' },
+    homeRuns: { name: 'No Data', team: '---', value: '0' },
+    rbi: { name: 'No Data', team: '---', value: '0' },
+    era: { name: 'No Data', team: '---', value: '0.00' },
+    strikeouts: { name: 'No Data', team: '---', value: '0' },
+    steals: { name: 'No Data', team: '---', value: '0' }
   },
   NL: {
-    battingAvg: { name: 'Shohei Ohtani', team: 'LAD', value: '.335' },
-    homeRuns: { name: 'Shohei Ohtani', team: 'LAD', value: '28' },
-    rbi: { name: 'Mookie Betts', team: 'LAD', value: '82' },
-    era: { name: 'Spencer Strider', team: 'ATL', value: '2.78' },
-    strikeouts: { name: 'Spencer Strider', team: 'ATL', value: '142' },
-    steals: { name: 'Ronald Acuña Jr.', team: 'ATL', value: '31' }
+    battingAvg: { name: 'No Data', team: '---', value: '.000' },
+    homeRuns: { name: 'No Data', team: '---', value: '0' },
+    rbi: { name: 'No Data', team: '---', value: '0' },
+    era: { name: 'No Data', team: '---', value: '0.00' },
+    strikeouts: { name: 'No Data', team: '---', value: '0' },
+    steals: { name: 'No Data', team: '---', value: '0' }
   }
 };
 
@@ -44,13 +44,19 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'hot-teams', title: 'Hot Teams', type: 'standings', size: 'small', position: 5, enabled: true }
 ];
 
+// Define the proper type for trends
+interface TrendsState {
+  battingAverage?: number[];
+  era?: number[];
+}
+
 const Overview = () => {
   const [games, setGames] = useState({ recent: [], upcoming: [] });
-  const [trends, setTrends] = useState({});
+  const [trends, setTrends] = useState<TrendsState>({});
   const [widgets, setWidgets] = useState(DEFAULT_WIDGETS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeLeague, setActiveLeague] = useState('AL');
+  const [activeLeague, setActiveLeague] = useState<'AL' | 'NL'>('AL');
   const [showCustomizer, setShowCustomizer] = useState(false);
   const [editMode, setEditMode] = useState(false);
   
@@ -145,7 +151,7 @@ const Overview = () => {
   };
 
   const renderLeadersWidget = (league: 'AL' | 'NL') => {
-    const leaders = MOCK_LEAGUE_LEADERS[league];
+    const leaders = LEAGUE_LEADERS[league];
     const isActiveLeague = league === activeLeague;
     
     return (
