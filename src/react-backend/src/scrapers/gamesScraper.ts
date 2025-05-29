@@ -1,5 +1,7 @@
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
+import { cacheData, getCachedData } from '../services/dataService';
+import { withRetry } from './mlbStatsApiService';
 
 // Add mock data for when scraping fails
 const MOCK_GAMES = {
@@ -29,50 +31,145 @@ interface Game {
 
 /**
  * Scrapes recent and upcoming MLB games using HTTP requests and cheerio
+ * Handles dynamic content loading limitations via multiple strategies:
+ * 1. Try cached data first
+ * 2. Use MLB Stats API as primary data source
+ * 3. Fall back to web scraping with retry mechanism
+ * 4. Use mock data as final fallback
+ * 
  * @returns Promise containing game data
  */
 export async function scrapeGames(): Promise<{ recent: Game[], upcoming: Game[] }> {
   try {
     console.log("Starting game data collection process...");
 
-    // First, try to fetch games using the MLB Stats API
+    // Try to get cached games data first (main cache)
+    const cachedGames = getCachedData<{ recent: Game[], upcoming: Game[] }>('games');
+    if (cachedGames) {
+      console.log("Using cached games data (expires in separate cache entry)");
+      return cachedGames;
+    }
+    
+    // If no cache, try to fetch games using the MLB Stats API
     try {
-      console.log("Attempting to fetch games from MLB Stats API...");
+      console.log("Attempting to fetch games from MLB Stats API (most reliable source)...");
       // Import dynamically to avoid circular dependencies
       const { fetchGamesFromAPI } = await import('./mlbStatsApiService');
       const apiGames = await fetchGamesFromAPI();
       
-      if (apiGames.recent.length > 0 || apiGames.upcoming.length > 0) {
-        console.log(`Successfully retrieved ${apiGames.recent.length} recent games and ${apiGames.upcoming.length} upcoming games from API`);
-        return apiGames;
+      // Convert API game statuses to our specific types
+      const formattedGames = {
+        recent: apiGames.recent.map(game => ({
+          ...game,
+          status: game.status === 'completed' ? 'completed' : 
+                  game.status === 'live' ? 'live' : 'scheduled'
+        } as Game)),
+        upcoming: apiGames.upcoming.map(game => ({
+          ...game,
+          status: game.status === 'live' ? 'live' : 'scheduled'
+        } as Game))
+      };
+      
+      if (formattedGames.recent.length > 0 || formattedGames.upcoming.length > 0) {
+        console.log(`Successfully retrieved ${formattedGames.recent.length} recent games and ${formattedGames.upcoming.length} upcoming games from API`);
+        
+        // Cache the successful result with different expirations based on game type
+        // Recent games can be cached longer as they don't change
+        cacheData('games', formattedGames, 120); // Cache combined data for 2 hours
+        
+        // Individual caches for component pieces (backup)
+        if (formattedGames.recent.length > 0) {
+          cacheData('recent-games', formattedGames.recent, 240); // Cache for 4 hours (historical data)
+        }
+        if (formattedGames.upcoming.length > 0) {
+          cacheData('upcoming-games', formattedGames.upcoming, 60); // Cache for 1 hour (more volatile)
+        }
+        
+        return formattedGames;
       }
       console.log("No games found from MLB Stats API, falling back to web scraping");
     } catch (apiError) {
       console.error('Error fetching games from MLB Stats API:', apiError);
-      console.log("Falling back to web scraping due to API error");
+      console.log("Falling back to web scraping due to API error (note: may be limited by dynamic content)");
     }
     
     // Fallback to web scraping if API fails
-    console.log("Starting HTTP-based game scraper as fallback...");
+    console.log("Starting HTTP-based game scraper as fallback (warning: MLB.com uses dynamic content)...");
     
-    console.log("Scraping recent games...");
-    const recentGames = await scrapeRecentGames();
-    console.log(`Found ${recentGames.length} recent games`);
+    // Create a promise to handle potential timeout for web scraping
+    const scrapingWithTimeout = async () => {
+      return Promise.race([
+        // The actual scraping process
+        (async () => {
+          try {
+            // Check for separate caches first
+            const separateCachedRecent = getCachedData<Game[]>('recent-games');
+            const separateCachedUpcoming = getCachedData<Game[]>('upcoming-games');
+            
+            // If both caches exist, combine and return
+            if (separateCachedRecent && separateCachedUpcoming) {
+              console.log("Using separately cached recent and upcoming games");
+              return { 
+                recent: separateCachedRecent,
+                upcoming: separateCachedUpcoming
+              };
+            }
+            
+            // Otherwise scrape what we need
+            console.log("Scraping recent games...");
+            const recentGames = separateCachedRecent || await scrapeRecentGames();
+            console.log(`Found ${recentGames.length} recent games`);
+            
+            console.log("Scraping upcoming games...");
+            const upcomingGames = separateCachedUpcoming || await scrapeUpcomingGames();
+            console.log(`Found ${upcomingGames.length} upcoming games`);
+            
+            // Cache the combined result
+            const combinedResults = {
+              recent: recentGames,
+              upcoming: upcomingGames
+            };
+            
+            if (recentGames.length > 0 || upcomingGames.length > 0) {
+              cacheData('games', combinedResults, 120); // Cache for 2 hours
+            }
+            
+            return combinedResults;
+          } catch (error) {
+            console.error("Error in scraping process:", error);
+            throw error;
+          }
+        })(),
+        
+        // Timeout after 10 seconds to avoid hanging
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Web scraping timed out after 10 seconds")), 10000)
+        )
+      ]);
+    };
     
-    console.log("Scraping upcoming games...");
-    const upcomingGames = await scrapeUpcomingGames();
-    console.log(`Found ${upcomingGames.length} upcoming games`);
-    
-    // Return mock data if no real data was found from either source
-    if (recentGames.length === 0 && upcomingGames.length === 0) {
-      console.log("No games found from any source, using mock data");
+    try {
+      const scrapedGames = await scrapingWithTimeout() as { recent: Game[], upcoming: Game[] };
+      
+      // Check if we actually got data or need to fall back to mock data
+      const needsMockRecent = scrapedGames.recent.length === 0;
+      const needsMockUpcoming = scrapedGames.upcoming.length === 0;
+      
+      if (needsMockRecent || needsMockUpcoming) {
+        console.log(`Using ${needsMockRecent && needsMockUpcoming ? 'all mock data' : 
+          needsMockRecent ? 'mock recent games' : 'mock upcoming games'}`);
+      }
+      
+      return { 
+        recent: needsMockRecent ? MOCK_GAMES.recent : scrapedGames.recent,
+        upcoming: needsMockUpcoming ? MOCK_GAMES.upcoming : scrapedGames.upcoming
+      };
+    } catch (scrapingError) {
+      console.error('Error or timeout in web scraping:', scrapingError);
+      // Fallback to mock data on error/timeout
+      console.log("Returning mock game data due to scraping error/timeout");
       return MOCK_GAMES;
     }
-    
-    return { 
-      recent: recentGames.length > 0 ? recentGames : MOCK_GAMES.recent,
-      upcoming: upcomingGames.length > 0 ? upcomingGames : MOCK_GAMES.upcoming
-    };
   } catch (error) {
     console.error('Error retrieving games data:', error);
     // Fallback to mock data on error
@@ -86,18 +183,27 @@ export async function scrapeGames(): Promise<{ recent: Game[], upcoming: Game[] 
  */
 async function scrapeRecentGames(): Promise<Game[]> {
   try {
-    // Navigate to MLB scoreboard page
-    const response = await fetch('https://www.mlb.com/scores/', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // Try to get cached recent games first
+    const cachedRecent = getCachedData<Game[]>('recent-games');
+    if (cachedRecent) {
+      console.log("Using cached recent games data");
+      return cachedRecent;
     }
 
-    const html = await response.text();
+    // Navigate to MLB scoreboard page with retry mechanism
+    const html = await withRetry(async () => {
+      const response = await fetch('https://www.mlb.com/scores/', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return response.text();
+    });
     const $ = cheerio.load(html);
 
     const games: Game[] = [];
@@ -163,6 +269,14 @@ async function scrapeRecentGames(): Promise<Game[]> {
       }
     });
     
+    // Cache the successful result for 2 hours (even if empty)
+    if (games.length > 0) {
+      console.log(`Caching ${games.length} recent games`);
+      cacheData('recent-games', games, 120); // Cache for 2 hours
+    } else {
+      console.log('No recent games found to cache');
+    }
+    
     return games;
   } catch (error) {
     console.error('Error scraping recent games:', error);
@@ -175,18 +289,27 @@ async function scrapeRecentGames(): Promise<Game[]> {
  */
 async function scrapeUpcomingGames(): Promise<Game[]> {
   try {
-    // Navigate to MLB schedule page for today/tomorrow
-    const response = await fetch('https://www.mlb.com/schedule/', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // Try to get cached upcoming games first
+    const cachedUpcoming = getCachedData<Game[]>('upcoming-games');
+    if (cachedUpcoming) {
+      console.log("Using cached upcoming games data");
+      return cachedUpcoming;
     }
+    
+    // Navigate to MLB schedule page for today/tomorrow with retry mechanism
+    const html = await withRetry(async () => {
+      const response = await fetch('https://www.mlb.com/schedule/', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+      });
 
-    const html = await response.text();
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return response.text();
+    });
     const $ = cheerio.load(html);
 
     const games: Game[] = [];
@@ -238,6 +361,14 @@ async function scrapeUpcomingGames(): Promise<Game[]> {
       }
     });
     
+    // Cache the successful result for 2 hours (even if empty)
+    if (games.length > 0) {
+      console.log(`Caching ${games.length} upcoming games`);
+      cacheData('upcoming-games', games, 120); // Cache for 2 hours
+    } else {
+      console.log('No upcoming games found to cache');
+    }
+    
     return games;
   } catch (error) {
     console.error('Error scraping upcoming games:', error);
@@ -245,10 +376,20 @@ async function scrapeUpcomingGames(): Promise<Game[]> {
   }
 }
 
+// Cache for team codes to avoid repeated lookups
+const teamCodeCache: { [key: string]: string } = {};
+
 /**
  * Helper function to convert team name to team code
+ * Uses caching for efficiency and to handle potential issues in dynamic content
  */
 function getTeamCodeFromName(teamName: string): string {
+  // Fast path: check in-memory cache first
+  if (teamCodeCache[teamName]) {
+    return teamCodeCache[teamName];
+  }
+  
+  // Standard mapping of team names to codes
   const teamCodes: { [key: string]: string } = {
     'New York Yankees': 'nyy',
     'Boston Red Sox': 'bos',
@@ -261,6 +402,7 @@ function getTeamCodeFromName(teamName: string): string {
     'Oakland Athletics': 'oak',
     'Texas Rangers': 'tex',
     'Cleveland Guardians': 'cle',
+    'Cleveland Indians': 'cle', // Handle legacy name
     'Minnesota Twins': 'min',
     'Chicago White Sox': 'cws',
     'Detroit Tigers': 'det',
@@ -282,5 +424,14 @@ function getTeamCodeFromName(teamName: string): string {
     'Cincinnati Reds': 'cin'
   };
   
-  return teamCodes[teamName] || teamName.toLowerCase().replace(/\s+/g, '').substring(0, 3);
+  // Handle case variations (MLB.com sometimes has inconsistent casing)
+  const normalizedTeamName = teamName.trim();
+  const code = teamCodes[normalizedTeamName] || 
+               teamCodes[normalizedTeamName.toLowerCase()] || 
+               normalizedTeamName.toLowerCase().replace(/\s+/g, '').substring(0, 3);
+  
+  // Cache the result for future lookups
+  teamCodeCache[teamName] = code;
+  
+  return code;
 }

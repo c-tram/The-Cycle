@@ -1,0 +1,50 @@
+{
+  "data": [
+    {
+      "homeTeam": "Baltimore Orioles",
+      "homeTeamCode": "bal",
+      "awayTeam": "St. Louis Cardinals",
+      "awayTeamCode": "stl",
+      "date": "2025-05-28",
+      "status": "live",
+      "time": "5:35 PM"
+    },
+    {
+      "homeTeam": "Kansas City Royals",
+      "homeTeamCode": "kc",
+      "awayTeam": "Cincinnati Reds",
+      "awayTeamCode": "cin",
+      "date": "2025-05-28",
+      "status": "live",
+      "time": "6:40 PM"
+    },
+    {
+      "homeTeam": "Chicago Cubs",
+      "homeTeamCode": "chc",
+      "awayTeam": "Colorado Rockies",
+      "awayTeamCode": "col",
+      "date": "2025-05-29",
+      "status": "live",
+      "time": "7:05 PM"
+    },
+    {
+      "homeTeam": "Texas Rangers",
+      "homeTeamCode": "tex",
+      "awayTeam": "Toronto Blue Jays",
+      "awayTeamCode": "tor",
+      "date": "2025-05-29",
+      "status": "live",
+      "time": "7:05 PM"
+    },
+    {
+      "homeTeam": "Los Angeles Angels",
+      "homeTeamCode": "laa",
+      "awayTeam": "New York Yankees",
+      "awayTeamCode": "nyy",
+      "date": "2025-05-29",
+      "status": "scheduled",
+      "time": "8:38 PM"
+    }
+  ],
+  "expires": "2025-05-29T01:49:39.657Z"
+}

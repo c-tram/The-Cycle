@@ -1,5 +1,48 @@
 import fetch from 'node-fetch';
 
+/**
+ * Helper function to retry failed API calls
+ * @param fn The async function to retry
+ * @param retries Number of retries
+ * @param delay Delay between retries in ms
+ */
+export async function withRetry<T>(
+  fn: () => Promise<T>, 
+  retries = 3, 
+  delay = 1000
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (retries <= 0) throw error;
+    
+    console.log(`API call failed. Retrying in ${delay}ms... (${retries} attempts left)`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return withRetry(fn, retries - 1, delay * 1.5); // Exponential backoff
+  }
+}
+
+/**
+ * Fetches data from the MLB Stats API with retry mechanism
+ */
+async function fetchFromMLBApi(url: string): Promise<any> {
+  return withRetry(async () => {
+    console.log(`Fetching from MLB API: ${url}`);
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'MLBStatCast/1.0.0',
+        'Accept': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`MLB API error: ${response.status} - ${response.statusText}`);
+    }
+    
+    return response.json();
+  });
+}
+
 // MLB Team ID to abbreviation mapping
 const TEAM_ABBREVIATIONS: { [key: number]: string } = {
   108: 'LAA', // Los Angeles Angels
@@ -235,14 +278,9 @@ export async function fetchGamesFromAPI(): Promise<GameData> {
     const startDate = yesterday.toISOString().split('T')[0];
     const endDate = tomorrow.toISOString().split('T')[0];
     
-    // Fetch games for the date range
-    const response = await fetch(`https://statsapi.mlb.com/api/v1/schedule?startDate=${startDate}&endDate=${endDate}&sportId=1`);
-    
-    if (!response.ok) {
-      throw new Error(`API request failed with status: ${response.status}`);
-    }
-    
-    const data = await response.json() as MLBApiGameResponse;
+    // Fetch games for the date range with retry mechanism
+    const apiUrl = `https://statsapi.mlb.com/api/v1/schedule?startDate=${startDate}&endDate=${endDate}&sportId=1`;
+    const data = await fetchFromMLBApi(apiUrl) as MLBApiGameResponse;
     
     const recent: Game[] = [];
     const upcoming: Game[] = [];

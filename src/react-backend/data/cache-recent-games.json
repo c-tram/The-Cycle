@@ -1,0 +1,55 @@
+{
+  "data": [
+    {
+      "homeTeam": "Cleveland Guardians",
+      "homeTeamCode": "cle",
+      "awayTeam": "Los Angeles Dodgers",
+      "awayTeamCode": "lad",
+      "date": "2025-05-28",
+      "status": "completed",
+      "homeScore": 7,
+      "awayScore": 4
+    },
+    {
+      "homeTeam": "Detroit Tigers",
+      "homeTeamCode": "det",
+      "awayTeam": "San Francisco Giants",
+      "awayTeamCode": "sf",
+      "date": "2025-05-28",
+      "status": "completed",
+      "homeScore": 4,
+      "awayScore": 3
+    },
+    {
+      "homeTeam": "Tampa Bay Rays",
+      "homeTeamCode": "tb",
+      "awayTeam": "Minnesota Twins",
+      "awayTeamCode": "min",
+      "date": "2025-05-28",
+      "status": "completed",
+      "homeScore": 5,
+      "awayScore": 0
+    },
+    {
+      "homeTeam": "New York Mets",
+      "homeTeamCode": "nym",
+      "awayTeam": "Chicago White Sox",
+      "awayTeamCode": "cws",
+      "date": "2025-05-28",
+      "status": "completed",
+      "homeScore": 4,
+      "awayScore": 9
+    },
+    {
+      "homeTeam": "Milwaukee Brewers",
+      "homeTeamCode": "mil",
+      "awayTeam": "Boston Red Sox",
+      "awayTeamCode": "bos",
+      "date": "2025-05-28",
+      "status": "completed",
+      "homeScore": 6,
+      "awayScore": 5
+    }
+  ],
+  "expires": "2025-05-29T04:49:39.657Z"
+}

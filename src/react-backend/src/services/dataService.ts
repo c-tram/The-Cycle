@@ -129,3 +129,59 @@ export async function calculateDailyTrends(playerStatsData: any): Promise<void> 
   
   // ... calculate other trends
 }
+
+/**
+ * Caches data with expiration time support
+ * @param key The cache key
+ * @param data The data to cache
+ * @param expirationMinutes Minutes until the cache expires
+ */
+export function cacheData<T>(key: string, data: T, expirationMinutes: number = 60): void {
+  const cacheItem = {
+    data,
+    expires: new Date(Date.now() + expirationMinutes * 60 * 1000).toISOString()
+  };
+  
+  storeData(`cache-${key}.json`, cacheItem);
+}
+
+/**
+ * Retrieves cached data if it hasn't expired
+ * @param key The cache key
+ * @returns The cached data or null if expired or not found
+ */
+export function getCachedData<T>(key: string): T | null {
+  try {
+    const cacheItem = retrieveData<{ data: T; expires: string }>(`cache-${key}.json`);
+    
+    if (!cacheItem) return null;
+    
+    // Check if cache has expired
+    const expiresDate = new Date(cacheItem.expires);
+    if (expiresDate < new Date()) {
+      console.log(`Cache for ${key} has expired`);
+      return null;
+    }
+    
+    console.log(`Using cached data for ${key} (expires ${formatTimeRemaining(expiresDate)})`);
+    return cacheItem.data;
+  } catch (error) {
+    console.error(`Error retrieving cache for ${key}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Format time remaining until expiration in a human-readable way
+ */
+function formatTimeRemaining(expiresDate: Date): string {
+  const diff = expiresDate.getTime() - Date.now();
+  const minutes = Math.floor(diff / 60000);
+  
+  if (minutes < 60) {
+    return `in ${minutes} minutes`;
+  }
+  
+  const hours = Math.floor(minutes / 60);
+  return `in ${hours} hours`;
+}
