@@ -1,6 +1,12 @@
 /**
  * MLB.com Website Scraping Tests
  * Tests for analyzing MLB.com pages structure (converted from analyze-mlb-stats-pages.js)
+ * 
+ * Note: This test is expected to detect dynamic content loading on MLB.com pages.
+ * Our application is designed to handle this by:
+ * 1. Using the MLB Stats API as the primary data source
+ * 2. Falling back to web scraping only when the API fails
+ * 3. Using mock data as a final fallback
  */
 
 import fetch from 'node-fetch';
@@ -185,8 +191,10 @@ describe('MLB.com Website Analysis', () => {
       // At least expect some JavaScript on a modern MLB.com page
       expect(scriptTags.length).toBeGreaterThan(0);
       
-      if (hasReact || hasVue || hasAngular) {
+      if (hasReact || hasVue || hasAngular || hasAjax) {
         console.log('⚠️  Page likely uses dynamic content loading - static scraping may be limited');
+        // This warning is expected and not a test failure 
+        // We have fallback mechanisms in place
       }
     }, testTimeout);
   });

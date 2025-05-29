@@ -33,21 +33,39 @@ interface Game {
  */
 export async function scrapeGames(): Promise<{ recent: Game[], upcoming: Game[] }> {
   try {
-    console.log("Starting HTTP-based game scraper...");
+    console.log("Starting game data collection process...");
+
+    // First, try to fetch games using the MLB Stats API
+    try {
+      console.log("Attempting to fetch games from MLB Stats API...");
+      // Import dynamically to avoid circular dependencies
+      const { fetchGamesFromAPI } = await import('./mlbStatsApiService');
+      const apiGames = await fetchGamesFromAPI();
+      
+      if (apiGames.recent.length > 0 || apiGames.upcoming.length > 0) {
+        console.log(`Successfully retrieved ${apiGames.recent.length} recent games and ${apiGames.upcoming.length} upcoming games from API`);
+        return apiGames;
+      }
+      console.log("No games found from MLB Stats API, falling back to web scraping");
+    } catch (apiError) {
+      console.error('Error fetching games from MLB Stats API:', apiError);
+      console.log("Falling back to web scraping due to API error");
+    }
+    
+    // Fallback to web scraping if API fails
+    console.log("Starting HTTP-based game scraper as fallback...");
     
     console.log("Scraping recent games...");
-    // Scrape completed games
     const recentGames = await scrapeRecentGames();
     console.log(`Found ${recentGames.length} recent games`);
     
     console.log("Scraping upcoming games...");
-    // Scrape upcoming games
     const upcomingGames = await scrapeUpcomingGames();
     console.log(`Found ${upcomingGames.length} upcoming games`);
     
-    // Return mock data if no real data was found
+    // Return mock data if no real data was found from either source
     if (recentGames.length === 0 && upcomingGames.length === 0) {
-      console.log("No games found, using mock data");
+      console.log("No games found from any source, using mock data");
       return MOCK_GAMES;
     }
     
@@ -56,7 +74,7 @@ export async function scrapeGames(): Promise<{ recent: Game[], upcoming: Game[] 
       upcoming: upcomingGames.length > 0 ? upcomingGames : MOCK_GAMES.upcoming
     };
   } catch (error) {
-    console.error('Error scraping games:', error);
+    console.error('Error retrieving games data:', error);
     // Fallback to mock data on error
     console.log("Returning mock game data due to error");
     return MOCK_GAMES;

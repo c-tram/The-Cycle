@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-# Dev run script for The Cycle - last updated: 2025-05-17 by coletrammell
+# Dev run script for The Cycle - last updated: 2025-05-28 by coletrammell
 # Use this script to run both backend and frontend in dev mode
 # Update this comment with each commit to track changes
 
