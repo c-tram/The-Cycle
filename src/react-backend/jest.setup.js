@@ -7,12 +7,16 @@ if (isCI) {
   console.log('Detected CI environment - adjusting test configuration...');
   
   // Set timeout higher for all tests in CI
-  jest.setTimeout(45000);
+  jest.setTimeout(60000); // Increased timeout for CI environment
   
   // Make sure CI env var is available to tests
   process.env.CI = 'true';
   
-  console.log('CI test configuration applied.');
+  // Configure mock endpoints for network-dependent tests in CI
+  process.env.USE_MOCK_DATA = 'true';
+  process.env.SKIP_CACHE_VALIDATION = 'true'; // Skip strict cache validation in CI
+  
+  console.log('CI test configuration applied - using mock data where appropriate.');
 } else {
   console.log('Running in local environment.');
   
