@@ -2,53 +2,66 @@
  * Test file for verifying the caching mechanisms in the MLB Statcast analytics pipeline
  */
 
-import { cacheData, getCachedData } from '../services/dataService';
+import { getCachedData } from '../services/dataService';
 import { scrapeGames } from '../scrapers/gamesScraper';
 
-// Simple test to verify cache functionality
-async function testCaching() {
-  console.log("Testing MLB Statcast caching mechanisms...");
-
-  // Clear any existing cache first
-  try {
-    console.log("Step 1: Getting games data (first run - should scrape fresh data)");
+// Proper Jest test suite
+describe('MLB Statcast Cache Functionality', () => {
+  
+  // Test case for verifying cache mechanism
+  test('should cache game data on first run and use cache on second run', async () => {
+    // Execute first run and measure performance
     const firstRunStart = Date.now();
     const firstRunResult = await scrapeGames();
     const firstRunTime = Date.now() - firstRunStart;
     
-    console.log(`First run completed in ${firstRunTime}ms`);
-    console.log(`Retrieved ${firstRunResult.recent.length} recent games and ${firstRunResult.upcoming.length} upcoming games`);
+    // Verify we got data from first run
+    expect(firstRunResult).toBeDefined();
+    expect(firstRunResult.recent).toBeInstanceOf(Array);
+    expect(firstRunResult.upcoming).toBeInstanceOf(Array);
     
-    // Wait a second to ensure timestamp differences
+    // Wait to ensure timestamp differences
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    console.log("\nStep 2: Getting games data again (should use cache)");
+    // Execute second run and measure performance
     const secondRunStart = Date.now();
     const secondRunResult = await scrapeGames();
     const secondRunTime = Date.now() - secondRunStart;
     
-    console.log(`Second run completed in ${secondRunTime}ms`);
-    console.log(`Retrieved ${secondRunResult.recent.length} recent games and ${secondRunResult.upcoming.length} upcoming games`);
+    // Verify second run also returns valid data
+    expect(secondRunResult).toBeDefined();
+    expect(secondRunResult.recent).toBeInstanceOf(Array);
+    expect(secondRunResult.upcoming).toBeInstanceOf(Array);
     
-    // Validate that second run was significantly faster (cached)
-    if (secondRunTime < firstRunTime / 2) {
-      console.log("\n✅ SUCCESS: Second run was much faster, indicating cache was used");
-    } else {
-      console.log("\n⚠️ WARNING: Second run wasn't significantly faster, cache may not be working as expected");
-    }
+    // Check that recent and upcoming games are equal between runs
+    expect(secondRunResult.recent.length).toBe(firstRunResult.recent.length);
+    expect(secondRunResult.upcoming.length).toBe(firstRunResult.upcoming.length);
     
-    // Check individual component caches
-    console.log("\nStep 3: Checking component caches");
+    // Expect the second run to be faster, indicating cache was used
+    // Note: This may be flaky in CI environments but should work locally
+    expect(secondRunTime).toBeLessThan(firstRunTime);
+  });
+
+  // Test for verifying component caches
+  test('should create separate caches for components', async () => {
+    // Run scrapeGames first to populate caches
+    await scrapeGames();
+    
+    // Check if component caches exist
     const recentGamesCache = getCachedData('recent-games');
     const upcomingGamesCache = getCachedData('upcoming-games');
     
-    console.log(`Recent games cache exists: ${recentGamesCache !== null}`);
-    console.log(`Upcoming games cache exists: ${upcomingGamesCache !== null}`);
+    // Verify caches exist and contain data
+    expect(recentGamesCache).toBeTruthy();
+    expect(upcomingGamesCache).toBeTruthy();
     
-  } catch (error) {
-    console.error("Error during cache testing:", error);
-  }
-}
-
-// Run the test
-testCaching();
+    // If caches exist, verify they contain arrays
+    if (recentGamesCache) {
+      expect(Array.isArray(recentGamesCache)).toBe(true);
+    }
+    
+    if (upcomingGamesCache) {
+      expect(Array.isArray(upcomingGamesCache)).toBe(true);
+    }
+  });
+});
