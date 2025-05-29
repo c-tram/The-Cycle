@@ -3,6 +3,27 @@
 ## Overview
 Successfully converted all standalone JavaScript test files from the root directory into proper Jest/Vitest test suites within the backend testing framework.
 
+## May 29, 2025 Update: Azure Pipeline Test Fix
+Made tests more resilient in CI/CD environments to fix discrepancies between local test runs and Azure Pipeline executions:
+
+1. **Environment Detection**:
+   - Added CI environment detection to adjust test behavior
+   - Created Jest setup file for environment-specific configuration
+
+2. **Dynamic Content Handling**:
+   - Added timeout protection for MLB.com requests
+   - Implemented graceful error handling with fallbacks
+
+3. **Test Configuration**:
+   - Updated timeouts and jest configuration
+   - Modified timing-sensitive tests for CI environments
+
+4. **Pipeline Configuration**:
+   - Added environment variables to Azure pipeline
+   - Set explicit memory allocation and timeouts
+
+These changes make our test suite more robust across different environments while preserving test coverage.
+
 ## Converted Files
 
 ### 1. **simple-api-test.js** → **mlb-api.test.ts**

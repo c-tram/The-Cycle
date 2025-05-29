@@ -1,5 +1,8 @@
 {
   "preset": "ts-jest",
   "testEnvironment": "node",
-  "roots": ["<rootDir>/src"]
+  "roots": ["<rootDir>/src"],
+  "testTimeout": 30000,
+  "verbose": true,
+  "setupFilesAfterEnv": ["<rootDir>/jest.setup.js"]
 }

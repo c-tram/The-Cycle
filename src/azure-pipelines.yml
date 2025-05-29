@@ -48,6 +48,11 @@ stages:
   jobs:
   - job: Test
     displayName: Run unit and integration tests
+    variables:
+      CI: 'true'
+      AZURE_PIPELINE: 'true'
+      NODE_OPTIONS: '--max-old-space-size=4096'
+      TEST_TIMEOUT: '60000'
     pool:
       vmImage: $(vmImageName)
     steps:
