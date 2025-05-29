@@ -8,9 +8,19 @@ import fetch from 'node-fetch';
 describe('Backend API Integration', () => {
   const baseUrl = 'http://localhost:3000/api';
   const testTimeout = 30000; // 30 seconds for API calls
+  
+  // Helper function to conditionally skip tests that need localhost server in CI
+  const conditionalTest = (name: string, fn: () => Promise<void>, timeout?: number) => {
+    if (process.env.SKIP_LOCALHOST_TESTS === 'true') {
+      console.log(`Skipping localhost test in CI: ${name}`);
+      test.skip(name, fn, timeout);
+    } else {
+      test(name, fn, timeout);
+    }
+  };
 
   describe('Roster Endpoint', () => {
-    test('should return pitching stats for Yankees', async () => {
+    conditionalTest('should return pitching stats for Yankees', async () => {
       const response = await fetch(`${baseUrl}/roster?team=nyy&period=season&statType=pitching`);
       
       expect(response.ok).toBe(true);
@@ -37,7 +47,7 @@ describe('Backend API Integration', () => {
       console.log(`Sample pitcher: ${pitcher.name} - ERA: ${pitcher.era}, WHIP: ${pitcher.whip}`);
     }, testTimeout);
 
-    test('should return batting stats for Yankees (hitting normalization)', async () => {
+    conditionalTest('should return batting stats for Yankees (hitting normalization)', async () => {
       const response = await fetch(`${baseUrl}/roster?team=nyy&period=season&statType=batting`);
       
       expect(response.ok).toBe(true);
@@ -63,7 +73,7 @@ describe('Backend API Integration', () => {
       console.log(`Sample hitter: ${hitter.name} - AVG: ${hitter.avg}, HR: ${hitter.hr}, RBI: ${hitter.rbi}`);
     }, testTimeout);
 
-    test('should return hitting stats for Yankees (explicit hitting)', async () => {
+    conditionalTest('should return hitting stats for Yankees (explicit hitting)', async () => {
       const response = await fetch(`${baseUrl}/roster?team=nyy&period=season&statType=hitting`);
       
       expect(response.ok).toBe(true);
@@ -81,7 +91,7 @@ describe('Backend API Integration', () => {
       console.log(`✅ Found ${teamData.players.length} hitters for Yankees (explicit hitting)`);
     }, testTimeout);
 
-    test('should work for multiple teams', async () => {
+    conditionalTest('should work for multiple teams', async () => {
       const teams = ['nyy', 'bos', 'lad'];
       
       for (const team of teams) {
@@ -97,7 +107,7 @@ describe('Backend API Integration', () => {
       }
     }, testTimeout);
 
-    test('should validate realistic statistical values', async () => {
+    conditionalTest('should validate realistic statistical values', async () => {
       const response = await fetch(`${baseUrl}/roster?team=nyy&period=season&statType=pitching`);
       const data = await response.json();
       const pitchers = data[0].players.slice(0, 3); // Test first 3 pitchers
@@ -127,7 +137,7 @@ describe('Backend API Integration', () => {
   });
 
   describe('Other API Endpoints', () => {
-    test('should return standings data', async () => {
+    conditionalTest('should return standings data', async () => {
       const response = await fetch(`${baseUrl}/standings`);
       
       expect(response.ok).toBe(true);
@@ -144,7 +154,7 @@ describe('Backend API Integration', () => {
       }
     }, testTimeout);
 
-    test('should return games data', async () => {
+    conditionalTest('should return games data', async () => {
       const response = await fetch(`${baseUrl}/games`);
       
       expect(response.ok).toBe(true);
@@ -155,7 +165,7 @@ describe('Backend API Integration', () => {
       console.log(`✅ Games endpoint working - Recent: ${data.recent?.length || 0}, Upcoming: ${data.upcoming?.length || 0}`);
     }, testTimeout);
 
-    test('should return trends data', async () => {
+    conditionalTest('should return trends data', async () => {
       const response = await fetch(`${baseUrl}/trends`);
       
       expect(response.ok).toBe(true);
@@ -167,7 +177,7 @@ describe('Backend API Integration', () => {
   });
 
   describe('Error Handling', () => {
-    test('should handle invalid team abbreviation', async () => {
+    conditionalTest('should handle invalid team abbreviation', async () => {
       const response = await fetch(`${baseUrl}/roster?team=invalid&period=season&statType=batting`);
       
       // Should either return an error status or fallback data
@@ -180,7 +190,7 @@ describe('Backend API Integration', () => {
       }
     }, testTimeout);
 
-    test('should handle missing parameters gracefully', async () => {
+    conditionalTest('should handle missing parameters gracefully', async () => {
       const response = await fetch(`${baseUrl}/roster`);
       
       // Should either return an error or default to some team

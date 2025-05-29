@@ -14,7 +14,8 @@ if (isCI) {
   
   // Configure mock endpoints for network-dependent tests in CI
   process.env.USE_MOCK_DATA = 'true';
-  process.env.SKIP_CACHE_VALIDATION = 'true'; // Skip strict cache validation in CI
+  process.env.SKIP_CACHE_VALIDATION = 'true';
+  process.env.SKIP_LOCALHOST_TESTS = 'true';
   
   console.log('CI test configuration applied - using mock data where appropriate.');
 } else {
