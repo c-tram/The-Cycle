@@ -10,31 +10,30 @@
   margin-bottom: 30px;
 }
 
-.trend-selector, .team-selector, .period-selector {.analysis h3 {
-  margin-top: 0;
-  margin-bottom: 15px;
-  color: var(--primary-text);
-  border-bottom: 2px solid var(--mlb-red);
-  padding-bottom: 8px;
-}ground: linear-gradient(145deg, var(--card-bg) 0%, var(--card-bg-alt) 100%);
+.trend-selector, .team-selector, .period-selector, .analysis {
+  background: linear-gradient(145deg, var(--card-bg) 0%, var(--card-bg-alt) 100%);
   border: 2px solid var(--mlb-red-alpha);
   border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   padding: 24px;
+  margin-bottom: 20px;
   transition: all 0.3s ease;
 }
 
-.trend-selector:hover, .team-selector:hover, .period-selector:hover {
+.trend-selector:hover, .team-selector:hover, .period-selector:hover, .analysis:hover {
   border-color: var(--mlb-red);
-  box-shadow: 0 6px 20px rgba(213, 0, 0, 0.15);
+  box-shadow: 0 8px 24px rgba(213, 0, 0, 0.15);
+  transform: translateY(-3px);
 }
 
-.trend-selector h3, .team-selector h3, .period-selector h3 {
+.trend-selector h3, .team-selector h3, .period-selector h3, .analysis h3 {
   margin-top: 0;
   margin-bottom: 18px;
   color: var(--text-on-light);
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
+  border-bottom: 2px solid var(--mlb-red);
+  padding-bottom: 12px;
 }
 
 .selector-controls {

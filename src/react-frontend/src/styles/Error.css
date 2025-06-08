@@ -3,37 +3,40 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px;
+  padding: 32px 24px;
   margin: 20px auto;
   text-align: center;
-  background-color: #2a1a1a;
-  border-radius: 8px;
-  border: 1px solid #ff3333;
+  background: linear-gradient(145deg, var(--card-bg) 0%, var(--card-bg-alt) 100%);
+  border: 2px solid var(--mlb-red);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  max-width: 400px;
 }
 
 .error-icon {
   font-size: 2rem;
-  color: #d32f2f;
+  color: var(--mlb-red);
   margin-bottom: 15px;
 }
 
 .error-message {
   font-size: 1rem;
-  color: #d32f2f;
+  color: var(--text-on-light);
   margin-bottom: 20px;
 }
 
 .retry-button {
-  background-color: #4caf50;
-  color: #ffffff;
+  background: linear-gradient(135deg, var(--mlb-red) 0%, var(--mlb-red-dark) 100%);
+  color: var(--white);
   border: none;
   border-radius: 4px;
   padding: 8px 16px;
   cursor: pointer;
   font-size: 0.9rem;
   transition: background-color 0.3s;
+  font-weight: 600;
 }
 
 .retry-button:hover {
-  background-color: #388e3c;
+  background: linear-gradient(135deg, var(--mlb-red-light) 0%, var(--mlb-red) 100%);
 }
