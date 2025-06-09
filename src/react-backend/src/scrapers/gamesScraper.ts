@@ -45,7 +45,7 @@ export async function scrapeGames(): Promise<{ recent: Game[], upcoming: Game[] 
     console.log("Starting game data collection process...");
 
     // Try to get cached games data first (main cache)
-    const cachedGames = getCachedData<{ recent: Game[], upcoming: Game[] }>('games');
+    const cachedGames = await getCachedData<{ recent: Game[], upcoming: Game[] }>('games');
     if (cachedGames) {
       console.log("Using cached games data (expires in separate cache entry)");
       return cachedGames;
@@ -185,7 +185,7 @@ export async function scrapeGames(): Promise<{ recent: Game[], upcoming: Game[] 
 async function scrapeRecentGames(): Promise<Game[]> {
   try {
     // Try to get cached recent games first
-    const cachedRecent = getCachedData<Game[]>('recent-games');
+    const cachedRecent = await getCachedData<Game[]>('recent-games');
     if (cachedRecent) {
       console.log("Using cached recent games data");
       return cachedRecent;
@@ -291,7 +291,7 @@ async function scrapeRecentGames(): Promise<Game[]> {
 async function scrapeUpcomingGames(): Promise<Game[]> {
   try {
     // Try to get cached upcoming games first
-    const cachedUpcoming = getCachedData<Game[]>('upcoming-games');
+    const cachedUpcoming = await getCachedData<Game[]>('upcoming-games');
     if (cachedUpcoming) {
       console.log("Using cached upcoming games data");
       return cachedUpcoming;

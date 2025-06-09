@@ -10,6 +10,8 @@ import { fetchStandingsFromAPI, fetchGamesFromAPI } from './scrapers/mlbStatsApi
 import { storeData, retrieveData, calculateDailyTrends } from './services/dataService';
 import playersRouter from './routes/v1/players';
 import { TEAM_ID_MAP, TEAM_NAME_MAP } from './constants/teams';
+// Import Redis client for health checks
+import redisCache from './services/redisCache';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -55,9 +57,28 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json(errorResponse);
 });
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check endpoint with Redis status
+app.get('/api/health', async (req, res) => {
+  try {
+    // Check Redis connection
+    const redisStatus = await redisCache.ping();
+    
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      redis: redisStatus ? 'connected' : 'disconnected',
+      cacheType: process.env.NODE_ENV === 'production' ? 'redis' : 'file'
+    });
+  } catch (err) {
+    console.error('Health check error:', err);
+    res.status(500).json({ 
+      status: 'error', 
+      timestamp: new Date().toISOString(),
+      redis: 'error',
+      message: err instanceof Error ? err.message : 'Unknown error'
+    });
+  }
 });
 
 // Use absolute path for static files
@@ -482,6 +503,21 @@ app.get('/api/trends', (req, res) => {
   })();
 });
 
+// Redis health check endpoint
+app.get('/api/health/redis', async (req, res) => {
+  try {
+    // Check Redis connection
+    const isRedisConnected = await redisCache.ping();
+    res.json({ redis: 'connected' });
+  } catch (err) {
+    console.error('Redis health check error:', err);
+    res.status(500).json({ 
+      redis: 'not connected', 
+      error: err instanceof Error ? err.message : 'Unknown error' 
+    });
+  }
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
@@ -490,4 +526,5 @@ app.listen(port, () => {
   console.log(` - /api/games`);
   console.log(` - /api/standings`);
   console.log(` - /api/trends`);
+  console.log(` - /api/health/redis`); // Redis health check endpoint
 });

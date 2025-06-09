@@ -78,8 +78,8 @@ class MLBDataService {
 
   private async loadCachedData() {
     console.log('Loading cached data...');
-    const cachedPlayers = retrieveData<PlayerDataMap>('player-registry.json');
-    const cachedTeams = retrieveData<TeamDataMap>('team-registry.json');
+    const cachedPlayers = await retrieveData<PlayerDataMap>('player-registry.json');
+    const cachedTeams = await retrieveData<TeamDataMap>('team-registry.json');
     
     if (cachedPlayers) {
       this.playerRegistry = cachedPlayers;
