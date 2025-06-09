@@ -13,13 +13,18 @@ A comprehensive MLB dashboard application providing real-time standings, player 
 
 ### Technical Features
 - **HTTP-Based Scraping**: Lightweight data collection using fetch + cheerio (no browser automation)
+- **Redis Caching**: High-performance in-memory caching with Azure Redis Cache support
 - **TypeScript**: Full type safety across frontend and backend
 - **Dockerized**: Container-ready for easy deployment
-- **Azure-Ready**: Built for Azure cloud deployment with DevOps pipelines
+- **Azure-Ready**: Built for Azure cloud deployment with DevOps pipelines and AAD authentication
 - **REST API**: Clean API endpoints for all data access
 - **Responsive UI**: Modern React interface with custom styling
 
 ## 🚀 Quick Start
+
+### Prerequisites
+- **Node.js** 18+ with npm
+- **Redis** (for local development) or **Azure Redis Cache** (for production)
 
 ### Development Setup
 
@@ -29,20 +34,39 @@ A comprehensive MLB dashboard application providing real-time standings, player 
    npm install
    ```
 
-2. **Start the development server**
+2. **Configure Redis (choose one option)**
+   
+   **Option A: Local Redis**
+   ```bash
+   # Install and start Redis locally
+   brew install redis  # macOS
+   redis-server        # Start Redis server
+   ```
+   
+   **Option B: Azure Redis Cache**
+   ```bash
+   # Set environment variables
+   export REDIS_HOST=your-redis-cache.redis.cache.windows.net
+   export REDIS_PORT=6380
+   export REDIS_PASSWORD=your-redis-key
+   export REDIS_TLS=true
+   export REDIS_AUTH_MODE=key  # or 'aad' for Azure AD authentication
+   ```
+
+3. **Start the development server**
    ```bash
    npm run dev
    ```
    - Backend API: [http://localhost:3000](http://localhost:3000)
    - Endpoints available at `/api/*`
 
-3. **Install frontend dependencies** (separate terminal)
+4. **Install frontend dependencies** (separate terminal)
    ```bash
    cd src/react-frontend
    npm install
    ```
 
-4. **Start the frontend**
+5. **Start the frontend**
    ```bash
    npm run dev
    ```
@@ -67,11 +91,21 @@ A comprehensive MLB dashboard application providing real-time standings, player 
 ### Build and Run Container
 
 ```bash
-# Build the Docker image
-docker build -t mlb-dashboard .
+# Build the Docker image with Redis configuration
+docker build -t mlb-dashboard \
+  --build-arg REDIS_HOST=your-redis-host \
+  --build-arg REDIS_PORT=6379 \
+  --build-arg REDIS_AUTH_MODE=key \
+  .
 
-# Run the container
-docker run -p 3000:3000 mlb-dashboard
+# Run the container with Redis environment variables
+docker run -p 3000:3000 \
+  -e REDIS_HOST=your-redis-host \
+  -e REDIS_PORT=6379 \
+  -e REDIS_PASSWORD=your-redis-password \
+  -e REDIS_TLS=true \
+  -e REDIS_AUTH_MODE=key \
+  mlb-dashboard
 ```
 
 The containerized app will be available at [http://localhost:3000](http://localhost:3000)
@@ -88,7 +122,7 @@ docker push your-registry.azurecr.io/mlb-dashboard:latest
 
 ## 📡 API Endpoints
 
-All endpoints return JSON data and include error handling with fallback mock data.
+All endpoints return JSON data with intelligent Redis caching for optimal performance. Cache expiration times are optimized per data type (standings: 30min, stats: 60min, games: 15min).
 
 ### `/api/standings`
 Returns current MLB division standings
@@ -160,36 +194,39 @@ Returns trend analysis data
 }
 ```
 
-## 🔄 Migration: Puppeteer → HTTP Scraping
+## 🔄 Migration: Local Files → Redis Caching
 
-**Successfully completed migration from browser automation to HTTP-based scraping (May 2025)**
+**Successfully completed migration from local file caching to Redis-based caching (June 2025)**
 
 ### What Changed
-- **Removed Dependencies**: Puppeteer, puppeteer-extra, puppeteer-extra-plugin-stealth
-- **Added Dependencies**: node-fetch, cheerio, @types/cheerio, @types/node-fetch
-- **Updated All Scrapers**: Converted 4 scrapers to use HTTP requests instead of browser automation
+- **Removed**: Local JSON file caching in `data/` directory
+- **Added**: Redis-based in-memory caching with configurable TTL
+- **Enhanced**: Support for both local Redis and Azure Redis Cache
+- **Implemented**: Azure AD authentication for enterprise Redis instances
 
 ### Benefits
-- **Faster Performance**: No browser overhead or startup time
-- **Lower Resource Usage**: Reduced memory and CPU consumption by ~80%
-- **Better Deployment**: No need for browser dependencies in containers
-- **Improved Reliability**: Less prone to timeout and navigation errors
-- **Smaller Container Size**: Significantly reduced Docker image size
+- **Faster Performance**: In-memory caching vs file I/O operations
+- **Scalability**: Multiple application instances can share cache
+- **Cloud-Ready**: Native Azure Redis Cache integration
+- **Configurable TTL**: Optimized cache expiration per data type
+- **High Availability**: Redis clustering and failover support
+- **Security**: Azure AD authentication and TLS encryption
 
-### Technical Implementation
+### Cache Configuration
 ```typescript
-// Before (Puppeteer)
-const browser = await puppeteer.launch();
-const page = await browser.newPage();
-await page.goto(url);
-const data = await page.$eval('selector', el => el.textContent);
-
-// After (HTTP + Cheerio)
-const response = await fetch(url);
-const html = await response.text();
-const $ = cheerio.load(html);
-const data = $('selector').text();
+// Cache TTL by data type
+const cacheTTL = {
+  standings: 30 * 60,     // 30 minutes
+  playerStats: 60 * 60,   // 60 minutes  
+  games: 15 * 60,         // 15 minutes
+  trends: 120 * 60        // 2 hours
+};
 ```
+
+### Redis Authentication Modes
+- **Key Authentication**: Traditional Redis password-based auth
+- **Azure AD Authentication**: Enterprise SSO with managed identities
+- **Automatic Fallback**: In-memory cache when Redis unavailable
 
 ## 🚀 Recent Updates & Upcoming Features
 

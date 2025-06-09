@@ -33,6 +33,37 @@ const redisConfig: RedisOptions = {
 // Using "any" type here to accommodate both Cluster and Redis interfaces
 let redisClient: any;
 
+// Dummy client for graceful degradation when Redis is unavailable
+function createDummyClient() {
+    const memoryCache = new Map();
+    console.warn('Using in-memory fallback instead of Redis');
+    
+    return {
+        set: async (key: string, value: string, ...args: any[]) => {
+            memoryCache.set(key, value);
+            return 'OK';
+        },
+        get: async (key: string) => memoryCache.get(key) || null,
+        del: async (...keys: string[]) => {
+            keys.forEach(k => memoryCache.delete(k));
+            return keys.length;
+        },
+        keys: async (pattern: string) => {
+            const regex = new RegExp(pattern.replace('*', '.*'));
+            return Array.from(memoryCache.keys()).filter(k => regex.test(k));
+        },
+        ping: async () => 'PONG',
+        on: (event: string, handler: Function) => {},
+        auth: async (token: string) => 'OK',
+    };
+}
+
+// Check if we're in a test environment and should use dummy client
+if (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID !== undefined || process.env.CI === 'true') {
+    console.log('Test environment detected, using dummy Redis client');
+    redisClient = createDummyClient();
+}
+
 // Function to get AAD token for Redis
 async function getAadTokenForRedis(): Promise<string | undefined> {
     try {
@@ -79,7 +110,7 @@ async function getAadTokenForRedis(): Promise<string | undefined> {
 }
 
 // Check if using Azure Redis Cache in cluster mode 
-if (process.env.REDIS_CLUSTER === 'true') {
+if (process.env.REDIS_CLUSTER === 'true' && !redisClient) {
     try {
         const hosts = (process.env.REDIS_HOST || '').split(',').map(host => ({
             host: host.trim(),
@@ -108,7 +139,8 @@ if (process.env.REDIS_CLUSTER === 'true') {
         console.log('Falling back to standard Redis mode');
     }
 } else {
-    // Create a standard client
+    // Create a standard client (only if not already created for test environment)
+    if (!redisClient) {
     try {
         if (process.env.REDIS_AUTH_MODE === 'aad') {
             // For AAD authentication, we need to create a custom authentication handler
@@ -151,48 +183,32 @@ if (process.env.REDIS_CLUSTER === 'true') {
         // Create a dummy client for graceful failure
         redisClient = createDummyClient();
     }
+    } // End of if (!redisClient)
 }
 
-// Dummy client for graceful degradation when Redis is unavailable
-function createDummyClient() {
-    const memoryCache = new Map();
-    console.warn('Using in-memory fallback instead of Redis');
-    
-    return {
-        set: async (key: string, value: string, ...args: any[]) => {
-            memoryCache.set(key, value);
-            return 'OK';
-        },
-        get: async (key: string) => memoryCache.get(key) || null,
-        del: async (...keys: string[]) => {
-            keys.forEach(k => memoryCache.delete(k));
-            return keys.length;
-        },
-        keys: async (pattern: string) => {
-            const regex = new RegExp(pattern.replace('*', '.*'));
-            return Array.from(memoryCache.keys()).filter(k => regex.test(k));
-        },
-        ping: async () => 'PONG',
-        on: (event: string, handler: Function) => {},
-    };
+// Only add event listeners if not in test environment
+if (process.env.NODE_ENV !== 'test' && process.env.JEST_WORKER_ID === undefined) {
+    redisClient.on('error', (err: Error) => {
+        console.error('Redis Client Error:', err);
+    });
+
+    redisClient.on('connect', () => {
+        console.log('Redis Client Connected');
+    });
+
+    redisClient.on('ready', () => {
+        console.log('Redis Client Ready');
+    });
 }
-
-redisClient.on('error', (err: Error) => {
-    console.error('Redis Client Error:', err);
-});
-
-redisClient.on('connect', () => {
-    console.log('Redis Client Connected');
-});
-
-redisClient.on('ready', () => {
-    console.log('Redis Client Ready');
-});
 
 // Track Redis readiness for AAD authentication
-let redisReady = process.env.REDIS_AUTH_MODE !== 'aad'; // For key auth, assume ready immediately
+let redisReady = process.env.REDIS_AUTH_MODE !== 'aad' || 
+                 process.env.NODE_ENV === 'test' || 
+                 process.env.JEST_WORKER_ID !== undefined; // Assume ready for tests
 
-if (process.env.REDIS_AUTH_MODE === 'aad') {
+if (process.env.REDIS_AUTH_MODE === 'aad' && 
+    process.env.NODE_ENV !== 'test' && 
+    process.env.JEST_WORKER_ID === undefined) {
     redisClient.on('ready', () => {
         redisReady = true;
     });
