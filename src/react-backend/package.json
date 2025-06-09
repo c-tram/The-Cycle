@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@azure/identity": "^4.10.0",
     "@types/node-schedule": "^2.1.7",
     "cheerio": "^1.1.0",
     "cors": "^2.8.5",

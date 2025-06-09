@@ -24,6 +24,7 @@ fi
 export REDIS_HOST=localhost
 export REDIS_PORT=6379
 export REDIS_TLS=false
+export REDIS_AUTH_MODE=key
 
 # Start Redis container in the background
 echo "Starting Redis container..."

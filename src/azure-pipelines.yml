@@ -25,7 +25,7 @@ variables:
   redisLocation: '$(LOCATION)'
   redisSku: '$(SKU)'
   redisFamily: '$(FAMILY)'
-  redisCapacity: $(CAPACITY)'
+  redisCapacity: '$(CAPACITY)'
 
   # Agent VM image name
   vmImageName: 'ubuntu-latest'
@@ -109,7 +109,7 @@ stages:
         buildArgs: |
           REDIS_HOST=$(REDIS_HOST)
           REDIS_PORT=$(REDIS_PORT)
-          REDIS_PASSWORD=$(REDIS_PASSWORD)
+          REDIS_AUTH_MODE=$(REDIS_AUTH_MODE)
           NODE_ENV=production
         tags: |
           $(tag)

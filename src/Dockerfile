@@ -7,18 +7,18 @@ WORKDIR /usr/src/app
 # Install curl for health checks and redis-tools for debugging
 RUN apt-get update && apt-get install -y curl redis-tools && rm -rf /var/lib/apt/lists/*
 
-# Set build arguments for Redis configuration
+# Set build arguments for non-sensitive Redis configuration
 ARG REDIS_HOST=localhost
 ARG REDIS_PORT=6379
-ARG REDIS_PASSWORD=
 ARG NODE_ENV=production
 ARG REDIS_TLS=true
+ARG REDIS_AUTH_MODE=key
 
-# Set environment variables
+# Set environment variables (sensitive data will be provided at runtime)
 ENV REDIS_HOST=$REDIS_HOST \
     REDIS_PORT=$REDIS_PORT \
-    REDIS_PASSWORD=$REDIS_PASSWORD \
     REDIS_TLS=$REDIS_TLS \
+    REDIS_AUTH_MODE=$REDIS_AUTH_MODE \
     NODE_ENV=$NODE_ENV
 
 # Copy root package files and install root dependencies (if any)
@@ -54,6 +54,11 @@ RUN echo '#!/bin/bash\n\
 echo "Checking Redis connection..."\n\
 if [ "$NODE_ENV" = "production" ]; then\n\
   echo "Running in production mode with Redis"\n\
+  if [ "$REDIS_AUTH_MODE" = "aad" ]; then\n\
+    echo "Using Azure AD authentication for Redis"\n\
+  else\n\
+    echo "Using key authentication for Redis"\n\
+  fi\n\
   echo "Starting application..."\n\
   node react-backend/dist/index.js\n\
 else\n\
