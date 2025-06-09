@@ -15,6 +15,7 @@ import Overview from './pages/Overview';
 import Teams from './pages/Teams';
 import Standings from './pages/Standings';
 import Trends from './pages/Trends';
+import PlayerSearch from './pages/PlayerSearch';
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -48,6 +49,7 @@ function App() {
                     <Route path="/teams" element={<Teams />} />
                     <Route path="/standings" element={<Standings />} />
                     <Route path="/trends" element={<Trends />} />
+                    <Route path="/players" element={<PlayerSearch />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
                 </div>

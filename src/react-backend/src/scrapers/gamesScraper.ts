@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
 import { cacheData, getCachedData } from '../services/dataService';
 import { withRetry } from './mlbStatsApiService';
+import { TEAM_ID_MAP } from '../constants/teams';
 
 // Add mock data for when scraping fails
 const MOCK_GAMES = {
@@ -388,50 +389,55 @@ function getTeamCodeFromName(teamName: string): string {
   if (teamCodeCache[teamName]) {
     return teamCodeCache[teamName];
   }
-  
-  // Standard mapping of team names to codes
-  const teamCodes: { [key: string]: string } = {
-    'New York Yankees': 'nyy',
-    'Boston Red Sox': 'bos',
-    'Tampa Bay Rays': 'tb',
-    'Toronto Blue Jays': 'tor',
-    'Baltimore Orioles': 'bal',
-    'Houston Astros': 'hou',
-    'Seattle Mariners': 'sea',
-    'Los Angeles Angels': 'laa',
-    'Oakland Athletics': 'oak',
-    'Texas Rangers': 'tex',
-    'Cleveland Guardians': 'cle',
-    'Cleveland Indians': 'cle', // Handle legacy name
-    'Minnesota Twins': 'min',
-    'Chicago White Sox': 'cws',
-    'Detroit Tigers': 'det',
-    'Kansas City Royals': 'kc',
-    'Los Angeles Dodgers': 'lad',
-    'San Diego Padres': 'sd',
-    'San Francisco Giants': 'sf',
-    'Colorado Rockies': 'col',
-    'Arizona Diamondbacks': 'ari',
-    'Atlanta Braves': 'atl',
-    'New York Mets': 'nym',
-    'Philadelphia Phillies': 'phi',
-    'Miami Marlins': 'mia',
-    'Washington Nationals': 'was',
-    'Milwaukee Brewers': 'mil',
-    'Chicago Cubs': 'chc',
-    'St. Louis Cardinals': 'stl',
-    'Pittsburgh Pirates': 'pit',
-    'Cincinnati Reds': 'cin'
-  };
-  
+
+  // Convert full team names to codes using TEAM_ID_MAP mapping
+  const teamFullNameToCode = Object.entries(TEAM_ID_MAP).reduce((acc, [code, _]) => {
+    switch (code) {
+      case 'nyy': acc['New York Yankees'] = code; break;
+      case 'bos': acc['Boston Red Sox'] = code; break;
+      case 'tb': acc['Tampa Bay Rays'] = code; break;
+      case 'tor': acc['Toronto Blue Jays'] = code; break;
+      case 'bal': acc['Baltimore Orioles'] = code; break;
+      case 'cle': 
+        acc['Cleveland Guardians'] = code;
+        acc['Cleveland Indians'] = code; // Handle legacy name
+        break;
+      case 'min': acc['Minnesota Twins'] = code; break;
+      case 'cws': acc['Chicago White Sox'] = code; break;
+      case 'kc': acc['Kansas City Royals'] = code; break;
+      case 'det': acc['Detroit Tigers'] = code; break;
+      case 'hou': acc['Houston Astros'] = code; break;
+      case 'sea': acc['Seattle Mariners'] = code; break;
+      case 'tex': acc['Texas Rangers'] = code; break;
+      case 'laa': acc['Los Angeles Angels'] = code; break;
+      case 'oak': acc['Oakland Athletics'] = code; break;
+      case 'atl': acc['Atlanta Braves'] = code; break;
+      case 'nym': acc['New York Mets'] = code; break;
+      case 'phi': acc['Philadelphia Phillies'] = code; break;
+      case 'mia': acc['Miami Marlins'] = code; break;
+      case 'wsh': acc['Washington Nationals'] = code; break;
+      case 'chc': acc['Chicago Cubs'] = code; break;
+      case 'stl': acc['St. Louis Cardinals'] = code; break;
+      case 'mil': acc['Milwaukee Brewers'] = code; break;
+      case 'cin': acc['Cincinnati Reds'] = code; break;
+      case 'pit': acc['Pittsburgh Pirates'] = code; break;
+      case 'lad': acc['Los Angeles Dodgers'] = code; break;
+      case 'sd': acc['San Diego Padres'] = code; break;
+      case 'sf': acc['San Francisco Giants'] = code; break;
+      case 'ari': acc['Arizona Diamondbacks'] = code; break;
+      case 'col': acc['Colorado Rockies'] = code; break;
+    }
+    return acc;
+  }, {} as Record<string, string>);
+
   // Handle case variations (MLB.com sometimes has inconsistent casing)
   const normalizedTeamName = teamName.trim();
-  const code = teamCodes[normalizedTeamName] || 
-               teamCodes[normalizedTeamName.toLowerCase()] || 
-               normalizedTeamName.toLowerCase().replace(/\s+/g, '').substring(0, 3);
-  
+  const code = teamFullNameToCode[normalizedTeamName] || 
+              teamFullNameToCode[normalizedTeamName.toLowerCase()] || 
+              normalizedTeamName.toLowerCase().replace(/\s+/g, '').substring(0, 3);
+
   // Cache the result for future lookups
   teamCodeCache[teamName] = code;
-  
+
   return code;
 }

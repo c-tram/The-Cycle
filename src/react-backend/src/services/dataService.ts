@@ -18,17 +18,44 @@ export function storeData<T>(filename: string, data: T): void {
 }
 
 /**
- * General-purpose function to retrieve data from a JSON file
+ * General-purpose function to retrieve data from a JSON file with expiration check
  */
 export function retrieveData<T>(filename: string): T | null {
   const filePath = path.join(DATA_DIR, filename);
   
   if (fs.existsSync(filePath)) {
-    const data = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(data) as T;
+    try {
+      const fileContent = fs.readFileSync(filePath, 'utf8');
+      const cacheData = JSON.parse(fileContent);
+      
+      // Check if cache has expired
+      if (cacheData.expires && Date.now() < cacheData.expires) {
+        return cacheData.data as T;
+      } else {
+        console.log(`Cache expired for ${filename}`);
+        return null;
+      }
+    } catch (error) {
+      console.error(`Error reading cache file ${filename}:`, error);
+      return null;
+    }
   }
   
   return null;
+}
+
+/**
+ * Store bulk team data efficiently
+ */
+export function storeBulkTeamData(teams: any[], statType: string): void {
+  // Store individual team data
+  teams.forEach(team => {
+    const teamCode = team.teamCode.toLowerCase();
+    storeData(`player-stats-${teamCode}-${statType}.json`, team.players);
+  });
+  
+  // Store consolidated data
+  storeData('player-stats.json', teams.flatMap(t => t.players));
 }
 
 /**

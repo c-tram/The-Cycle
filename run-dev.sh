@@ -11,7 +11,7 @@ set -e
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Omit Pipeline tests that utilize localhost: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Reference ReadMe for updates. Lots Changed and Upcoming: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Pull latest changes from Azure DevOps remote (origin) and merge
 git pull origin main --no-rebase

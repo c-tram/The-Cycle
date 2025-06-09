@@ -14,7 +14,7 @@
   "license": "ISC",
   "dependencies": {
     "@types/node-schedule": "^2.1.7",
-    "cheerio": "^1.0.0",
+    "cheerio": "^1.1.0",
     "cors": "^2.8.5",
     "csv-parse": "^5.6.0",
     "express": "^5.1.0",

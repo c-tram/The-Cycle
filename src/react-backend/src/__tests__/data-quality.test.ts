@@ -4,14 +4,7 @@
  */
 
 import fetch from 'node-fetch';
-
-// Team mapping for tests
-const TEAM_ID_MAP: Record<string, number> = {
-  ari: 109, atl: 144, bal: 110, bos: 111, chc: 112, cin: 113, cle: 114, col: 115, det: 116,
-  hou: 117, kc: 118, ana: 108, laa: 108, lad: 119, mia: 146, mil: 158, min: 142, nym: 121,
-  nyy: 147, oak: 133, phi: 143, pit: 134, sd: 135, sea: 136, sf: 137, stl: 138, tb: 139,
-  tex: 140, tor: 141, was: 120, wsh: 120, cws: 145, chw: 145
-};
+import { TEAM_ID_MAP } from '../constants/teams';
 
 /**
  * Simulates the fetchTeamRosterFromAPI function for testing

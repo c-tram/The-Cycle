@@ -7,7 +7,8 @@ import {
   faChartLine,
   faBaseball,
   faBars,
-  faTimes
+  faTimes,
+  faSearch
 } from '@fortawesome/free-solid-svg-icons';
 import { useLayout } from '../hooks/useLayout';
 import '../styles/Sidebar.css';
@@ -80,6 +81,17 @@ const Sidebar = () => {
               >
                 <FontAwesomeIcon icon={faChartLine} className="menu-icon" />
                 <span className="menu-text">Trends</span>
+              </Link>
+            </li>
+            <li>
+              <Link 
+                to="/players" 
+                className={pathname === '/players' ? 'active' : ''} 
+                onClick={handleLinkClick}
+                title="Player Search"
+              >
+                <FontAwesomeIcon icon={faSearch} className="menu-icon" />
+                <span className="menu-text">Player Search</span>
               </Link>
             </li>
           </ul>

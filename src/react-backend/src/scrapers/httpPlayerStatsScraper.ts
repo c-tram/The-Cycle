@@ -1,5 +1,6 @@
 import fetch from 'node-fetch';
 import * as cheerio from 'cheerio';
+import { TEAM_ID_MAP } from '../constants/teams';
 
 // Add mock data for fallback
 const MOCK_PLAYERS: PlayerStat[] = [
@@ -375,7 +376,8 @@ export async function scrapeTrendData(statCategory: string): Promise<Record<stri
  * Helper function to convert team name to team code
  */
 function getTeamCodeFromName(teamName: string): string {
-  const teamMapping: Record<string, string> = {
+  // Short team names that map to codes
+  const shortTeamCodeMap: Record<string, string> = {
     'Yankees': 'nyy',
     'Red Sox': 'bos',
     'Blue Jays': 'tor',
@@ -409,7 +411,7 @@ function getTeamCodeFromName(teamName: string): string {
   };
   
   // Find the team code by looking for the team name
-  for (const [key, value] of Object.entries(teamMapping)) {
+  for (const [key, value] of Object.entries(shortTeamCodeMap)) {
     if (teamName.toLowerCase().includes(key.toLowerCase())) {
       return value;
     }

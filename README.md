@@ -191,6 +191,46 @@ const $ = cheerio.load(html);
 const data = $('selector').text();
 ```
 
+## 🚀 Recent Updates & Upcoming Features
+
+### Recent Performance Improvements (June 2025)
+- **Enhanced Timeout Handling**: Increased frontend timeout to 60s, backend to 90s
+- **Retry Logic**: Added exponential backoff for API retries (2s, 4s, 8s)
+- **Error Handling**: Improved error logging and user feedback
+- **API Stability**: Enhanced connection reliability between frontend and backend
+
+### 🚀 Upcoming Features
+
+#### 1. Enhanced Trend Analysis
+- **1/7/30 Day Views**: Historical performance trends across different timeframes
+- **Key Metrics**:
+  - Batting averages and slash lines
+  - Pitching ERA and WHIP
+  - Team win/loss percentages
+- **Visual Analytics**: Interactive charts and graphs
+- **Data Export**: CSV/JSON export options
+
+#### 2. Team Schedule Management
+- **Calendar View**: Visual schedule representation
+- **Game Details**: 
+  - Start times and venues
+  - Probable pitchers
+  - Weather conditions
+  - TV/streaming information
+- **Filters**: Home/away games, division matchups
+- **Integration**: Sync with calendar apps
+
+#### 3. Game Prediction Engine
+- **Win/Loss Predictions**: Machine learning-based game outcome forecasting
+- **Factors Considered**:
+  - Historical matchup data
+  - Current team performance
+  - Pitcher matchups
+  - Weather conditions
+  - Team rest days
+- **Confidence Scores**: Probability ratings for predictions
+- **Performance Tracking**: Accuracy monitoring of predictions
+
 ## 🔧 Recent Fixes: MLB Batting Stats API (May 28, 2025)
 
 **Successfully resolved batting stats API issue that was returning empty player data**

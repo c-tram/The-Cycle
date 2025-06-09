@@ -88,22 +88,30 @@ const Teams = () => {
           const allData: {[key: string]: Player[]} = {};
           const statType = viewMode.includes('pitching') ? 'pitching' : 'hitting';
           
-          // Fetch data for each team
-          const promises = TEAMS.map(async (teamInfo) => {
-            try {
-              const teamData = await getTeamRoster(teamInfo.code, timePeriod, statType);
-              if (teamData && teamData.length > 0 && teamData[0].players) {
-                allData[teamInfo.code] = teamData[0].players;
-              } else {
+          // Handle all teams in batches of 5
+          const batchSize = 5;
+          for (let i = 0; i < TEAMS.length; i += batchSize) {
+            const batch = TEAMS.slice(i, i + batchSize);
+            const batchPromises = batch.map(async (teamInfo) => {
+              try {
+                const teamData = await getTeamRoster(teamInfo.code, timePeriod, statType);
+                if (teamData && teamData.length > 0 && teamData[0].players) {
+                  allData[teamInfo.code] = teamData[0].players;
+                } else {
+                  allData[teamInfo.code] = [];
+                }
+              } catch (err) {
+                console.error(`Error fetching data for ${teamInfo.name}:`, err);
                 allData[teamInfo.code] = [];
               }
-            } catch (err) {
-              console.error(`Error fetching data for ${teamInfo.name}:`, err);
-              allData[teamInfo.code] = [];
-            }
-          });
+            });
+            
+            await Promise.all(batchPromises);
+            
+            // Add a small delay between batches to avoid overwhelming the server
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
           
-          await Promise.all(promises);
           setAllTeamsData(allData);
           setLoading(false);
         } catch (err) {
@@ -115,7 +123,7 @@ const Teams = () => {
     };
     
     fetchAllTeamsData();
-  }, [timePeriod, viewMode]);
+  }, [team, timePeriod, viewMode]);
 
   // Group teams by division
   const teamsByDivision: Record<string, typeof TEAMS> = {};
