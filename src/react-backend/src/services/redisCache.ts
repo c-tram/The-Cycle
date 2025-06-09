@@ -38,13 +38,42 @@ async function getAadTokenForRedis(): Promise<string | undefined> {
     try {
         if (process.env.REDIS_AUTH_MODE === 'aad') {
             console.log('Getting Azure AD token for Redis');
-            const credential = new DefaultAzureCredential();
+            
+            // Create DefaultAzureCredential with logging
+            const credential = new DefaultAzureCredential({
+                // Enable logging to help troubleshoot credential issues
+                loggingOptions: { 
+                    allowLoggingAccountIdentifiers: process.env.NODE_ENV === 'development'
+                }
+            });
+            
+            // Request token with proper scope for Redis
             const token = await credential.getToken('https://redis.azure.com/.default');
-            return token?.token;
+            
+            if (!token || !token.token) {
+                console.error('No AAD token received from Azure Identity');
+                return undefined;
+            }
+            
+            console.log('AAD token successfully obtained');
+            return token.token;
         }
         return undefined;
     } catch (error) {
-        console.error('Failed to get AAD token for Redis:', error);
+        // Enhanced error logging
+        console.error('Failed to get AAD token for Redis:');
+        if (error instanceof Error) {
+            console.error(`- Error name: ${error.name}`);
+            console.error(`- Error message: ${error.message}`);
+            console.error(`- Error stack: ${error.stack}`);
+            
+            // Additional diagnostic info
+            if ('code' in error) {
+                console.error(`- Error code: ${(error as any).code}`);
+            }
+        } else {
+            console.error(error);
+        }
         return undefined;
     }
 }
@@ -101,11 +130,17 @@ if (process.env.REDIS_CLUSTER === 'true') {
                 }
             };
             
-            // Initial authentication
-            refreshAuthToken();
+            // Initial authentication with proper error handling
+            refreshAuthToken().catch(err => {
+                console.error('Failed initial AAD authentication:', err);
+            });
             
             // Refresh token every 20 minutes (tokens typically last 1 hour)
-            setInterval(refreshAuthToken, 20 * 60 * 1000);
+            setInterval(() => {
+                refreshAuthToken().catch(err => {
+                    console.error('Failed to refresh AAD token:', err);
+                });
+            }, 20 * 60 * 1000);
         } else {
             // Standard key-based authentication
             redisClient = new Redis(redisConfig);
@@ -150,6 +185,37 @@ redisClient.on('connect', () => {
     console.log('Redis Client Connected');
 });
 
+redisClient.on('ready', () => {
+    console.log('Redis Client Ready');
+});
+
+// Track Redis readiness for AAD authentication
+let redisReady = process.env.REDIS_AUTH_MODE !== 'aad'; // For key auth, assume ready immediately
+
+if (process.env.REDIS_AUTH_MODE === 'aad') {
+    redisClient.on('ready', () => {
+        redisReady = true;
+    });
+    
+    redisClient.on('error', () => {
+        redisReady = false;
+    });
+}
+
+/**
+ * Wait for Redis to be ready (especially important for AAD authentication)
+ */
+async function waitForRedisReady(timeoutMs: number = 30000): Promise<boolean> {
+    if (redisReady) return true;
+    
+    const startTime = Date.now();
+    while (!redisReady && (Date.now() - startTime) < timeoutMs) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    return redisReady;
+}
+
 /**
  * Store data in Redis cache
  * @param key The cache key
@@ -163,6 +229,13 @@ export async function cacheData<T>(key: string, data: T, expirationMinutes: numb
     };
     
     try {
+        // Wait for Redis to be ready (important for AAD authentication)
+        const isReady = await waitForRedisReady();
+        if (!isReady) {
+            console.warn('Redis not ready, skipping cache operation');
+            return;
+        }
+        
         await redisClient.set(
             `cache:${key}`,
             JSON.stringify(cacheItem),
@@ -182,6 +255,13 @@ export async function cacheData<T>(key: string, data: T, expirationMinutes: numb
  */
 export async function getCachedData<T>(key: string): Promise<T | null> {
     try {
+        // Wait for Redis to be ready (important for AAD authentication)
+        const isReady = await waitForRedisReady();
+        if (!isReady) {
+            console.warn('Redis not ready, returning null for cache lookup');
+            return null;
+        }
+        
         const cacheItem = await redisClient.get(`cache:${key}`);
         if (!cacheItem) {
             return null;
@@ -234,6 +314,13 @@ export async function clearAllCache(): Promise<void> {
  */
 export async function ping(): Promise<boolean> {
     try {
+        // Wait for Redis to be ready (important for AAD authentication)
+        const isReady = await waitForRedisReady();
+        if (!isReady) {
+            console.warn('Redis not ready for ping');
+            return false;
+        }
+        
         const result = await redisClient.ping();
         return result === 'PONG';
     } catch (error) {

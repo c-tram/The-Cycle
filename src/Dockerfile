@@ -28,12 +28,17 @@ RUN npm install || true
 # Copy backend and frontend package files and install dependencies
 COPY react-backend/package*.json ./react-backend/
 COPY react-frontend/package*.json ./react-frontend/
-RUN cd react-backend && npm install && cd ../react-frontend && npm install && cd ..
+
+# Install backend dependencies including devDependencies for build process
+RUN cd react-backend && NODE_ENV=development npm ci
+
+# Install frontend dependencies including devDependencies for build process
+RUN cd react-frontend && NODE_ENV=development npm ci
 
 # Copy the rest of the application
 COPY . .
 
-# Build frontend
+# Build frontend (requires TypeScript from devDependencies)
 RUN cd react-frontend && npm run build
 
 # Move frontend build to backend public directory
@@ -41,6 +46,10 @@ RUN mkdir -p react-backend/public && cp -r react-frontend/dist/* react-backend/p
 
 # Build backend
 RUN cd react-backend && npm run build
+
+# Clean up devDependencies to reduce image size
+RUN cd react-backend && npm prune --production
+RUN rm -rf react-frontend/node_modules
 
 # Expose port
 EXPOSE 3000
