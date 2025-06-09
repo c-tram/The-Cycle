@@ -54,15 +54,6 @@
     ],
     "upcoming": [
       {
-        "homeTeam": "New York Yankees",
-        "homeTeamCode": "nyy",
-        "awayTeam": "Boston Red Sox",
-        "awayTeamCode": "bos",
-        "date": "2025-06-08",
-        "status": "live",
-        "time": "6:10 PM"
-      },
-      {
         "homeTeam": "Cleveland Guardians",
         "homeTeamCode": "cle",
         "awayTeam": "Cincinnati Reds",
@@ -97,8 +88,17 @@
         "date": "2025-06-09",
         "status": "scheduled",
         "time": "6:10 PM"
+      },
+      {
+        "homeTeam": "Milwaukee Brewers",
+        "homeTeamCode": "mil",
+        "awayTeam": "Atlanta Braves",
+        "awayTeamCode": "atl",
+        "date": "2025-06-09",
+        "status": "scheduled",
+        "time": "6:40 PM"
       }
     ]
   },
-  "expires": "2025-06-09T04:27:26.739Z"
+  "expires": "2025-06-09T05:15:44.158Z"
 }

@@ -1,7 +1,8 @@
 import { APICache } from './cache';
 
-// API base URL (default to localhost for development)
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+// API base URL - use relative path in production, localhost for development
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (import.meta.env.PROD ? '/api' : 'http://localhost:3000/api');
 
 // Default timeout for API requests
 const DEFAULT_TIMEOUT = 60000; // 60 seconds

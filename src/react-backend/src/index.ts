@@ -16,9 +16,32 @@ import redisCache from './services/redisCache';
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Enable CORS with proper configuration
+// Enable CORS with proper configuration for both development and production
+const allowedOrigins = [
+  'http://localhost:5173', 
+  'http://127.0.0.1:5173',
+  // Add production domain if specified
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
+];
+
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // In production, since frontend is served by the same backend, 
+    // allow same-origin requests
+    if (process.env.NODE_ENV === 'production') {
+      return callback(null, true);
+    }
+    
+    // For development, check against allowed origins
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    return callback(new Error('Not allowed by CORS'));
+  },
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
