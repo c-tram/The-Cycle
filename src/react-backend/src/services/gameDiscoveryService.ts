@@ -259,14 +259,23 @@ class GameDiscoveryService {
     if (this.activeJobs.has(jobId)) {
       return this.activeJobs.get(jobId)!;
     }
-    
+
     // Check cache
     const cachedJob = await getCachedData(`${this.JOBS_CACHE_PREFIX}${jobId}`);
-    if (cachedJob) {
-      this.activeJobs.set(jobId, cachedJob);
-      return cachedJob;
+    // Validate cachedJob shape
+    if (
+      cachedJob &&
+      typeof cachedJob === 'object' &&
+      'id' in cachedJob &&
+      'startDate' in cachedJob &&
+      'endDate' in cachedJob &&
+      'status' in cachedJob &&
+      'progress' in cachedJob
+    ) {
+      this.activeJobs.set(jobId, cachedJob as ScrapeJob);
+      return cachedJob as ScrapeJob;
     }
-    
+
     return null;
   }
 
