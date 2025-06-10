@@ -325,3 +325,33 @@ export async function getTeamRoster(teamCode: string, timePeriod: string = 'seas
     throw error;
   }
 }
+
+/**
+ * Get comprehensive player trend analysis
+ * This provides enhanced trend data across multiple timeframes and detailed performance metrics
+ */
+export async function getPlayerTrendAnalysis(playerId: string): Promise<any> {
+  const cacheKey = `player-trend-analysis-${playerId}`;
+  const cached = APICache.get<any>(cacheKey);
+  
+  if (cached) {
+    return cached;
+  }
+  
+  try {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/v2/players/${playerId}/trend-analysis`);
+    const data = await response.json();
+    
+    if (!data.success) {
+      throw new Error(data.message || 'Failed to fetch player trend analysis');
+    }
+    
+    // Cache for 10 minutes - trend data changes relatively frequently
+    APICache.set(cacheKey, data.data, { expiresIn: 10 * 60 * 1000 });
+    
+    return data.data;
+  } catch (error) {
+    console.error('Error fetching player trend analysis:', error);
+    throw error;
+  }
+}

@@ -13,12 +13,35 @@ const gamesScraper_1 = require("./scrapers/gamesScraper");
 const mlbStatsApiService_1 = require("./scrapers/mlbStatsApiService");
 const dataService_1 = require("./services/dataService");
 const players_1 = __importDefault(require("./routes/v1/players"));
+const boxScores_1 = __importDefault(require("./routes/v2/boxScores"));
 const teams_1 = require("./constants/teams");
+// Import Redis client for health checks
+const redisCache_1 = __importDefault(require("./services/redisCache"));
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3000;
-// Enable CORS with proper configuration
+// Enable CORS with proper configuration for both development and production
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    // Add production domain if specified
+    ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
+];
 app.use((0, cors_1.default)({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin)
+            return callback(null, true);
+        // In production, since frontend is served by the same backend, 
+        // allow same-origin requests
+        if (process.env.NODE_ENV === 'production') {
+            return callback(null, true);
+        }
+        // For development, check against allowed origins
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
@@ -50,16 +73,37 @@ app.use((err, req, res, next) => {
     }
     res.status(500).json(errorResponse);
 });
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check endpoint with Redis status
+app.get('/api/health', async (req, res) => {
+    try {
+        // Check Redis connection
+        const redisStatus = await redisCache_1.default.ping();
+        res.json({
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            environment: process.env.NODE_ENV || 'development',
+            redis: redisStatus ? 'connected' : 'disconnected',
+            cacheType: process.env.NODE_ENV === 'production' ? 'redis' : 'file'
+        });
+    }
+    catch (err) {
+        console.error('Health check error:', err);
+        res.status(500).json({
+            status: 'error',
+            timestamp: new Date().toISOString(),
+            redis: 'error',
+            message: err instanceof Error ? err.message : 'Unknown error'
+        });
+    }
 });
 // Use absolute path for static files
 app.use(express_1.default.static(path_1.default.join(__dirname, '../public')));
 // Mount v1 API routes
 app.use('/api/v1/players', players_1.default);
+// Mount v2 API routes
+app.use('/api/v2/boxScores', boxScores_1.default);
 // Add timeout handler to all routes
-const ROUTE_TIMEOUT = 30000; // 30 seconds
+const ROUTE_TIMEOUT = 90000; // 90 seconds - allows for frontend timeout + retries
 app.use((req, res, next) => {
     res.setTimeout(ROUTE_TIMEOUT, () => {
         res.status(408).json({ error: 'Request timeout', timeoutMs: ROUTE_TIMEOUT });
@@ -70,64 +114,101 @@ app.use((req, res, next) => {
 app.get('/api/roster', (req, res) => {
     (async () => {
         const teamAbbr = req.query.team?.toLowerCase() || 'nyy';
-        const requestedStatType = req.query.statType?.toLowerCase() || 'hitting';
-        const season = req.query.season || '2025';
+        const statType = req.query.statType?.toLowerCase() || 'hitting';
         const period = req.query.period?.toLowerCase() || 'season';
-        // Normalize statType - 'batting' should be treated as 'hitting' for MLB API
-        const statType = requestedStatType === 'batting' ? 'hitting' : requestedStatType;
-        console.log(`API Request - Team: ${teamAbbr}, RequestedStatType: ${requestedStatType}, NormalizedStatType: ${statType}, Period: ${period}`);
+        console.log(`API Request - Team: ${teamAbbr}, StatType: ${statType}, Period: ${period}`);
         try {
-            // Try fetching via MLB Stats API first
-            const apiData = await fetchTeamRosterFromAPI(teamAbbr, period, statType);
-            console.log(`✅ Successfully fetched data via MLB Stats API: ${apiData[0]?.players?.length || 0} players`);
-            // Format response to match frontend expectations
-            if (apiData && apiData[0]) {
-                res.json({
-                    name: apiData[0].teamName,
-                    code: apiData[0].teamCode,
-                    players: apiData[0].players.map(player => ({
+            // Calculate cache key and TTL based on period
+            const cacheKey = `player-stats-${teamAbbr}-${statType}-${period}.json`;
+            const cacheTTL = ((p) => {
+                switch (p) {
+                    case 'season': return 120; // 2 hours
+                    case '30day': return 60; // 1 hour
+                    case '7day': return 30; // 30 minutes 
+                    case '1day': return 15; // 15 minutes
+                    default: return 60;
+                }
+            })(period);
+            // Try cache first
+            const cachedData = (0, dataService_1.retrieveData)(cacheKey);
+            if (cachedData && cachedData.length > 0) {
+                console.log('Returning cached data for', teamAbbr);
+                const filteredData = cachedData.filter(player => (statType === 'hitting' && player.position !== 'P') ||
+                    (statType === 'pitching' && player.position === 'P'));
+                return res.json([{
+                        teamName: teams_1.TEAM_NAME_MAP[teamAbbr.toUpperCase()] || 'Unknown Team',
+                        teamCode: teamAbbr.toUpperCase(),
+                        players: filteredData.map(player => ({
+                            name: player.name,
+                            position: player.position,
+                            team: player.team,
+                            avg: player.avg,
+                            hr: player.hr,
+                            rbi: player.rbi,
+                            runs: player.runs,
+                            sb: player.sb,
+                            obp: player.obp,
+                            slg: player.slg,
+                            ops: player.ops,
+                            era: player.era,
+                            whip: player.whip,
+                            wins: player.wins,
+                            so: player.strikeouts
+                        }))
+                    }]);
+            }
+            // If not in cache, fetch from API
+            const rosterData = await fetchTeamRosterFromAPI(teamAbbr, period, statType);
+            if (rosterData && rosterData[0]) {
+                // Format and cache response
+                const response = {
+                    teamName: rosterData[0].teamName,
+                    teamCode: rosterData[0].teamCode,
+                    players: rosterData[0].players.map(player => ({
                         name: player.name,
                         position: player.position,
                         team: player.team,
-                        stats: {
-                            hitting: player.statType === 'hitting' ? {
-                                avg: player.avg,
-                                hr: player.hr,
-                                rbi: player.rbi,
-                                runs: player.runs,
-                                sb: player.sb,
-                                obp: player.obp,
-                                slg: player.slg,
-                                ops: player.ops
-                            } : undefined,
-                            pitching: player.statType === 'pitching' ? {
-                                era: player.era,
-                                whip: player.whip,
-                                wins: player.wins,
-                                losses: player.losses,
-                                saves: player.saves,
-                                strikeouts: player.strikeouts
-                            } : undefined
-                        }
+                        avg: player.avg,
+                        hr: player.hr,
+                        rbi: player.rbi,
+                        runs: player.runs,
+                        sb: player.sb,
+                        obp: player.obp,
+                        slg: player.slg,
+                        ops: player.ops,
+                        era: player.era,
+                        whip: player.whip,
+                        wins: player.wins,
+                        so: player.strikeouts
                     }))
-                });
+                };
+                // Cache the formatted data
+                (0, dataService_1.storeData)(cacheKey, response.players);
+                return res.json([response]);
             }
             else {
                 res.json({ error: 'No data found' });
             }
         }
         catch (error) {
-            // If it's a team-specific error, return 400, otherwise 500
-            const statusCode = error.message?.includes('Unknown team abbreviation') ||
-                error.message?.includes('Invalid team abbreviation') ? 400 : 500;
             console.error('Error fetching roster:', error);
-            res.status(statusCode).json({ error: error.message });
+            res.status(500).json({ error: 'Failed to fetch roster data' });
         }
     })();
 });
 // Function to fetch team roster using MLB Stats API or cache
 async function fetchTeamRosterFromAPI(teamAbbr, period, statType) {
     try {
+        // First check if we have cached data
+        const cacheKey = `player-stats-${teamAbbr}-${statType}.json`;
+        const cachedData = (0, dataService_1.retrieveData)(cacheKey);
+        if (cachedData && cachedData.length > 0) {
+            return [{
+                    teamName: teams_1.TEAM_NAME_MAP[teamAbbr.toUpperCase()] || 'Unknown',
+                    teamCode: teamAbbr.toUpperCase(),
+                    players: cachedData
+                }];
+        }
         // Special case for 'all' - fetch stats for all teams using the MLB stats endpoint
         if (teamAbbr.toLowerCase() === 'all') {
             console.log(`Fetching ${statType} stats for all teams via MLB Stats API...`);
@@ -371,6 +452,21 @@ app.get('/api/trends', (req, res) => {
         }
     })();
 });
+// Redis health check endpoint
+app.get('/api/health/redis', async (req, res) => {
+    try {
+        // Check Redis connection
+        const isRedisConnected = await redisCache_1.default.ping();
+        res.json({ redis: 'connected' });
+    }
+    catch (err) {
+        console.error('Redis health check error:', err);
+        res.status(500).json({
+            redis: 'not connected',
+            error: err instanceof Error ? err.message : 'Unknown error'
+        });
+    }
+});
 // Start the server
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
@@ -379,4 +475,5 @@ app.listen(port, () => {
     console.log(` - /api/games`);
     console.log(` - /api/standings`);
     console.log(` - /api/trends`);
+    console.log(` - /api/health/redis`); // Redis health check endpoint
 });
