@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.storeData = storeData;
 exports.retrieveData = retrieveData;
+exports.storeBulkTeamData = storeBulkTeamData;
 exports.storeTrendData = storeTrendData;
 exports.getTrendData = getTrendData;
 exports.calculateDailyTrends = calculateDailyTrends;
@@ -26,15 +27,41 @@ function storeData(filename, data) {
     fs_1.default.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 /**
- * General-purpose function to retrieve data from a JSON file
+ * General-purpose function to retrieve data from a JSON file with expiration check
  */
 function retrieveData(filename) {
     const filePath = path_1.default.join(DATA_DIR, filename);
     if (fs_1.default.existsSync(filePath)) {
-        const data = fs_1.default.readFileSync(filePath, 'utf8');
-        return JSON.parse(data);
+        try {
+            const fileContent = fs_1.default.readFileSync(filePath, 'utf8');
+            const cacheData = JSON.parse(fileContent);
+            // Check if cache has expired
+            if (cacheData.expires && Date.now() < cacheData.expires) {
+                return cacheData.data;
+            }
+            else {
+                console.log(`Cache expired for ${filename}`);
+                return null;
+            }
+        }
+        catch (error) {
+            console.error(`Error reading cache file ${filename}:`, error);
+            return null;
+        }
     }
     return null;
+}
+/**
+ * Store bulk team data efficiently
+ */
+function storeBulkTeamData(teams, statType) {
+    // Store individual team data
+    teams.forEach(team => {
+        const teamCode = team.teamCode.toLowerCase();
+        storeData(`player-stats-${teamCode}-${statType}.json`, team.players);
+    });
+    // Store consolidated data
+    storeData('player-stats.json', teams.flatMap(t => t.players));
 }
 /**
  * Creates or appends data to a trend file, storing historical data

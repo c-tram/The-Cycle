@@ -9,6 +9,7 @@ import { scrapeGames } from './scrapers/gamesScraper';
 import { fetchStandingsFromAPI, fetchGamesFromAPI } from './scrapers/mlbStatsApiService';
 import { storeData, retrieveData, calculateDailyTrends } from './services/dataService';
 import playersRouter from './routes/v1/players';
+import boxScoresRouter from './routes/v2/boxScores';
 import { TEAM_ID_MAP, TEAM_NAME_MAP } from './constants/teams';
 // Import Redis client for health checks
 import redisCache from './services/redisCache';
@@ -109,6 +110,9 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Mount v1 API routes
 app.use('/api/v1/players', playersRouter);
+
+// Mount v2 API routes
+app.use('/api/v2/boxScores', boxScoresRouter);
 
 // Add timeout handler to all routes
 const ROUTE_TIMEOUT = 90000; // 90 seconds - allows for frontend timeout + retries

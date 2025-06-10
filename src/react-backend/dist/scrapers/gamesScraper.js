@@ -69,7 +69,7 @@ async function scrapeGames() {
     try {
         console.log("Starting game data collection process...");
         // Try to get cached games data first (main cache)
-        const cachedGames = (0, dataService_1.getCachedData)('games');
+        const cachedGames = await (0, dataService_1.getCachedData)('games');
         if (cachedGames) {
             console.log("Using cached games data (expires in separate cache entry)");
             return cachedGames;
@@ -191,7 +191,7 @@ async function scrapeGames() {
 async function scrapeRecentGames() {
     try {
         // Try to get cached recent games first
-        const cachedRecent = (0, dataService_1.getCachedData)('recent-games');
+        const cachedRecent = await (0, dataService_1.getCachedData)('recent-games');
         if (cachedRecent) {
             console.log("Using cached recent games data");
             return cachedRecent;
@@ -287,7 +287,7 @@ async function scrapeRecentGames() {
 async function scrapeUpcomingGames() {
     try {
         // Try to get cached upcoming games first
-        const cachedUpcoming = (0, dataService_1.getCachedData)('upcoming-games');
+        const cachedUpcoming = await (0, dataService_1.getCachedData)('upcoming-games');
         if (cachedUpcoming) {
             console.log("Using cached upcoming games data");
             return cachedUpcoming;

@@ -2,9 +2,13 @@
 /**
  * Test file for verifying the caching mechanisms in the MLB Statcast analytics pipeline
  */
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 const dataService_1 = require("../services/dataService");
 const gamesScraper_1 = require("../scrapers/gamesScraper");
+const redisCache_1 = __importDefault(require("../services/redisCache"));
 // Proper Jest test suite
 describe('MLB Statcast Cache Functionality', () => {
     // Test case for verifying cache mechanism
@@ -96,4 +100,66 @@ describe('MLB Statcast Cache Functionality', () => {
             throw error;
         }
     }, 30000); // Increase timeout for this test
+    // Redis-specific tests - these will run only when Redis is available
+    describe('Redis Cache Functionality', () => {
+        // Check if Redis is available before running these tests
+        let isRedisAvailable = false;
+        beforeAll(async () => {
+            try {
+                isRedisAvailable = await redisCache_1.default.ping();
+                console.log(`Redis availability: ${isRedisAvailable ? 'Connected' : 'Not available'}`);
+            }
+            catch (error) {
+                console.warn('Redis not available for testing:', error);
+            }
+        });
+        // Conditional test that skips if Redis is not available
+        const conditionalTest = (name, fn, timeout) => {
+            if (isRedisAvailable) {
+                test(name, fn, timeout);
+            }
+            else {
+                test.skip(`${name} (SKIPPED - Redis not available)`, async () => { });
+            }
+        };
+        conditionalTest('should store and retrieve data from Redis cache', async () => {
+            const testKey = 'test-redis-key';
+            const testData = { message: 'Hello Redis Cache', timestamp: Date.now() };
+            // Store data in Redis
+            await redisCache_1.default.cacheData(testKey, testData, 1);
+            // Retrieve data from Redis
+            const cachedData = await redisCache_1.default.getCachedData(testKey);
+            // Verify data was correctly stored and retrieved
+            expect(cachedData).toEqual(testData);
+        }, 10000);
+        conditionalTest('should handle cache expiration correctly', async () => {
+            const testKey = 'test-expiring-key';
+            const testData = { message: 'This should expire quickly', timestamp: Date.now() };
+            // Store data with very short expiration (1 second)
+            await redisCache_1.default.cacheData(testKey, testData, 0.016); // ~1 second
+            // Data should be available immediately
+            const dataBefore = await redisCache_1.default.getCachedData(testKey);
+            expect(dataBefore).toEqual(testData);
+            // Wait for expiration (2 seconds to be safe)
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Data should be gone now
+            const dataAfter = await redisCache_1.default.getCachedData(testKey);
+            expect(dataAfter).toBeNull();
+        }, 10000);
+        conditionalTest('should clear specific cache keys', async () => {
+            // Create multiple cache entries
+            await redisCache_1.default.cacheData('test-key1', { value: 1 }, 5);
+            await redisCache_1.default.cacheData('test-key2', { value: 2 }, 5);
+            // Verify both exist
+            expect(await redisCache_1.default.getCachedData('test-key1')).not.toBeNull();
+            expect(await redisCache_1.default.getCachedData('test-key2')).not.toBeNull();
+            // Clear just one key
+            await redisCache_1.default.clearCache('test-key1');
+            // Verify correct key was cleared
+            expect(await redisCache_1.default.getCachedData('test-key1')).toBeNull();
+            expect(await redisCache_1.default.getCachedData('test-key2')).not.toBeNull();
+            // Clean up remaining test data
+            await redisCache_1.default.clearCache('test-key2');
+        }, 10000);
+    });
 });
