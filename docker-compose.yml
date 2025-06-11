@@ -13,5 +13,36 @@ services:
       timeout: 3s
       retries: 5
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - REDIS_TLS=false
+      - NODE_ENV=development
+      - PORT=3000
+    depends_on:
+      - redis
+    ports:
+      - "5001:3000"
+    working_dir: /usr/src/app/src/react-backend
+    command: node dist/index.new.js
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - VITE_API_URL=http://localhost:5001/api
+    depends_on:
+      - backend
+    ports:
+      - "5173:5173"
+    working_dir: /usr/src/app/src/react-frontend
+    command: npx vite --host 0.0.0.0
+
 volumes:
   redis_data:

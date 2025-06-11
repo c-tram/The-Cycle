@@ -15,8 +15,8 @@ const redisConfig = {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT || '6379'),
     password: process.env.REDIS_AUTH_MODE === 'aad' ? undefined : process.env.REDIS_PASSWORD,
-    // Enable TLS if in production or a TLS endpoint is specified
-    tls: process.env.NODE_ENV === 'production' || process.env.REDIS_TLS === 'true'
+    // Enable TLS only if explicitly set to true (for Azure Redis)
+    tls: process.env.REDIS_TLS === 'true'
         ? { servername: process.env.REDIS_HOST }
         : undefined,
     // Configure Azure Redis specific options if in Azure

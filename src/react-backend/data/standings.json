@@ -12,15 +12,6 @@
         "streak": "L2"
       },
       {
-        "team": "Tampa Bay Rays",
-        "wins": 36,
-        "losses": 30,
-        "pct": ".545",
-        "gb": "4.0",
-        "last10": "7-3",
-        "streak": "W2"
-      },
-      {
         "team": "Toronto Blue Jays",
         "wins": 36,
         "losses": 30,
@@ -30,22 +21,31 @@
         "streak": "W1"
       },
       {
-        "team": "Boston Red Sox",
-        "wins": 32,
-        "losses": 36,
-        "pct": ".471",
-        "gb": "9.0",
-        "last10": "5-5",
+        "team": "Tampa Bay Rays",
+        "wins": 36,
+        "losses": 31,
+        "pct": ".537",
+        "gb": "4.5",
+        "last10": "7-3",
         "streak": "L1"
+      },
+      {
+        "team": "Boston Red Sox",
+        "wins": 33,
+        "losses": 36,
+        "pct": ".478",
+        "gb": "8.5",
+        "last10": "5-5",
+        "streak": "W1"
       },
       {
         "team": "Baltimore Orioles",
         "wins": 26,
-        "losses": 38,
-        "pct": ".406",
-        "gb": "13.0",
+        "losses": 39,
+        "pct": ".400",
+        "gb": "13.5",
         "last10": "7-3",
-        "streak": "L1"
+        "streak": "L2"
       }
     ]
   },
@@ -54,37 +54,37 @@
     "teams": [
       {
         "team": "Detroit Tigers",
-        "wins": 43,
+        "wins": 44,
         "losses": 24,
-        "pct": ".642",
+        "pct": ".647",
         "gb": "-",
         "last10": "6-4",
-        "streak": "W1"
+        "streak": "W2"
       },
       {
         "team": "Minnesota Twins",
         "wins": 35,
         "losses": 30,
         "pct": ".538",
-        "gb": "7.0",
+        "gb": "7.5",
         "last10": "5-5",
         "streak": "W1"
       },
       {
         "team": "Cleveland Guardians",
         "wins": 34,
-        "losses": 31,
-        "pct": ".523",
-        "gb": "8.0",
+        "losses": 32,
+        "pct": ".515",
+        "gb": "9.0",
         "last10": "4-6",
-        "streak": "L1"
+        "streak": "L2"
       },
       {
         "team": "Kansas City Royals",
         "wins": 34,
         "losses": 32,
         "pct": ".515",
-        "gb": "8.5",
+        "gb": "9.0",
         "last10": "5-5",
         "streak": "W1"
       },
@@ -93,7 +93,7 @@
         "wins": 22,
         "losses": 44,
         "pct": ".333",
-        "gb": "20.5",
+        "gb": "21.0",
         "last10": "4-6",
         "streak": "L1"
       }
@@ -164,11 +164,11 @@
       {
         "team": "Philadelphia Phillies",
         "wins": 38,
-        "losses": 28,
-        "pct": ".576",
-        "gb": "4.0",
+        "losses": 29,
+        "pct": ".567",
+        "gb": "4.5",
         "last10": "2-8",
-        "streak": "W1"
+        "streak": "L1"
       },
       {
         "team": "Washington Nationals",
@@ -190,12 +190,12 @@
       },
       {
         "team": "Miami Marlins",
-        "wins": 24,
+        "wins": 25,
         "losses": 40,
-        "pct": ".375",
-        "gb": "17.0",
-        "last10": "2-8",
-        "streak": "L2"
+        "pct": ".385",
+        "gb": "16.5",
+        "last10": "3-7",
+        "streak": "W1"
       }
     ]
   },
@@ -204,19 +204,19 @@
     "teams": [
       {
         "team": "Chicago Cubs",
-        "wins": 40,
+        "wins": 41,
         "losses": 26,
-        "pct": ".606",
+        "pct": ".612",
         "gb": "-",
-        "last10": "5-5",
-        "streak": "L2"
+        "last10": "6-4",
+        "streak": "W1"
       },
       {
         "team": "St. Louis Cardinals",
         "wins": 36,
         "losses": 30,
         "pct": ".545",
-        "gb": "4.0",
+        "gb": "4.5",
         "last10": "4-6",
         "streak": "L2"
       },
@@ -225,27 +225,27 @@
         "wins": 35,
         "losses": 32,
         "pct": ".522",
-        "gb": "5.5",
+        "gb": "6.0",
         "last10": "6-4",
         "streak": "L2"
       },
       {
         "team": "Cincinnati Reds",
-        "wins": 34,
+        "wins": 35,
         "losses": 33,
-        "pct": ".507",
+        "pct": ".515",
         "gb": "6.5",
         "last10": "6-4",
-        "streak": "W4"
+        "streak": "W5"
       },
       {
         "team": "Pittsburgh Pirates",
         "wins": 27,
-        "losses": 40,
-        "pct": ".403",
-        "gb": "13.5",
+        "losses": 41,
+        "pct": ".397",
+        "gb": "14.5",
         "last10": "6-4",
-        "streak": "W4"
+        "streak": "L1"
       }
     ]
   },

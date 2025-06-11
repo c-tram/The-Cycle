@@ -1,42 +1,6 @@
 {
   "data": [
     {
-      "homeTeam": "Baltimore Orioles",
-      "homeTeamCode": "bal",
-      "awayTeam": "Detroit Tigers",
-      "awayTeamCode": "det",
-      "date": "2025-06-10",
-      "status": "live",
-      "time": "5:35 PM"
-    },
-    {
-      "homeTeam": "Cleveland Guardians",
-      "homeTeamCode": "cle",
-      "awayTeam": "Cincinnati Reds",
-      "awayTeamCode": "cin",
-      "date": "2025-06-10",
-      "status": "live",
-      "time": "5:40 PM"
-    },
-    {
-      "homeTeam": "Pittsburgh Pirates",
-      "homeTeamCode": "pit",
-      "awayTeam": "Miami Marlins",
-      "awayTeamCode": "mia",
-      "date": "2025-06-10",
-      "status": "live",
-      "time": "5:40 PM"
-    },
-    {
-      "homeTeam": "Philadelphia Phillies",
-      "homeTeamCode": "phi",
-      "awayTeam": "Chicago Cubs",
-      "awayTeamCode": "chc",
-      "date": "2025-06-10",
-      "status": "live",
-      "time": "5:45 PM"
-    },
-    {
       "homeTeam": "New York Mets",
       "homeTeamCode": "nym",
       "awayTeam": "Washington Nationals",
@@ -44,7 +8,43 @@
       "date": "2025-06-10",
       "status": "live",
       "time": "6:10 PM"
+    },
+    {
+      "homeTeam": "Minnesota Twins",
+      "homeTeamCode": "min",
+      "awayTeam": "Texas Rangers",
+      "awayTeamCode": "tex",
+      "date": "2025-06-10",
+      "status": "live",
+      "time": "6:40 PM"
+    },
+    {
+      "homeTeam": "Kansas City Royals",
+      "homeTeamCode": "kc",
+      "awayTeam": "New York Yankees",
+      "awayTeamCode": "nyy",
+      "date": "2025-06-10",
+      "status": "live",
+      "time": "6:40 PM"
+    },
+    {
+      "homeTeam": "Milwaukee Brewers",
+      "homeTeamCode": "mil",
+      "awayTeam": "Atlanta Braves",
+      "awayTeamCode": "atl",
+      "date": "2025-06-10",
+      "status": "live",
+      "time": "6:40 PM"
+    },
+    {
+      "homeTeam": "St. Louis Cardinals",
+      "homeTeamCode": "stl",
+      "awayTeam": "Toronto Blue Jays",
+      "awayTeamCode": "tor",
+      "date": "2025-06-10",
+      "status": "live",
+      "time": "6:45 PM"
     }
   ],
-  "expires": "2025-06-11T01:00:46.071Z"
+  "expires": "2025-06-11T02:56:56.979Z"
 }

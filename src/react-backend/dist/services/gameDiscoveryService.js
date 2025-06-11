@@ -210,6 +210,7 @@ class GameDiscoveryService {
         // Check cache
         const cachedJob = await (0, dataService_1.getCachedData)(`${this.JOBS_CACHE_PREFIX}${jobId}`);
         if (cachedJob) {
+            // Ensure cachedJob is typed as ScrapeJob
             this.activeJobs.set(jobId, cachedJob);
             return cachedJob;
         }

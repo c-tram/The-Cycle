@@ -1,8 +1,8 @@
 [
   {
     "name": "Aaron Judge",
-    "team": "New York Yankees",
     "position": "",
+    "team": "New York Yankees",
     "avg": ".398",
     "hr": "24",
     "rbi": "58",
@@ -10,14 +10,12 @@
     "sb": "5",
     "obp": ".493",
     "slg": ".779",
-    "ops": "1.272",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": "1.272"
   },
   {
     "name": "Jacob Wilson",
-    "team": "Athletics",
     "position": "",
+    "team": "Athletics",
     "avg": ".366",
     "hr": "8",
     "rbi": "38",
@@ -25,14 +23,12 @@
     "sb": "5",
     "obp": ".402",
     "slg": ".520",
-    "ops": ".922",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".922"
   },
   {
     "name": "Freddie Freeman",
-    "team": "Los Angeles Dodgers",
     "position": "",
+    "team": "Los Angeles Dodgers",
     "avg": ".349",
     "hr": "9",
     "rbi": "41",
@@ -40,14 +36,12 @@
     "sb": "0",
     "obp": ".416",
     "slg": ".589",
-    "ops": "1.005",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": "1.005"
   },
   {
     "name": "José Ramírez",
-    "team": "Cleveland Guardians",
     "position": "",
+    "team": "Cleveland Guardians",
     "avg": ".332",
     "hr": "12",
     "rbi": "32",
@@ -55,14 +49,12 @@
     "sb": "19",
     "obp": ".391",
     "slg": ".548",
-    "ops": ".939",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".939"
   },
   {
     "name": "Will Smith",
-    "team": "Los Angeles Dodgers",
     "position": "",
+    "team": "Los Angeles Dodgers",
     "avg": ".320",
     "hr": "6",
     "rbi": "36",
@@ -70,14 +62,12 @@
     "sb": "2",
     "obp": ".423",
     "slg": ".503",
-    "ops": ".926",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".926"
   },
   {
     "name": "Manny Machado",
-    "team": "San Diego Padres",
     "position": "",
+    "team": "San Diego Padres",
     "avg": ".320",
     "hr": "10",
     "rbi": "34",
@@ -85,14 +75,12 @@
     "sb": "8",
     "obp": ".382",
     "slg": ".516",
-    "ops": ".898",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".898"
   },
   {
     "name": "Alejandro Kirk",
-    "team": "Toronto Blue Jays",
     "position": "",
+    "team": "Toronto Blue Jays",
     "avg": ".320",
     "hr": "5",
     "rbi": "31",
@@ -100,14 +88,12 @@
     "sb": "0",
     "obp": ".363",
     "slg": ".438",
-    "ops": ".801",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".801"
   },
   {
     "name": "Jonathan Aranda",
-    "team": "Tampa Bay Rays",
     "position": "",
+    "team": "Tampa Bay Rays",
     "avg": ".317",
     "hr": "7",
     "rbi": "36",
@@ -115,14 +101,12 @@
     "sb": "0",
     "obp": ".402",
     "slg": ".480",
-    "ops": ".882",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".882"
   },
   {
     "name": "Jeremy Peña",
-    "team": "Houston Astros",
     "position": "",
+    "team": "Houston Astros",
     "avg": ".316",
     "hr": "9",
     "rbi": "32",
@@ -130,14 +114,12 @@
     "sb": "13",
     "obp": ".373",
     "slg": ".482",
-    "ops": ".855",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".855"
   },
   {
     "name": "Ryan O'Hearn",
-    "team": "Baltimore Orioles",
     "position": "",
+    "team": "Baltimore Orioles",
     "avg": ".311",
     "hr": "9",
     "rbi": "24",
@@ -145,14 +127,12 @@
     "sb": "3",
     "obp": ".395",
     "slg": ".492",
-    "ops": ".887",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".887"
   },
   {
     "name": "Brendan Donovan",
-    "team": "St. Louis Cardinals",
     "position": "",
+    "team": "St. Louis Cardinals",
     "avg": ".310",
     "hr": "4",
     "rbi": "26",
@@ -160,14 +140,12 @@
     "sb": "3",
     "obp": ".379",
     "slg": ".440",
-    "ops": ".819",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".819"
   },
   {
     "name": "Paul Goldschmidt",
-    "team": "New York Yankees",
     "position": "",
+    "team": "New York Yankees",
     "avg": ".310",
     "hr": "7",
     "rbi": "29",
@@ -175,14 +153,12 @@
     "sb": "5",
     "obp": ".366",
     "slg": ".459",
-    "ops": ".825",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".825"
   },
   {
     "name": "Maikel Garcia",
-    "team": "Kansas City Royals",
     "position": "",
+    "team": "Kansas City Royals",
     "avg": ".308",
     "hr": "7",
     "rbi": "31",
@@ -190,14 +166,12 @@
     "sb": "13",
     "obp": ".371",
     "slg": ".481",
-    "ops": ".852",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".852"
   },
   {
     "name": "Steven Kwan",
-    "team": "Cleveland Guardians",
     "position": "",
+    "team": "Cleveland Guardians",
     "avg": ".305",
     "hr": "5",
     "rbi": "22",
@@ -205,14 +179,12 @@
     "sb": "9",
     "obp": ".368",
     "slg": ".422",
-    "ops": ".790",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".790"
   },
   {
     "name": "Jake Meyers",
-    "team": "Houston Astros",
     "position": "",
+    "team": "Houston Astros",
     "avg": ".302",
     "hr": "3",
     "rbi": "16",
@@ -220,14 +192,12 @@
     "sb": "10",
     "obp": ".360",
     "slg": ".411",
-    "ops": ".771",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".771"
   },
   {
     "name": "Pete Alonso",
-    "team": "New York Mets",
     "position": "",
+    "team": "New York Mets",
     "avg": ".300",
     "hr": "17",
     "rbi": "62",
@@ -235,14 +205,12 @@
     "sb": "0",
     "obp": ".394",
     "slg": ".589",
-    "ops": ".983",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".983"
   },
   {
     "name": "Alex Bregman",
-    "team": "Boston Red Sox",
     "position": "",
+    "team": "Boston Red Sox",
     "avg": ".299",
     "hr": "11",
     "rbi": "35",
@@ -250,14 +218,12 @@
     "sb": "1",
     "obp": ".385",
     "slg": ".553",
-    "ops": ".938",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".938"
   },
   {
     "name": "Trea Turner",
-    "team": "Philadelphia Phillies",
     "position": "",
+    "team": "Philadelphia Phillies",
     "avg": ".299",
     "hr": "7",
     "rbi": "30",
@@ -265,14 +231,12 @@
     "sb": "18",
     "obp": ".355",
     "slg": ".440",
-    "ops": ".795",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".795"
   },
   {
     "name": "TJ Friedl",
-    "team": "Cincinnati Reds",
     "position": "",
+    "team": "Cincinnati Reds",
     "avg": ".294",
     "hr": "6",
     "rbi": "24",
@@ -280,14 +244,12 @@
     "sb": "9",
     "obp": ".382",
     "slg": ".429",
-    "ops": ".811",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".811"
   },
   {
     "name": "Heliot Ramos",
-    "team": "San Francisco Giants",
     "position": "",
+    "team": "San Francisco Giants",
     "avg": ".293",
     "hr": "11",
     "rbi": "33",
@@ -295,14 +257,12 @@
     "sb": "5",
     "obp": ".361",
     "slg": ".482",
-    "ops": ".843",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".843"
   },
   {
     "name": "Bobby Witt Jr.",
-    "team": "Kansas City Royals",
     "position": "",
+    "team": "Kansas City Royals",
     "avg": ".291",
     "hr": "8",
     "rbi": "37",
@@ -310,14 +270,12 @@
     "sb": "21",
     "obp": ".349",
     "slg": ".490",
-    "ops": ".839",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".839"
   },
   {
     "name": "Shohei Ohtani",
-    "team": "Los Angeles Dodgers",
     "position": "",
+    "team": "Los Angeles Dodgers",
     "avg": ".290",
     "hr": "23",
     "rbi": "39",
@@ -325,14 +283,12 @@
     "sb": "11",
     "obp": ".386",
     "slg": ".626",
-    "ops": "1.012",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": "1.012"
   },
   {
     "name": "Andy Pages",
-    "team": "Los Angeles Dodgers",
     "position": "",
+    "team": "Los Angeles Dodgers",
     "avg": ".290",
     "hr": "12",
     "rbi": "40",
@@ -340,14 +296,12 @@
     "sb": "6",
     "obp": ".333",
     "slg": ".492",
-    "ops": ".825",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".825"
   },
   {
     "name": "Josh Naylor",
-    "team": "Arizona Diamondbacks",
     "position": "",
+    "team": "Arizona Diamondbacks",
     "avg": ".290",
     "hr": "8",
     "rbi": "44",
@@ -355,14 +309,12 @@
     "sb": "9",
     "obp": ".346",
     "slg": ".457",
-    "ops": ".803",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".803"
   },
   {
     "name": "Nick Castellanos",
-    "team": "Philadelphia Phillies",
     "position": "",
+    "team": "Philadelphia Phillies",
     "avg": ".287",
     "hr": "6",
     "rbi": "32",
@@ -370,14 +322,12 @@
     "sb": "2",
     "obp": ".327",
     "slg": ".425",
-    "ops": ".752",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".752"
   },
   {
     "name": "Sal Frelick",
-    "team": "Milwaukee Brewers",
     "position": "",
+    "team": "Milwaukee Brewers",
     "avg": ".285",
     "hr": "4",
     "rbi": "21",
@@ -385,14 +335,12 @@
     "sb": "12",
     "obp": ".351",
     "slg": ".390",
-    "ops": ".741",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".741"
   },
   {
     "name": "Nico Hoerner",
-    "team": "Chicago Cubs",
     "position": "",
+    "team": "Chicago Cubs",
     "avg": ".285",
     "hr": "0",
     "rbi": "28",
@@ -400,14 +348,12 @@
     "sb": "13",
     "obp": ".331",
     "slg": ".354",
-    "ops": ".685",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".685"
   },
   {
     "name": "J.P. Crawford",
-    "team": "Seattle Mariners",
     "position": "",
+    "team": "Seattle Mariners",
     "avg": ".284",
     "hr": "5",
     "rbi": "24",
@@ -415,14 +361,12 @@
     "sb": "2",
     "obp": ".400",
     "slg": ".392",
-    "ops": ".792",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".792"
   },
   {
     "name": "Francisco Lindor",
-    "team": "New York Mets",
     "position": "",
+    "team": "New York Mets",
     "avg": ".282",
     "hr": "14",
     "rbi": "38",
@@ -430,14 +374,12 @@
     "sb": "13",
     "obp": ".352",
     "slg": ".485",
-    "ops": ".837",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".837"
   },
   {
     "name": "Austin Riley",
-    "team": "Atlanta Braves",
     "position": "",
+    "team": "Atlanta Braves",
     "avg": ".280",
     "hr": "11",
     "rbi": "35",
@@ -445,14 +387,12 @@
     "sb": "2",
     "obp": ".332",
     "slg": ".450",
-    "ops": ".782",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".782"
   },
   {
     "name": "Vinnie Pasquantino",
-    "team": "Kansas City Royals",
     "position": "",
+    "team": "Kansas City Royals",
     "avg": ".280",
     "hr": "10",
     "rbi": "38",
@@ -460,14 +400,12 @@
     "sb": "0",
     "obp": ".333",
     "slg": ".432",
-    "ops": ".765",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".765"
   },
   {
     "name": "Alec Bohm",
-    "team": "Philadelphia Phillies",
     "position": "",
+    "team": "Philadelphia Phillies",
     "avg": ".280",
     "hr": "5",
     "rbi": "24",
@@ -475,14 +413,12 @@
     "sb": "2",
     "obp": ".316",
     "slg": ".384",
-    "ops": ".700",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".700"
   },
   {
     "name": "Gavin Lux",
-    "team": "Cincinnati Reds",
     "position": "",
+    "team": "Cincinnati Reds",
     "avg": ".280",
     "hr": "2",
     "rbi": "27",
@@ -490,14 +426,12 @@
     "sb": "1",
     "obp": ".366",
     "slg": ".390",
-    "ops": ".756",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".756"
   },
   {
     "name": "Riley Greene",
-    "team": "Detroit Tigers",
     "position": "",
+    "team": "Detroit Tigers",
     "avg": ".280",
     "hr": "13",
     "rbi": "44",
@@ -505,14 +439,12 @@
     "sb": "1",
     "obp": ".332",
     "slg": ".492",
-    "ops": ".824",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".824"
   },
   {
     "name": "Nolan Schanuel",
-    "team": "Los Angeles Angels",
     "position": "",
+    "team": "Los Angeles Angels",
     "avg": ".279",
     "hr": "3",
     "rbi": "20",
@@ -520,14 +452,12 @@
     "sb": "2",
     "obp": ".376",
     "slg": ".387",
-    "ops": ".763",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".763"
   },
   {
     "name": "Rafael Devers",
-    "team": "Boston Red Sox",
     "position": "",
+    "team": "Boston Red Sox",
     "avg": ".279",
     "hr": "14",
     "rbi": "57",
@@ -535,14 +465,12 @@
     "sb": "1",
     "obp": ".407",
     "slg": ".512",
-    "ops": ".919",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".919"
   },
   {
     "name": "Kyle Tucker",
-    "team": "Chicago Cubs",
     "position": "",
+    "team": "Chicago Cubs",
     "avg": ".278",
     "hr": "13",
     "rbi": "42",
@@ -550,14 +478,12 @@
     "sb": "17",
     "obp": ".393",
     "slg": ".516",
-    "ops": ".909",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".909"
   },
   {
     "name": "Ty France",
-    "team": "Minnesota Twins",
     "position": "",
+    "team": "Minnesota Twins",
     "avg": ".278",
     "hr": "4",
     "rbi": "36",
@@ -565,14 +491,12 @@
     "sb": "1",
     "obp": ".341",
     "slg": ".376",
-    "ops": ".717",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".717"
   },
   {
     "name": "Hunter Goodman",
-    "team": "Colorado Rockies",
     "position": "",
+    "team": "Colorado Rockies",
     "avg": ".277",
     "hr": "10",
     "rbi": "37",
@@ -580,14 +504,12 @@
     "sb": "1",
     "obp": ".324",
     "slg": ".479",
-    "ops": ".803",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".803"
   },
   {
     "name": "Xavier Edwards",
-    "team": "Miami Marlins",
     "position": "",
+    "team": "Miami Marlins",
     "avg": ".277",
     "hr": "0",
     "rbi": "14",
@@ -595,14 +517,12 @@
     "sb": "11",
     "obp": ".348",
     "slg": ".317",
-    "ops": ".665",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".665"
   },
   {
     "name": "Jung Hoo Lee",
-    "team": "San Francisco Giants",
     "position": "",
+    "team": "San Francisco Giants",
     "avg": ".276",
     "hr": "6",
     "rbi": "32",
@@ -610,14 +530,12 @@
     "sb": "6",
     "obp": ".330",
     "slg": ".443",
-    "ops": ".773",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".773"
   },
   {
     "name": "Zach McKinstry",
-    "team": "Detroit Tigers",
     "position": "",
+    "team": "Detroit Tigers",
     "avg": ".276",
     "hr": "3",
     "rbi": "19",
@@ -625,14 +543,12 @@
     "sb": "5",
     "obp": ".361",
     "slg": ".438",
-    "ops": ".799",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".799"
   },
   {
     "name": "Vladimir Guerrero Jr.",
-    "team": "Toronto Blue Jays",
     "position": "",
+    "team": "Toronto Blue Jays",
     "avg": ".275",
     "hr": "8",
     "rbi": "29",
@@ -640,14 +556,12 @@
     "sb": "1",
     "obp": ".380",
     "slg": ".421",
-    "ops": ".801",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".801"
   },
   {
     "name": "Kyle Stowers",
-    "team": "Miami Marlins",
     "position": "",
+    "team": "Miami Marlins",
     "avg": ".274",
     "hr": "10",
     "rbi": "33",
@@ -655,14 +569,12 @@
     "sb": "3",
     "obp": ".342",
     "slg": ".470",
-    "ops": ".812",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".812"
   },
   {
     "name": "Luis Arraez",
-    "team": "San Diego Padres",
     "position": "",
+    "team": "San Diego Padres",
     "avg": ".273",
     "hr": "3",
     "rbi": "24",
@@ -670,14 +582,12 @@
     "sb": "3",
     "obp": ".307",
     "slg": ".391",
-    "ops": ".698",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".698"
   },
   {
     "name": "Kerry Carpenter",
-    "team": "Detroit Tigers",
     "position": "",
+    "team": "Detroit Tigers",
     "avg": ".273",
     "hr": "13",
     "rbi": "27",
@@ -685,14 +595,12 @@
     "sb": "1",
     "obp": ".300",
     "slg": ".505",
-    "ops": ".805",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".805"
   },
   {
     "name": "Josh Smith",
-    "team": "Texas Rangers",
     "position": "",
+    "team": "Texas Rangers",
     "avg": ".273",
     "hr": "5",
     "rbi": "17",
@@ -700,14 +608,12 @@
     "sb": "8",
     "obp": ".338",
     "slg": ".399",
-    "ops": ".737",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".737"
   },
   {
     "name": "Gleyber Torres",
-    "team": "Detroit Tigers",
     "position": "",
+    "team": "Detroit Tigers",
     "avg": ".273",
     "hr": "5",
     "rbi": "30",
@@ -715,14 +621,12 @@
     "sb": "4",
     "obp": ".381",
     "slg": ".394",
-    "ops": ".775",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".775"
   },
   {
     "name": "Ernie Clement",
-    "team": "Toronto Blue Jays",
     "position": "",
+    "team": "Toronto Blue Jays",
     "avg": ".272",
     "hr": "3",
     "rbi": "17",
@@ -730,14 +634,12 @@
     "sb": "2",
     "obp": ".310",
     "slg": ".381",
-    "ops": ".691",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".691"
   },
   {
     "name": "Bo Bichette",
-    "team": "Toronto Blue Jays",
     "position": "",
+    "team": "Toronto Blue Jays",
     "avg": ".272",
     "hr": "8",
     "rbi": "38",
@@ -745,14 +647,12 @@
     "sb": "4",
     "obp": ".317",
     "slg": ".424",
-    "ops": ".741",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".741"
   },
   {
     "name": "Mookie Betts",
-    "team": "Los Angeles Dodgers",
     "position": "",
+    "team": "Los Angeles Dodgers",
     "avg": ".271",
     "hr": "9",
     "rbi": "33",
@@ -760,14 +660,12 @@
     "sb": "5",
     "obp": ".351",
     "slg": ".424",
-    "ops": ".775",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".775"
   },
   {
     "name": "Jarren Duran",
-    "team": "Boston Red Sox",
     "position": "",
+    "team": "Boston Red Sox",
     "avg": ".271",
     "hr": "4",
     "rbi": "37",
@@ -775,14 +673,12 @@
     "sb": "14",
     "obp": ".326",
     "slg": ".420",
-    "ops": ".746",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".746"
   },
   {
     "name": "Pete Crow-Armstrong",
-    "team": "Chicago Cubs",
     "position": "",
+    "team": "Chicago Cubs",
     "avg": ".271",
     "hr": "17",
     "rbi": "55",
@@ -790,14 +686,12 @@
     "sb": "21",
     "obp": ".305",
     "slg": ".545",
-    "ops": ".850",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".850"
   },
   {
     "name": "Geraldo Perdomo",
-    "team": "Arizona Diamondbacks",
     "position": "",
+    "team": "Arizona Diamondbacks",
     "avg": ".270",
     "hr": "7",
     "rbi": "43",
@@ -805,14 +699,12 @@
     "sb": "11",
     "obp": ".370",
     "slg": ".425",
-    "ops": ".795",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".795"
   },
   {
     "name": "James Wood",
-    "team": "Washington Nationals",
     "position": "",
+    "team": "Washington Nationals",
     "avg": ".270",
     "hr": "16",
     "rbi": "45",
@@ -820,14 +712,12 @@
     "sb": "9",
     "obp": ".367",
     "slg": ".528",
-    "ops": ".895",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".895"
   },
   {
     "name": "Gunnar Henderson",
-    "team": "Baltimore Orioles",
     "position": "",
+    "team": "Baltimore Orioles",
     "avg": ".270",
     "hr": "8",
     "rbi": "18",
@@ -835,14 +725,12 @@
     "sb": "7",
     "obp": ".328",
     "slg": ".443",
-    "ops": ".771",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".771"
   },
   {
     "name": "CJ Abrams",
-    "team": "Washington Nationals",
     "position": "",
+    "team": "Washington Nationals",
     "avg": ".269",
     "hr": "9",
     "rbi": "22",
@@ -850,14 +738,12 @@
     "sb": "11",
     "obp": ".338",
     "slg": ".486",
-    "ops": ".824",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".824"
   },
   {
     "name": "Cal Raleigh",
-    "team": "Seattle Mariners",
     "position": "",
+    "team": "Seattle Mariners",
     "avg": ".269",
     "hr": "26",
     "rbi": "53",
@@ -865,14 +751,12 @@
     "sb": "7",
     "obp": ".375",
     "slg": ".643",
-    "ops": "1.018",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": "1.018"
   },
   {
     "name": "Byron Buxton",
-    "team": "Minnesota Twins",
     "position": "",
+    "team": "Minnesota Twins",
     "avg": ".268",
     "hr": "10",
     "rbi": "38",
@@ -880,14 +764,12 @@
     "sb": "10",
     "obp": ".327",
     "slg": ".490",
-    "ops": ".817",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".817"
   },
   {
     "name": "Masyn Winn",
-    "team": "St. Louis Cardinals",
     "position": "",
+    "team": "St. Louis Cardinals",
     "avg": ".268",
     "hr": "6",
     "rbi": "22",
@@ -895,14 +777,12 @@
     "sb": "3",
     "obp": ".338",
     "slg": ".407",
-    "ops": ".745",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".745"
   },
   {
     "name": "Lawrence Butler",
-    "team": "Athletics",
     "position": "",
+    "team": "Athletics",
     "avg": ".267",
     "hr": "9",
     "rbi": "29",
@@ -910,14 +790,12 @@
     "sb": "10",
     "obp": ".335",
     "slg": ".465",
-    "ops": ".800",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".800"
   },
   {
     "name": "Michael Busch",
-    "team": "Chicago Cubs",
     "position": "",
+    "team": "Chicago Cubs",
     "avg": ".267",
     "hr": "11",
     "rbi": "39",
@@ -925,14 +803,12 @@
     "sb": "3",
     "obp": ".363",
     "slg": ".510",
-    "ops": ".873",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".873"
   },
   {
     "name": "Jackson Holliday",
-    "team": "Baltimore Orioles",
     "position": "",
+    "team": "Baltimore Orioles",
     "avg": ".267",
     "hr": "8",
     "rbi": "27",
@@ -940,14 +816,12 @@
     "sb": "6",
     "obp": ".319",
     "slg": ".439",
-    "ops": ".758",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".758"
   },
   {
     "name": "Seiya Suzuki",
-    "team": "Chicago Cubs",
     "position": "",
+    "team": "Chicago Cubs",
     "avg": ".266",
     "hr": "16",
     "rbi": "56",
@@ -955,14 +829,12 @@
     "sb": "2",
     "obp": ".326",
     "slg": ".544",
-    "ops": ".870",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".870"
   },
   {
     "name": "Brent Rooker",
-    "team": "Athletics",
     "position": "",
+    "team": "Athletics",
     "avg": ".266",
     "hr": "13",
     "rbi": "37",
@@ -970,14 +842,12 @@
     "sb": "2",
     "obp": ".334",
     "slg": ".465",
-    "ops": ".799",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".799"
   },
   {
     "name": "Andrew McCutchen",
-    "team": "Pittsburgh Pirates",
     "position": "",
+    "team": "Pittsburgh Pirates",
     "avg": ".264",
     "hr": "5",
     "rbi": "22",
@@ -985,14 +855,12 @@
     "sb": "1",
     "obp": ".356",
     "slg": ".393",
-    "ops": ".749",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".749"
   },
   {
     "name": "Jose Altuve",
-    "team": "Houston Astros",
     "position": "",
+    "team": "Houston Astros",
     "avg": ".263",
     "hr": "9",
     "rbi": "24",
@@ -1000,14 +868,12 @@
     "sb": "5",
     "obp": ".310",
     "slg": ".397",
-    "ops": ".707",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".707"
   },
   {
     "name": "Brice Turang",
-    "team": "Milwaukee Brewers",
     "position": "",
+    "team": "Milwaukee Brewers",
     "avg": ".261",
     "hr": "4",
     "rbi": "25",
@@ -1015,14 +881,12 @@
     "sb": "15",
     "obp": ".349",
     "slg": ".344",
-    "ops": ".693",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".693"
   },
   {
     "name": "Jordan Beck",
-    "team": "Colorado Rockies",
     "position": "",
+    "team": "Colorado Rockies",
     "avg": ".261",
     "hr": "8",
     "rbi": "20",
@@ -1030,14 +894,12 @@
     "sb": "8",
     "obp": ".318",
     "slg": ".477",
-    "ops": ".795",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".795"
   },
   {
     "name": "Cody Bellinger",
-    "team": "New York Yankees",
     "position": "",
+    "team": "New York Yankees",
     "avg": ".261",
     "hr": "9",
     "rbi": "36",
@@ -1045,14 +907,12 @@
     "sb": "7",
     "obp": ".335",
     "slg": ".450",
-    "ops": ".785",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".785"
   },
   {
     "name": "Teoscar Hernández",
-    "team": "Los Angeles Dodgers",
     "position": "",
+    "team": "Los Angeles Dodgers",
     "avg": ".261",
     "hr": "10",
     "rbi": "44",
@@ -1060,14 +920,12 @@
     "sb": "5",
     "obp": ".290",
     "slg": ".483",
-    "ops": ".773",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".773"
   },
   {
     "name": "Fernando Tatis Jr.",
-    "team": "San Diego Padres",
     "position": "",
+    "team": "San Diego Padres",
     "avg": ".260",
     "hr": "13",
     "rbi": "28",
@@ -1075,14 +933,12 @@
     "sb": "14",
     "obp": ".339",
     "slg": ".459",
-    "ops": ".798",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".798"
   },
   {
     "name": "Tyler Soderstrom",
-    "team": "Athletics",
     "position": "",
+    "team": "Athletics",
     "avg": ".259",
     "hr": "14",
     "rbi": "44",
@@ -1090,14 +946,12 @@
     "sb": "3",
     "obp": ".340",
     "slg": ".475",
-    "ops": ".815",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".815"
   },
   {
     "name": "George Springer",
-    "team": "Toronto Blue Jays",
     "position": "",
+    "team": "Toronto Blue Jays",
     "avg": ".259",
     "hr": "10",
     "rbi": "30",
@@ -1105,14 +959,12 @@
     "sb": "7",
     "obp": ".369",
     "slg": ".493",
-    "ops": ".862",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".862"
   },
   {
     "name": "Bryce Harper",
-    "team": "Philadelphia Phillies",
     "position": "",
+    "team": "Philadelphia Phillies",
     "avg": ".258",
     "hr": "9",
     "rbi": "34",
@@ -1120,14 +972,12 @@
     "sb": "8",
     "obp": ".368",
     "slg": ".446",
-    "ops": ".814",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".814"
   },
   {
     "name": "Marcell Ozuna",
-    "team": "Atlanta Braves",
     "position": "",
+    "team": "Atlanta Braves",
     "avg": ".258",
     "hr": "10",
     "rbi": "30",
@@ -1135,14 +985,12 @@
     "sb": "0",
     "obp": ".396",
     "slg": ".425",
-    "ops": ".821",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".821"
   },
   {
     "name": "Jackson Chourio",
-    "team": "Milwaukee Brewers",
     "position": "",
+    "team": "Milwaukee Brewers",
     "avg": ".257",
     "hr": "11",
     "rbi": "39",
@@ -1150,14 +998,12 @@
     "sb": "13",
     "obp": ".283",
     "slg": ".441",
-    "ops": ".724",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".724"
   },
   {
     "name": "Elly De La Cruz",
-    "team": "Cincinnati Reds",
     "position": "",
+    "team": "Cincinnati Reds",
     "avg": ".257",
     "hr": "12",
     "rbi": "43",
@@ -1165,14 +1011,12 @@
     "sb": "20",
     "obp": ".340",
     "slg": ".447",
-    "ops": ".787",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".787"
   },
   {
     "name": "Corbin Carroll",
-    "team": "Arizona Diamondbacks",
     "position": "",
+    "team": "Arizona Diamondbacks",
     "avg": ".257",
     "hr": "19",
     "rbi": "41",
@@ -1180,14 +1024,12 @@
     "sb": "10",
     "obp": ".338",
     "slg": ".567",
-    "ops": ".905",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".905"
   },
   {
     "name": "Luis García Jr.",
-    "team": "Washington Nationals",
     "position": "",
+    "team": "Washington Nationals",
     "avg": ".256",
     "hr": "5",
     "rbi": "27",
@@ -1195,14 +1037,12 @@
     "sb": "7",
     "obp": ".304",
     "slg": ".399",
-    "ops": ".703",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".703"
   },
   {
     "name": "Rhys Hoskins",
-    "team": "Milwaukee Brewers",
     "position": "",
+    "team": "Milwaukee Brewers",
     "avg": ".256",
     "hr": "9",
     "rbi": "36",
@@ -1210,14 +1050,12 @@
     "sb": "2",
     "obp": ".348",
     "slg": ".427",
-    "ops": ".775",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".775"
   },
   {
     "name": "Josh Jung",
-    "team": "Texas Rangers",
     "position": "",
+    "team": "Texas Rangers",
     "avg": ".256",
     "hr": "7",
     "rbi": "25",
@@ -1225,14 +1063,12 @@
     "sb": "4",
     "obp": ".302",
     "slg": ".398",
-    "ops": ".700",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".700"
   },
   {
     "name": "Ryan Jeffers",
-    "team": "Minnesota Twins",
     "position": "",
+    "team": "Minnesota Twins",
     "avg": ".256",
     "hr": "4",
     "rbi": "21",
@@ -1240,14 +1076,12 @@
     "sb": "0",
     "obp": ".350",
     "slg": ".394",
-    "ops": ".744",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".744"
   },
   {
     "name": "Ian Happ",
-    "team": "Chicago Cubs",
     "position": "",
+    "team": "Chicago Cubs",
     "avg": ".255",
     "hr": "7",
     "rbi": "29",
@@ -1255,14 +1089,12 @@
     "sb": "3",
     "obp": ".345",
     "slg": ".397",
-    "ops": ".742",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".742"
   },
   {
     "name": "Trevor Larnach",
-    "team": "Minnesota Twins",
     "position": "",
+    "team": "Minnesota Twins",
     "avg": ".255",
     "hr": "10",
     "rbi": "32",
@@ -1270,14 +1102,12 @@
     "sb": "2",
     "obp": ".319",
     "slg": ".421",
-    "ops": ".740",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".740"
   },
   {
     "name": "Wilmer Flores",
-    "team": "San Francisco Giants",
     "position": "",
+    "team": "San Francisco Giants",
     "avg": ".254",
     "hr": "11",
     "rbi": "49",
@@ -1285,14 +1115,12 @@
     "sb": "1",
     "obp": ".322",
     "slg": ".414",
-    "ops": ".736",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".736"
   },
   {
     "name": "Lourdes Gurriel Jr.",
-    "team": "Arizona Diamondbacks",
     "position": "",
+    "team": "Arizona Diamondbacks",
     "avg": ".254",
     "hr": "9",
     "rbi": "36",
@@ -1300,14 +1128,12 @@
     "sb": "3",
     "obp": ".301",
     "slg": ".432",
-    "ops": ".733",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".733"
   },
   {
     "name": "Eric Wagaman",
-    "team": "Miami Marlins",
     "position": "",
+    "team": "Miami Marlins",
     "avg": ".252",
     "hr": "4",
     "rbi": "19",
@@ -1315,14 +1141,12 @@
     "sb": "2",
     "obp": ".296",
     "slg": ".372",
-    "ops": ".668",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".668"
   },
   {
     "name": "Junior Caminero",
-    "team": "Tampa Bay Rays",
     "position": "",
+    "team": "Tampa Bay Rays",
     "avg": ".252",
     "hr": "15",
     "rbi": "41",
@@ -1330,14 +1154,12 @@
     "sb": "5",
     "obp": ".286",
     "slg": ".496",
-    "ops": ".782",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".782"
   },
   {
     "name": "Yandy Díaz",
-    "team": "Tampa Bay Rays",
     "position": "",
+    "team": "Tampa Bay Rays",
     "avg": ".252",
     "hr": "9",
     "rbi": "37",
@@ -1345,14 +1167,12 @@
     "sb": "3",
     "obp": ".304",
     "slg": ".412",
-    "ops": ".716",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".716"
   },
   {
     "name": "Carlos Santana",
-    "team": "Cleveland Guardians",
     "position": "",
+    "team": "Cleveland Guardians",
     "avg": ".251",
     "hr": "7",
     "rbi": "30",
@@ -1360,14 +1180,12 @@
     "sb": "2",
     "obp": ".352",
     "slg": ".377",
-    "ops": ".729",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".729"
   },
   {
     "name": "Julio Rodríguez",
-    "team": "Seattle Mariners",
     "position": "",
+    "team": "Seattle Mariners",
     "avg": ".251",
     "hr": "10",
     "rbi": "33",
@@ -1375,14 +1193,12 @@
     "sb": "11",
     "obp": ".316",
     "slg": ".411",
-    "ops": ".727",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".727"
   },
   {
     "name": "Keibert Ruiz",
-    "team": "Washington Nationals",
     "position": "",
+    "team": "Washington Nationals",
     "avg": ".250",
     "hr": "2",
     "rbi": "22",
@@ -1390,14 +1206,12 @@
     "sb": "0",
     "obp": ".287",
     "slg": ".325",
-    "ops": ".612",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".612"
   },
   {
     "name": "Jonathan India",
-    "team": "Kansas City Royals",
     "position": "",
+    "team": "Kansas City Royals",
     "avg": ".249",
     "hr": "3",
     "rbi": "18",
@@ -1405,14 +1219,12 @@
     "sb": "0",
     "obp": ".331",
     "slg": ".336",
-    "ops": ".667",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".667"
   },
   {
     "name": "Ceddanne Rafaela",
-    "team": "Boston Red Sox",
     "position": "",
+    "team": "Boston Red Sox",
     "avg": ".249",
     "hr": "6",
     "rbi": "25",
@@ -1420,14 +1232,12 @@
     "sb": "9",
     "obp": ".301",
     "slg": ".394",
-    "ops": ".695",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".695"
   },
   {
     "name": "Gavin Sheets",
-    "team": "San Diego Padres",
     "position": "",
+    "team": "San Diego Padres",
     "avg": ".249",
     "hr": "11",
     "rbi": "38",
@@ -1435,14 +1245,12 @@
     "sb": "1",
     "obp": ".305",
     "slg": ".454",
-    "ops": ".759",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".759"
   },
   {
     "name": "Willson Contreras",
-    "team": "St. Louis Cardinals",
     "position": "",
+    "team": "St. Louis Cardinals",
     "avg": ".248",
     "hr": "7",
     "rbi": "39",
@@ -1450,14 +1258,12 @@
     "sb": "2",
     "obp": ".326",
     "slg": ".395",
-    "ops": ".721",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".721"
   },
   {
     "name": "Juan Soto",
-    "team": "New York Mets",
     "position": "",
+    "team": "New York Mets",
     "avg": ".248",
     "hr": "12",
     "rbi": "33",
@@ -1465,14 +1271,12 @@
     "sb": "7",
     "obp": ".386",
     "slg": ".454",
-    "ops": ".840",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".840"
   },
   {
     "name": "Jasson Domínguez",
-    "team": "New York Yankees",
     "position": "",
+    "team": "New York Yankees",
     "avg": ".247",
     "hr": "6",
     "rbi": "25",
@@ -1480,14 +1284,12 @@
     "sb": "8",
     "obp": ".341",
     "slg": ".404",
-    "ops": ".745",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".745"
   },
   {
     "name": "Isaac Paredes",
-    "team": "Houston Astros",
     "position": "",
+    "team": "Houston Astros",
     "avg": ".247",
     "hr": "14",
     "rbi": "39",
@@ -1495,14 +1297,12 @@
     "sb": "0",
     "obp": ".344",
     "slg": ".457",
-    "ops": ".801",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".801"
   },
   {
     "name": "William Contreras",
-    "team": "Milwaukee Brewers",
     "position": "",
+    "team": "Milwaukee Brewers",
     "avg": ".247",
     "hr": "5",
     "rbi": "28",
@@ -1510,14 +1310,12 @@
     "sb": "5",
     "obp": ".358",
     "slg": ".348",
-    "ops": ".706",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".706"
   },
   {
     "name": "Wilyer Abreu",
-    "team": "Boston Red Sox",
     "position": "",
+    "team": "Boston Red Sox",
     "avg": ".245",
     "hr": "13",
     "rbi": "32",
@@ -1525,14 +1323,12 @@
     "sb": "4",
     "obp": ".321",
     "slg": ".471",
-    "ops": ".792",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".792"
   },
   {
     "name": "Carlos Correa",
-    "team": "Minnesota Twins",
     "position": "",
+    "team": "Minnesota Twins",
     "avg": ".245",
     "hr": "5",
     "rbi": "19",
@@ -1540,14 +1336,12 @@
     "sb": "0",
     "obp": ".286",
     "slg": ".380",
-    "ops": ".666",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".666"
   },
   {
     "name": "Kyle Schwarber",
-    "team": "Philadelphia Phillies",
     "position": "",
+    "team": "Philadelphia Phillies",
     "avg": ".245",
     "hr": "20",
     "rbi": "46",
@@ -1555,14 +1349,12 @@
     "sb": "4",
     "obp": ".375",
     "slg": ".535",
-    "ops": ".910",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".910"
   },
   {
     "name": "Anthony Volpe",
-    "team": "New York Yankees",
     "position": "",
+    "team": "New York Yankees",
     "avg": ".245",
     "hr": "8",
     "rbi": "37",
@@ -1570,14 +1362,12 @@
     "sb": "7",
     "obp": ".322",
     "slg": ".450",
-    "ops": ".772",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".772"
   },
   {
     "name": "Matt Chapman",
-    "team": "San Francisco Giants",
     "position": "",
+    "team": "San Francisco Giants",
     "avg": ".243",
     "hr": "12",
     "rbi": "30",
@@ -1585,14 +1375,12 @@
     "sb": "7",
     "obp": ".360",
     "slg": ".452",
-    "ops": ".812",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".812"
   },
   {
     "name": "Gabriel Arias",
-    "team": "Cleveland Guardians",
     "position": "",
+    "team": "Cleveland Guardians",
     "avg": ".243",
     "hr": "4",
     "rbi": "25",
@@ -1600,14 +1388,12 @@
     "sb": "3",
     "obp": ".305",
     "slg": ".369",
-    "ops": ".674",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".674"
   },
   {
     "name": "Trent Grisham",
-    "team": "New York Yankees",
     "position": "",
+    "team": "New York Yankees",
     "avg": ".242",
     "hr": "13",
     "rbi": "28",
@@ -1615,14 +1401,12 @@
     "sb": "0",
     "obp": ".347",
     "slg": ".478",
-    "ops": ".825",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".825"
   },
   {
     "name": "Nolan Arenado",
-    "team": "St. Louis Cardinals",
     "position": "",
+    "team": "St. Louis Cardinals",
     "avg": ".242",
     "hr": "8",
     "rbi": "35",
@@ -1630,14 +1414,12 @@
     "sb": "1",
     "obp": ".304",
     "slg": ".394",
-    "ops": ".698",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".698"
   },
   {
     "name": "Brandon Lowe",
-    "team": "Tampa Bay Rays",
     "position": "",
+    "team": "Tampa Bay Rays",
     "avg": ".242",
     "hr": "13",
     "rbi": "36",
@@ -1645,14 +1427,12 @@
     "sb": "2",
     "obp": ".293",
     "slg": ".441",
-    "ops": ".734",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".734"
   },
   {
     "name": "Logan O'Hoppe",
-    "team": "Los Angeles Angels",
     "position": "",
+    "team": "Los Angeles Angels",
     "avg": ".241",
     "hr": "14",
     "rbi": "31",
@@ -1660,14 +1440,12 @@
     "sb": "0",
     "obp": ".273",
     "slg": ".467",
-    "ops": ".740",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".740"
   },
   {
     "name": "Ben Rice",
-    "team": "New York Yankees",
     "position": "",
+    "team": "New York Yankees",
     "avg": ".241",
     "hr": "12",
     "rbi": "25",
@@ -1675,14 +1453,12 @@
     "sb": "2",
     "obp": ".327",
     "slg": ".497",
-    "ops": ".824",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".824"
   },
   {
     "name": "Dansby Swanson",
-    "team": "Chicago Cubs",
     "position": "",
+    "team": "Chicago Cubs",
     "avg": ".240",
     "hr": "12",
     "rbi": "35",
@@ -1690,14 +1466,12 @@
     "sb": "7",
     "obp": ".293",
     "slg": ".426",
-    "ops": ".719",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".719"
   },
   {
     "name": "Victor Scott II",
-    "team": "St. Louis Cardinals",
     "position": "",
+    "team": "St. Louis Cardinals",
     "avg": ".238",
     "hr": "2",
     "rbi": "19",
@@ -1705,14 +1479,12 @@
     "sb": "17",
     "obp": ".323",
     "slg": ".321",
-    "ops": ".644",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".644"
   },
   {
     "name": "Lars Nootbaar",
-    "team": "St. Louis Cardinals",
     "position": "",
+    "team": "St. Louis Cardinals",
     "avg": ".237",
     "hr": "8",
     "rbi": "28",
@@ -1720,14 +1492,12 @@
     "sb": "4",
     "obp": ".341",
     "slg": ".379",
-    "ops": ".720",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".720"
   },
   {
     "name": "Spencer Torkelson",
-    "team": "Detroit Tigers",
     "position": "",
+    "team": "Detroit Tigers",
     "avg": ".237",
     "hr": "16",
     "rbi": "47",
@@ -1735,14 +1505,12 @@
     "sb": "1",
     "obp": ".341",
     "slg": ".509",
-    "ops": ".850",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".850"
   },
   {
     "name": "Bryson Stott",
-    "team": "Philadelphia Phillies",
     "position": "",
+    "team": "Philadelphia Phillies",
     "avg": ".237",
     "hr": "4",
     "rbi": "26",
@@ -1750,14 +1518,12 @@
     "sb": "11",
     "obp": ".300",
     "slg": ".333",
-    "ops": ".633",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".633"
   },
   {
     "name": "Shea Langeliers",
-    "team": "Athletics",
     "position": "",
+    "team": "Athletics",
     "avg": ".237",
     "hr": "10",
     "rbi": "27",
@@ -1765,14 +1531,12 @@
     "sb": "4",
     "obp": ".300",
     "slg": ".430",
-    "ops": ".730",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".730"
   },
   {
     "name": "Bryan Reynolds",
-    "team": "Pittsburgh Pirates",
     "position": "",
+    "team": "Pittsburgh Pirates",
     "avg": ".235",
     "hr": "8",
     "rbi": "39",
@@ -1780,14 +1544,12 @@
     "sb": "3",
     "obp": ".310",
     "slg": ".380",
-    "ops": ".690",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".690"
   },
   {
     "name": "Max Muncy",
-    "team": "Los Angeles Dodgers",
     "position": "",
+    "team": "Los Angeles Dodgers",
     "avg": ".235",
     "hr": "9",
     "rbi": "35",
@@ -1795,14 +1557,12 @@
     "sb": "3",
     "obp": ".359",
     "slg": ".420",
-    "ops": ".779",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".779"
   },
   {
     "name": "Matt Olson",
-    "team": "Atlanta Braves",
     "position": "",
+    "team": "Atlanta Braves",
     "avg": ".235",
     "hr": "14",
     "rbi": "39",
@@ -1810,14 +1570,12 @@
     "sb": "0",
     "obp": ".343",
     "slg": ".465",
-    "ops": ".808",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".808"
   },
   {
     "name": "J.T. Realmuto",
-    "team": "Philadelphia Phillies",
     "position": "",
+    "team": "Philadelphia Phillies",
     "avg": ".234",
     "hr": "5",
     "rbi": "24",
@@ -1825,14 +1583,12 @@
     "sb": "4",
     "obp": ".302",
     "slg": ".361",
-    "ops": ".663",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".663"
   },
   {
     "name": "Michael Harris II",
-    "team": "Atlanta Braves",
     "position": "",
+    "team": "Atlanta Braves",
     "avg": ".234",
     "hr": "4",
     "rbi": "36",
@@ -1840,14 +1596,12 @@
     "sb": "10",
     "obp": ".262",
     "slg": ".337",
-    "ops": ".599",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".599"
   },
   {
     "name": "Yainer Diaz",
-    "team": "Houston Astros",
     "position": "",
+    "team": "Houston Astros",
     "avg": ".234",
     "hr": "8",
     "rbi": "26",
@@ -1855,14 +1609,12 @@
     "sb": "0",
     "obp": ".268",
     "slg": ".381",
-    "ops": ".649",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".649"
   },
   {
     "name": "Salvador Perez",
-    "team": "Kansas City Royals",
     "position": "",
+    "team": "Kansas City Royals",
     "avg": ".234",
     "hr": "5",
     "rbi": "31",
@@ -1870,14 +1622,12 @@
     "sb": "0",
     "obp": ".271",
     "slg": ".359",
-    "ops": ".630",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".630"
   },
   {
     "name": "Miguel Vargas",
-    "team": "Chicago White Sox",
     "position": "",
+    "team": "Chicago White Sox",
     "avg": ".234",
     "hr": "9",
     "rbi": "29",
@@ -1885,14 +1635,12 @@
     "sb": "1",
     "obp": ".315",
     "slg": ".416",
-    "ops": ".731",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".731"
   },
   {
     "name": "Christian Yelich",
-    "team": "Milwaukee Brewers",
     "position": "",
+    "team": "Milwaukee Brewers",
     "avg": ".233",
     "hr": "13",
     "rbi": "41",
@@ -1900,14 +1648,12 @@
     "sb": "10",
     "obp": ".320",
     "slg": ".417",
-    "ops": ".737",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".737"
   },
   {
     "name": "Ozzie Albies",
-    "team": "Atlanta Braves",
     "position": "",
+    "team": "Atlanta Braves",
     "avg": ".233",
     "hr": "6",
     "rbi": "24",
@@ -1915,14 +1661,12 @@
     "sb": "6",
     "obp": ".311",
     "slg": ".340",
-    "ops": ".651",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".651"
   },
   {
     "name": "Trevor Story",
-    "team": "Boston Red Sox",
     "position": "",
+    "team": "Boston Red Sox",
     "avg": ".233",
     "hr": "9",
     "rbi": "34",
@@ -1930,14 +1674,12 @@
     "sb": "10",
     "obp": ".279",
     "slg": ".360",
-    "ops": ".639",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".639"
   },
   {
     "name": "Mike Yastrzemski",
-    "team": "San Francisco Giants",
     "position": "",
+    "team": "San Francisco Giants",
     "avg": ".232",
     "hr": "5",
     "rbi": "20",
@@ -1945,14 +1687,12 @@
     "sb": "5",
     "obp": ".329",
     "slg": ".369",
-    "ops": ".698",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".698"
   },
   {
     "name": "Xander Bogaerts",
-    "team": "San Diego Padres",
     "position": "",
+    "team": "San Diego Padres",
     "avg": ".232",
     "hr": "3",
     "rbi": "21",
@@ -1960,14 +1700,12 @@
     "sb": "13",
     "obp": ".319",
     "slg": ".318",
-    "ops": ".637",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".637"
   },
   {
     "name": "Randy Arozarena",
-    "team": "Seattle Mariners",
     "position": "",
+    "team": "Seattle Mariners",
     "avg": ".231",
     "hr": "7",
     "rbi": "26",
@@ -1975,14 +1713,12 @@
     "sb": "11",
     "obp": ".344",
     "slg": ".389",
-    "ops": ".733",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".733"
   },
   {
     "name": "Brandon Nimmo",
-    "team": "New York Mets",
     "position": "",
+    "team": "New York Mets",
     "avg": ".231",
     "hr": "10",
     "rbi": "34",
@@ -1990,14 +1726,12 @@
     "sb": "4",
     "obp": ".295",
     "slg": ".410",
-    "ops": ".705",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".705"
   },
   {
     "name": "Nathaniel Lowe",
-    "team": "Washington Nationals",
     "position": "",
+    "team": "Washington Nationals",
     "avg": ".230",
     "hr": "9",
     "rbi": "42",
@@ -2005,14 +1739,12 @@
     "sb": "1",
     "obp": ".293",
     "slg": ".381",
-    "ops": ".674",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".674"
   },
   {
     "name": "Mark Vientos",
-    "team": "New York Mets",
     "position": "",
+    "team": "New York Mets",
     "avg": ".230",
     "hr": "6",
     "rbi": "21",
@@ -2020,14 +1752,12 @@
     "sb": "0",
     "obp": ".298",
     "slg": ".380",
-    "ops": ".678",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".678"
   },
   {
     "name": "Spencer Steer",
-    "team": "Cincinnati Reds",
     "position": "",
+    "team": "Cincinnati Reds",
     "avg": ".230",
     "hr": "4",
     "rbi": "21",
@@ -2035,14 +1765,12 @@
     "sb": "3",
     "obp": ".296",
     "slg": ".329",
-    "ops": ".625",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".625"
   },
   {
     "name": "Kristian Campbell",
-    "team": "Boston Red Sox",
     "position": "",
+    "team": "Boston Red Sox",
     "avg": ".229",
     "hr": "6",
     "rbi": "21",
@@ -2050,14 +1778,12 @@
     "sb": "2",
     "obp": ".320",
     "slg": ".355",
-    "ops": ".675",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".675"
   },
   {
     "name": "Eugenio Suárez",
-    "team": "Arizona Diamondbacks",
     "position": "",
+    "team": "Arizona Diamondbacks",
     "avg": ".228",
     "hr": "18",
     "rbi": "48",
@@ -2065,14 +1791,12 @@
     "sb": "1",
     "obp": ".303",
     "slg": ".506",
-    "ops": ".809",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".809"
   },
   {
     "name": "Oneil Cruz",
-    "team": "Pittsburgh Pirates",
     "position": "",
+    "team": "Pittsburgh Pirates",
     "avg": ".227",
     "hr": "13",
     "rbi": "29",
@@ -2080,14 +1804,12 @@
     "sb": "23",
     "obp": ".350",
     "slg": ".469",
-    "ops": ".819",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".819"
   },
   {
     "name": "Cedric Mullins",
-    "team": "Baltimore Orioles",
     "position": "",
+    "team": "Baltimore Orioles",
     "avg": ".227",
     "hr": "10",
     "rbi": "31",
@@ -2095,14 +1817,12 @@
     "sb": "8",
     "obp": ".318",
     "slg": ".438",
-    "ops": ".756",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".756"
   },
   {
     "name": "Austin Wells",
-    "team": "New York Yankees",
     "position": "",
+    "team": "New York Yankees",
     "avg": ".227",
     "hr": "11",
     "rbi": "41",
@@ -2110,14 +1830,12 @@
     "sb": "3",
     "obp": ".294",
     "slg": ".476",
-    "ops": ".770",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".770"
   },
   {
     "name": "Ke'Bryan Hayes",
-    "team": "Pittsburgh Pirates",
     "position": "",
+    "team": "Pittsburgh Pirates",
     "avg": ".226",
     "hr": "2",
     "rbi": "19",
@@ -2125,14 +1843,12 @@
     "sb": "6",
     "obp": ".285",
     "slg": ".286",
-    "ops": ".571",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".571"
   },
   {
     "name": "Adley Rutschman",
-    "team": "Baltimore Orioles",
     "position": "",
+    "team": "Baltimore Orioles",
     "avg": ".224",
     "hr": "7",
     "rbi": "19",
@@ -2140,14 +1856,12 @@
     "sb": "0",
     "obp": ".316",
     "slg": ".369",
-    "ops": ".685",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".685"
   },
   {
     "name": "Wyatt Langford",
-    "team": "Texas Rangers",
     "position": "",
+    "team": "Texas Rangers",
     "avg": ".223",
     "hr": "11",
     "rbi": "26",
@@ -2155,14 +1869,12 @@
     "sb": "11",
     "obp": ".301",
     "slg": ".417",
-    "ops": ".718",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".718"
   },
   {
     "name": "Adolis García",
-    "team": "Texas Rangers",
     "position": "",
+    "team": "Texas Rangers",
     "avg": ".220",
     "hr": "7",
     "rbi": "29",
@@ -2170,14 +1882,12 @@
     "sb": "7",
     "obp": ".263",
     "slg": ".376",
-    "ops": ".639",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".639"
   },
   {
     "name": "Marcus Semien",
-    "team": "Texas Rangers",
     "position": "",
+    "team": "Texas Rangers",
     "avg": ".218",
     "hr": "6",
     "rbi": "27",
@@ -2185,14 +1895,12 @@
     "sb": "6",
     "obp": ".303",
     "slg": ".314",
-    "ops": ".617",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".617"
   },
   {
     "name": "Jake Burger",
-    "team": "Texas Rangers",
     "position": "",
+    "team": "Texas Rangers",
     "avg": ".218",
     "hr": "9",
     "rbi": "25",
@@ -2200,14 +1908,12 @@
     "sb": "1",
     "obp": ".250",
     "slg": ".411",
-    "ops": ".661",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".661"
   },
   {
     "name": "Jorge Soler",
-    "team": "Los Angeles Angels",
     "position": "",
+    "team": "Los Angeles Angels",
     "avg": ".217",
     "hr": "8",
     "rbi": "24",
@@ -2215,14 +1921,12 @@
     "sb": "0",
     "obp": ".294",
     "slg": ".377",
-    "ops": ".671",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".671"
   },
   {
     "name": "Ryan McMahon",
-    "team": "Colorado Rockies",
     "position": "",
+    "team": "Colorado Rockies",
     "avg": ".215",
     "hr": "8",
     "rbi": "19",
@@ -2230,14 +1934,12 @@
     "sb": "1",
     "obp": ".323",
     "slg": ".377",
-    "ops": ".700",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".700"
   },
   {
     "name": "Christian Walker",
-    "team": "Houston Astros",
     "position": "",
+    "team": "Houston Astros",
     "avg": ".209",
     "hr": "8",
     "rbi": "29",
@@ -2245,14 +1947,12 @@
     "sb": "0",
     "obp": ".274",
     "slg": ".351",
-    "ops": ".625",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".625"
   },
   {
     "name": "Max Kepler",
-    "team": "Philadelphia Phillies",
     "position": "",
+    "team": "Philadelphia Phillies",
     "avg": ".208",
     "hr": "7",
     "rbi": "23",
@@ -2260,14 +1960,12 @@
     "sb": "0",
     "obp": ".293",
     "slg": ".376",
-    "ops": ".669",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".669"
   },
   {
     "name": "Taylor Ward",
-    "team": "Los Angeles Angels",
     "position": "",
+    "team": "Los Angeles Angels",
     "avg": ".208",
     "hr": "18",
     "rbi": "45",
@@ -2275,14 +1973,12 @@
     "sb": "1",
     "obp": ".259",
     "slg": ".480",
-    "ops": ".739",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".739"
   },
   {
     "name": "Luis Rengifo",
-    "team": "Los Angeles Angels",
     "position": "",
+    "team": "Los Angeles Angels",
     "avg": ".206",
     "hr": "1",
     "rbi": "12",
@@ -2290,14 +1986,12 @@
     "sb": "1",
     "obp": ".242",
     "slg": ".256",
-    "ops": ".498",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".498"
   },
   {
     "name": "Kyle Manzardo",
-    "team": "Cleveland Guardians",
     "position": "",
+    "team": "Cleveland Guardians",
     "avg": ".203",
     "hr": "11",
     "rbi": "29",
@@ -2305,14 +1999,12 @@
     "sb": "1",
     "obp": ".291",
     "slg": ".427",
-    "ops": ".718",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".718"
   },
   {
     "name": "Michael Massey",
-    "team": "Kansas City Royals",
     "position": "",
+    "team": "Kansas City Royals",
     "avg": ".202",
     "hr": "2",
     "rbi": "14",
@@ -2320,14 +2012,12 @@
     "sb": "1",
     "obp": ".221",
     "slg": ".258",
-    "ops": ".479",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".479"
   },
   {
     "name": "Brenton Doyle",
-    "team": "Colorado Rockies",
     "position": "",
+    "team": "Colorado Rockies",
     "avg": ".199",
     "hr": "5",
     "rbi": "22",
@@ -2335,14 +2025,12 @@
     "sb": "6",
     "obp": ".254",
     "slg": ".320",
-    "ops": ".574",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".574"
   },
   {
     "name": "Michael Toglia",
-    "team": "Colorado Rockies",
     "position": "",
+    "team": "Colorado Rockies",
     "avg": ".194",
     "hr": "6",
     "rbi": "20",
@@ -2350,14 +2038,12 @@
     "sb": "2",
     "obp": ".266",
     "slg": ".349",
-    "ops": ".615",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".615"
   },
   {
     "name": "Willy Adames",
-    "team": "San Francisco Giants",
     "position": "",
+    "team": "San Francisco Giants",
     "avg": ".192",
     "hr": "5",
     "rbi": "27",
@@ -2365,14 +2051,12 @@
     "sb": "3",
     "obp": ".279",
     "slg": ".302",
-    "ops": ".581",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".581"
   },
   {
     "name": "Joey Ortiz",
-    "team": "Milwaukee Brewers",
     "position": "",
+    "team": "Milwaukee Brewers",
     "avg": ".190",
     "hr": "2",
     "rbi": "9",
@@ -2380,14 +2064,12 @@
     "sb": "7",
     "obp": ".262",
     "slg": ".254",
-    "ops": ".516",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".516"
   },
   {
     "name": "Luis Robert Jr.",
-    "team": "Chicago White Sox",
     "position": "",
+    "team": "Chicago White Sox",
     "avg": ".184",
     "hr": "6",
     "rbi": "26",
@@ -2395,14 +2077,12 @@
     "sb": "21",
     "obp": ".270",
     "slg": ".306",
-    "ops": ".576",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".576"
   },
   {
     "name": "Matt McLain",
-    "team": "Cincinnati Reds",
     "position": "",
+    "team": "Cincinnati Reds",
     "avg": ".180",
     "hr": "7",
     "rbi": "22",
@@ -2410,14 +2090,12 @@
     "sb": "11",
     "obp": ".278",
     "slg": ".307",
-    "ops": ".585",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".585"
   },
   {
     "name": "Anthony Santander",
-    "team": "Toronto Blue Jays",
     "position": "",
+    "team": "Toronto Blue Jays",
     "avg": ".179",
     "hr": "6",
     "rbi": "18",
@@ -2425,14 +2103,12 @@
     "sb": "0",
     "obp": ".273",
     "slg": ".304",
-    "ops": ".577",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".577"
   },
   {
     "name": "Josh Bell",
-    "team": "Washington Nationals",
     "position": "",
+    "team": "Washington Nationals",
     "avg": ".176",
     "hr": "9",
     "rbi": "23",
@@ -2440,14 +2116,12 @@
     "sb": "0",
     "obp": ".271",
     "slg": ".337",
-    "ops": ".608",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".608"
   },
   {
     "name": "Michael Conforto",
-    "team": "Los Angeles Dodgers",
     "position": "",
+    "team": "Los Angeles Dodgers",
     "avg": ".170",
     "hr": "3",
     "rbi": "10",
@@ -2455,8 +2129,6 @@
     "sb": "1",
     "obp": ".312",
     "slg": ".269",
-    "ops": ".581",
-    "season": "2025",
-    "statType": "hitting"
+    "ops": ".581"
   }
 ]
