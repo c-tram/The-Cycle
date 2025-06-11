@@ -41,15 +41,15 @@
       "awayScore": 8
     },
     {
-      "homeTeam": "Boston Red Sox",
-      "homeTeamCode": "bos",
-      "awayTeam": "Tampa Bay Rays",
-      "awayTeamCode": "tb",
+      "homeTeam": "New York Mets",
+      "homeTeamCode": "nym",
+      "awayTeam": "Washington Nationals",
+      "awayTeamCode": "wsh",
       "date": "2025-06-10",
       "status": "completed",
-      "homeScore": 3,
-      "awayScore": 1
+      "homeScore": 5,
+      "awayScore": 4
     }
   ],
-  "expires": "2025-06-11T05:56:56.979Z"
+  "expires": "2025-06-11T20:10:07.472Z"
 }

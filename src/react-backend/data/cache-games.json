@@ -42,63 +42,63 @@
         "awayScore": 8
       },
       {
-        "homeTeam": "Boston Red Sox",
-        "homeTeamCode": "bos",
-        "awayTeam": "Tampa Bay Rays",
-        "awayTeamCode": "tb",
-        "date": "2025-06-10",
-        "status": "completed",
-        "homeScore": 3,
-        "awayScore": 1
-      }
-    ],
-    "upcoming": [
-      {
         "homeTeam": "New York Mets",
         "homeTeamCode": "nym",
         "awayTeam": "Washington Nationals",
         "awayTeamCode": "wsh",
         "date": "2025-06-10",
-        "status": "live",
-        "time": "6:10 PM"
+        "status": "completed",
+        "homeScore": 5,
+        "awayScore": 4
+      }
+    ],
+    "upcoming": [
+      {
+        "homeTeam": "Pittsburgh Pirates",
+        "homeTeamCode": "pit",
+        "awayTeam": "Miami Marlins",
+        "awayTeamCode": "mia",
+        "date": "2025-06-11",
+        "status": "scheduled",
+        "time": "11:35 AM"
       },
       {
-        "homeTeam": "Minnesota Twins",
-        "homeTeamCode": "min",
-        "awayTeam": "Texas Rangers",
-        "awayTeamCode": "tex",
-        "date": "2025-06-10",
-        "status": "live",
-        "time": "6:40 PM"
+        "homeTeam": "Philadelphia Phillies",
+        "homeTeamCode": "phi",
+        "awayTeam": "Chicago Cubs",
+        "awayTeamCode": "chc",
+        "date": "2025-06-11",
+        "status": "scheduled",
+        "time": "12:05 PM"
       },
       {
-        "homeTeam": "Kansas City Royals",
-        "homeTeamCode": "kc",
-        "awayTeam": "New York Yankees",
-        "awayTeamCode": "nyy",
-        "date": "2025-06-10",
-        "status": "live",
-        "time": "6:40 PM"
+        "homeTeam": "Cleveland Guardians",
+        "homeTeamCode": "cle",
+        "awayTeam": "Cincinnati Reds",
+        "awayTeamCode": "cin",
+        "date": "2025-06-11",
+        "status": "scheduled",
+        "time": "12:10 PM"
       },
       {
         "homeTeam": "Milwaukee Brewers",
         "homeTeamCode": "mil",
         "awayTeam": "Atlanta Braves",
         "awayTeamCode": "atl",
-        "date": "2025-06-10",
-        "status": "live",
-        "time": "6:40 PM"
+        "date": "2025-06-11",
+        "status": "scheduled",
+        "time": "1:10 PM"
       },
       {
         "homeTeam": "St. Louis Cardinals",
         "homeTeamCode": "stl",
         "awayTeam": "Toronto Blue Jays",
         "awayTeamCode": "tor",
-        "date": "2025-06-10",
-        "status": "live",
-        "time": "6:45 PM"
+        "date": "2025-06-11",
+        "status": "scheduled",
+        "time": "1:15 PM"
       }
     ]
   },
-  "expires": "2025-06-11T03:56:56.977Z"
+  "expires": "2025-06-11T18:10:07.470Z"
 }
