@@ -1,65 +1,23 @@
 {
   "data": {
-    "recent": [
-      {
-        "homeTeam": "Tampa Bay Rays",
-        "homeTeamCode": "tb",
-        "awayTeam": "Miami Marlins",
-        "awayTeamCode": "mia",
-        "date": "2025-06-08",
-        "status": "completed",
-        "homeScore": 3,
-        "awayScore": 2
-      },
-      {
-        "homeTeam": "Milwaukee Brewers",
-        "homeTeamCode": "mil",
-        "awayTeam": "San Diego Padres",
-        "awayTeamCode": "sd",
-        "date": "2025-06-08",
-        "status": "completed",
-        "homeScore": 0,
-        "awayScore": 1
-      },
-      {
-        "homeTeam": "Washington Nationals",
-        "homeTeamCode": "wsh",
-        "awayTeam": "Texas Rangers",
-        "awayTeamCode": "tex",
-        "date": "2025-06-08",
-        "status": "completed",
-        "homeScore": 2,
-        "awayScore": 4
-      },
-      {
-        "homeTeam": "Pittsburgh Pirates",
-        "homeTeamCode": "pit",
-        "awayTeam": "Philadelphia Phillies",
-        "awayTeamCode": "phi",
-        "date": "2025-06-08",
-        "status": "completed",
-        "homeScore": 2,
-        "awayScore": 1
-      },
-      {
-        "homeTeam": "Cincinnati Reds",
-        "homeTeamCode": "cin",
-        "awayTeam": "Arizona Diamondbacks",
-        "awayTeamCode": "ari",
-        "date": "2025-06-08",
-        "status": "completed",
-        "homeScore": 4,
-        "awayScore": 2
-      }
-    ],
+    "recent": [],
     "upcoming": [
+      {
+        "homeTeam": "Baltimore Orioles",
+        "homeTeamCode": "bal",
+        "awayTeam": "Detroit Tigers",
+        "awayTeamCode": "det",
+        "date": "2025-06-10",
+        "status": "live",
+        "time": "5:35 PM"
+      },
       {
         "homeTeam": "Cleveland Guardians",
         "homeTeamCode": "cle",
         "awayTeam": "Cincinnati Reds",
         "awayTeamCode": "cin",
-        "date": "2025-06-09",
-        "status": "scheduled",
+        "date": "2025-06-10",
+        "status": "live",
         "time": "5:40 PM"
       },
       {
@@ -67,8 +25,8 @@
         "homeTeamCode": "pit",
         "awayTeam": "Miami Marlins",
         "awayTeamCode": "mia",
-        "date": "2025-06-09",
-        "status": "scheduled",
+        "date": "2025-06-10",
+        "status": "live",
         "time": "5:40 PM"
       },
       {
@@ -76,29 +34,20 @@
         "homeTeamCode": "phi",
         "awayTeam": "Chicago Cubs",
         "awayTeamCode": "chc",
-        "date": "2025-06-09",
-        "status": "scheduled",
+        "date": "2025-06-10",
+        "status": "live",
         "time": "5:45 PM"
       },
       {
-        "homeTeam": "Boston Red Sox",
-        "homeTeamCode": "bos",
-        "awayTeam": "Tampa Bay Rays",
-        "awayTeamCode": "tb",
-        "date": "2025-06-09",
-        "status": "scheduled",
+        "homeTeam": "New York Mets",
+        "homeTeamCode": "nym",
+        "awayTeam": "Washington Nationals",
+        "awayTeamCode": "wsh",
+        "date": "2025-06-10",
+        "status": "live",
         "time": "6:10 PM"
-      },
-      {
-        "homeTeam": "Milwaukee Brewers",
-        "homeTeamCode": "mil",
-        "awayTeam": "Atlanta Braves",
-        "awayTeamCode": "atl",
-        "date": "2025-06-09",
-        "status": "scheduled",
-        "time": "6:40 PM"
       }
     ]
   },
-  "expires": "2025-06-09T05:15:44.158Z"
+  "expires": "2025-06-11T02:00:46.071Z"
 }
