@@ -7,19 +7,11 @@ WORKDIR /usr/src/app
 # Install curl for health checks and redis-tools for debugging
 RUN apt-get update && apt-get install -y curl redis-tools && rm -rf /var/lib/apt/lists/*
 
-# Set build arguments for non-sensitive Redis configuration
-ARG REDIS_HOST=localhost
-ARG REDIS_PORT=6379
+# Set build arguments for application configuration (Redis config will come from Azure environment)
 ARG NODE_ENV=production
-ARG REDIS_TLS=true
-ARG REDIS_AUTH_MODE=key
 
-# Set environment variables (sensitive data will be provided at runtime)
-ENV REDIS_HOST=$REDIS_HOST \
-    REDIS_PORT=$REDIS_PORT \
-    REDIS_TLS=$REDIS_TLS \
-    REDIS_AUTH_MODE=$REDIS_AUTH_MODE \
-    NODE_ENV=$NODE_ENV
+# Set environment variables (Redis configuration will be provided by Azure at runtime)
+ENV NODE_ENV=$NODE_ENV
 
 # Copy root package files and install root dependencies (if any)
 COPY package*.json ./
@@ -60,8 +52,36 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:3000/api/health || exit 1
 
-# Create a startup script that checks Redis connection before starting app
-RUN echo '#!/bin/bash\necho "Checking Redis connection..."\nif [ "$NODE_ENV" = "production" ]; then\n  echo "Running in production mode with Redis"\n  if [ "$REDIS_AUTH_MODE" = "aad" ]; then\n    echo "Using Azure AD authentication for Redis"\n  else\n    echo "Using key authentication for Redis"\n  fi\n  echo "Starting application..."\n  node src/react-backend/dist/index.js\nelse\n  echo "Running in development mode"\n  node src/react-backend/dist/index.js\nfi' > /usr/src/app/start.sh && chmod +x /usr/src/app/start.sh
+# Create a startup script that validates Redis configuration and starts the app
+RUN echo '#!/bin/bash\n\
+echo "=== The Cycle Application Startup ==="\n\
+echo "Environment: $NODE_ENV"\n\
+echo ""\n\
+echo "=== Redis Configuration Debug ==="\n\
+echo "REDIS_HOST: ${REDIS_HOST:-not set}"\n\
+echo "REDIS_PORT: ${REDIS_PORT:-not set}"\n\
+echo "REDIS_TLS: ${REDIS_TLS:-not set}"\n\
+echo "REDIS_AUTH_MODE: ${REDIS_AUTH_MODE:-not set}"\n\
+echo "REDIS_PASSWORD: ${REDIS_PASSWORD:+[REDACTED]:-not set}"\n\
+echo ""\n\
+echo "Validating Redis configuration..."\n\
+node src/react-backend/src/scripts/validate-redis-config.js\n\
+echo ""\n\
+echo "Starting application..."\n\
+if [ "$NODE_ENV" = "production" ]; then\n\
+  echo "Running in production mode"\n\
+  if [ "$REDIS_AUTH_MODE" = "aad" ]; then\n\
+    echo "Using Azure AD authentication for Redis"\n\
+  elif [ -n "$REDIS_HOST" ] && [ "$REDIS_HOST" != "localhost" ]; then\n\
+    echo "Using key authentication for Redis"\n\
+  else\n\
+    echo "Redis not configured - using in-memory fallback caching"\n\
+  fi\n\
+  node src/react-backend/dist/index.js\n\
+else\n\
+  echo "Running in development mode"\n\
+  node src/react-backend/dist/index.js\n\
+fi' > /usr/src/app/start.sh && chmod +x /usr/src/app/start.sh
 
 # Start the backend (which will serve frontend static files)
 CMD ["/usr/src/app/start.sh"]

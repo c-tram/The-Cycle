@@ -72,20 +72,37 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 app.get('/api/health', async (req, res) => {
   try {
     const redisStatus = await redisCache.ping();
+    const isLocalHost = !process.env.REDIS_HOST || 
+                       process.env.REDIS_HOST === 'localhost' || 
+                       process.env.REDIS_HOST === '127.0.0.1';
+    const cacheType = isLocalHost ? 'in-memory' : 'redis';
+    
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
-      redis: redisStatus ? 'connected' : 'disconnected',
-      cacheType: process.env.NODE_ENV === 'production' ? 'redis' : 'file'
+      redis: {
+        status: redisStatus ? 'connected' : 'disconnected',
+        cacheType: cacheType,
+        configured: !isLocalHost,
+        config: {
+          host: process.env.REDIS_HOST || 'not set',
+          port: process.env.REDIS_PORT || 'not set',
+          tls: process.env.REDIS_TLS || 'not set',
+          authMode: process.env.REDIS_AUTH_MODE || 'not set',
+          passwordConfigured: !!process.env.REDIS_PASSWORD
+        }
+      }
     });
   } catch (err) {
     console.error('Health check error:', err);
     res.status(500).json({
       status: 'error',
       timestamp: new Date().toISOString(),
-      redis: 'error',
-      message: err instanceof Error ? err.message : 'Unknown error'
+      redis: {
+        status: 'error',
+        message: err instanceof Error ? err.message : 'Unknown error'
+      }
     });
   }
 });
