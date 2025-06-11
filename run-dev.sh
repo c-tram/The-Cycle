@@ -11,7 +11,11 @@ set -e
 git add .
 
 # 2. Commit with a timestamped message
+<<<<<<< HEAD
 git commit -m "Back to Stable: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+=======
+git commit -m "Redis Caching / Rollback: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+>>>>>>> 109cccdc754033907ad4f9bab69f69b0951cf723
 
 # 3. Pull latest changes from Azure DevOps remote (origin) and merge
 git pull origin main --no-rebase
