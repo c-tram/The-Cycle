@@ -1,4 +1,2 @@
 # Ignore local/dev run scripts and sensitive infra files
 run-docker.sh
-docker-compose.yml
-Dockerfile
