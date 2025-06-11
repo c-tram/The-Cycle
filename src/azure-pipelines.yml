@@ -16,7 +16,7 @@ variables:
   # Container registry URL
   containerRegistry: $(CONTAINER_REGISTRY)
   # Path to the Dockerfile (corrected path)
-  dockerfilePath: $(Build.SourcesDirectory)/src/Dockerfile
+  dockerfilePath: $(Build.SourcesDirectory)/Dockerfile
   # Tag for the image
   tag: $(IMAGE_TAG)
   # Redis configuration

@@ -11,7 +11,7 @@ set -e
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Redis Fixed. Shell scripts added for more comprehensive testing: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Fixed Azure pipeline Dockerfile path: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Pull latest changes from Azure DevOps remote (origin) and merge
 git pull origin main --no-rebase
