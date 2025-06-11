@@ -104,7 +104,6 @@ const Overview = () => {
   const renderGameWidget = (widgetId: string, title: string) => {
     const isRecent = widgetId.includes('recent');
     const gamesList = isRecent ? games.recent : games.upcoming;
-    const maxGames = editMode ? 8 : 4; // Show more games in edit mode
     
     return (
       <div className={`widget-card medium ${editMode ? 'edit-mode' : ''}`}>
@@ -123,9 +122,9 @@ const Overview = () => {
             </div>
           )}
         </div>
-        <div className="widget-content">
+        <div className="widget-content scrollable-games">
           {gamesList.length > 0 ? (
-            gamesList.slice(0, maxGames).map((game: Game, i: number) => (
+            gamesList.map((game: Game, i: number) => (
               <div key={`${widgetId}-${i}`} className="game-item">
                 <div className="game-teams">
                   <span className="away-team">{game.awayTeamCode.toUpperCase()}</span>

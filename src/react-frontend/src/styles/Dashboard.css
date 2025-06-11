@@ -232,6 +232,31 @@
   color: #ccc;
 }
 
+/* Scrollable Games Widget */
+.widget-content.scrollable-games {
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.widget-content.scrollable-games::-webkit-scrollbar {
+  width: 6px;
+}
+
+.widget-content.scrollable-games::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.widget-content.scrollable-games::-webkit-scrollbar-thumb {
+  background: var(--mlb-red);
+  border-radius: 3px;
+}
+
+.widget-content.scrollable-games::-webkit-scrollbar-thumb:hover {
+  background: var(--mlb-red-light);
+}
+
 .no-data {
   text-align: center;
   color: #666;

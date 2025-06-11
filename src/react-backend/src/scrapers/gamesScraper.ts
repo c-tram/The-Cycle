@@ -264,7 +264,7 @@ async function scrapeRecentGames(): Promise<Game[]> {
           });
         }
         
-        if (games.length >= 5) return false; // Break out of each loop
+        // Remove artificial limit to show all available games
       } catch (e) {
         console.error('Error processing game card', e);
       }
@@ -356,7 +356,7 @@ async function scrapeUpcomingGames(): Promise<Game[]> {
           status: 'scheduled'
         });
         
-        if (games.length >= 5) return false; // Break out of each loop
+        // Remove artificial limit to show all available games
       } catch (e) {
         console.error('Error processing game entry', e);
       }
