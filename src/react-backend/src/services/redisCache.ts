@@ -2,32 +2,61 @@ import Redis from 'ioredis';
 import { RedisOptions, Cluster } from 'ioredis';
 import { DefaultAzureCredential } from '@azure/identity';
 
-// Redis client configuration
-const redisConfig: RedisOptions = {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_AUTH_MODE === 'aad' ? undefined : process.env.REDIS_PASSWORD,
-    // Enable TLS only if explicitly set to true (for Azure Redis)
-    tls: process.env.REDIS_TLS === 'true' 
-        ? { servername: process.env.REDIS_HOST } 
-        : undefined,
-    // Configure Azure Redis specific options if in Azure
-    enableReadyCheck: false, // Important for Azure Redis
-    maxRetriesPerRequest: 3,
-    retryStrategy: (times) => {
-        const delay = Math.min(times * 500, 2000);
-        return delay;
-    },
-    // Auto-reconnect settings
-    reconnectOnError: (err: Error) => {
-        const targetError = 'READONLY';
-        if (err.message.includes(targetError)) {
-            // When we get READONLY on a node, we always want to reconnect
-            return true;
-        }
-        return false;
+// Function to determine if we should use Azure Redis or fallback
+function shouldUseAzureRedis(): boolean {
+    // Check if Azure Redis is properly configured
+    const hasAzureRedisHost = process.env.REDIS_HOST && 
+                             process.env.REDIS_HOST !== 'localhost' && 
+                             process.env.REDIS_HOST !== '127.0.0.1';
+    
+    console.log('Redis Configuration Check:');
+    console.log(`  REDIS_HOST: ${process.env.REDIS_HOST || 'undefined'}`);
+    console.log(`  Has Azure Redis Host: ${hasAzureRedisHost}`);
+    console.log(`  NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+    
+    return hasAzureRedisHost;
+}
+
+// Function to create Redis configuration only when needed
+function createRedisConfig(): RedisOptions {
+    if (!shouldUseAzureRedis()) {
+        throw new Error('Azure Redis not configured, should use fallback');
     }
-};
+    
+    const config: RedisOptions = {
+        host: process.env.REDIS_HOST!,
+        port: parseInt(process.env.REDIS_PORT || '6380'),
+        password: process.env.REDIS_AUTH_MODE === 'aad' ? undefined : process.env.REDIS_PASSWORD,
+        // Enable TLS for Azure Redis
+        tls: process.env.REDIS_TLS === 'true' 
+            ? { servername: process.env.REDIS_HOST } 
+            : undefined,
+        // Configure Azure Redis specific options
+        enableReadyCheck: false, // Important for Azure Redis
+        maxRetriesPerRequest: 3,
+        retryStrategy: (times) => {
+            const delay = Math.min(times * 500, 2000);
+            return delay;
+        },
+        // Auto-reconnect settings
+        reconnectOnError: (err: Error) => {
+            const targetError = 'READONLY';
+            if (err.message.includes(targetError)) {
+                return true;
+            }
+            return false;
+        }
+    };
+    
+    console.log('Created Redis config for Azure:', {
+        host: config.host,
+        port: config.port,
+        tls: !!config.tls,
+        authMode: process.env.REDIS_AUTH_MODE || 'key'
+    });
+    
+    return config;
+}
 
 // Create Redis client with special handling for cluster mode
 // Using "any" type here to accommodate both Cluster and Redis interfaces
@@ -53,7 +82,7 @@ function createDummyClient() {
             return Array.from(memoryCache.keys()).filter(k => regex.test(k));
         },
         ping: async () => 'PONG',
-        on: (event: string, handler: Function) => {},
+        on: (event: string, handler: Function) => {}, // No-op for event listeners
         auth: async (token: string) => 'OK',
     };
 }
@@ -109,98 +138,91 @@ async function getAadTokenForRedis(): Promise<string | undefined> {
     }
 }
 
-// Check if using Azure Redis Cache in cluster mode 
-if (process.env.REDIS_CLUSTER === 'true' && !redisClient) {
-    try {
-        const hosts = (process.env.REDIS_HOST || '').split(',').map(host => ({
-            host: host.trim(),
-            port: parseInt(process.env.REDIS_PORT || '6380')
-        }));
-        
-        // Create a cluster client
-        redisClient = new Redis.Cluster(hosts, {
-            redisOptions: {
-                password: process.env.REDIS_AUTH_MODE === 'aad' ? undefined : process.env.REDIS_PASSWORD,
-                tls: process.env.NODE_ENV === 'production' || process.env.REDIS_TLS === 'true' 
-                    ? { servername: hosts[0].host } 
-                    : undefined
-            },
-            // For better cluster stability
-            scaleReads: 'slave',
-            maxRedirections: 3,
-            retryDelayOnFailover: 300
-        });
-        
-        console.log('Initialized Redis in cluster mode');
-    } catch (error) {
-        console.error('Failed to initialize Redis cluster mode:', error);
-        // Fallback to standard client
-        redisClient = new Redis(redisConfig);
-        console.log('Falling back to standard Redis mode');
-    }
-} else {
-    // Create a standard client (only if not already created for test environment)
-    if (!redisClient) {
-        console.log('Initializing Redis client...');
-        console.log(`REDIS_HOST: ${process.env.REDIS_HOST || 'localhost'}`);
-        console.log(`REDIS_PORT: ${process.env.REDIS_PORT || '6379'}`);
-        console.log(`REDIS_TLS: ${process.env.REDIS_TLS || 'false'}`);
-        console.log(`REDIS_AUTH_MODE: ${process.env.REDIS_AUTH_MODE || 'key'}`);
-        console.log(`NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
-        
-        try {
-            if (process.env.REDIS_AUTH_MODE === 'aad') {
-                // For AAD authentication, we need to create a custom authentication handler
-                console.log('Initializing Redis in standard mode with AAD authentication');
+// Initialize Redis client only if not already created for test environment
+if (!redisClient) {
+    console.log('Determining Redis configuration...');
+    
+    // Check if we should use Azure Redis or fallback to memory cache
+    if (!shouldUseAzureRedis()) {
+        console.log('No Azure Redis configured, using in-memory fallback');
+        redisClient = createDummyClient();
+    } else {
+        // Check if using Azure Redis Cache in cluster mode 
+        if (process.env.REDIS_CLUSTER === 'true') {
+            try {
+                const hosts = (process.env.REDIS_HOST || '').split(',').map(host => ({
+                    host: host.trim(),
+                    port: parseInt(process.env.REDIS_PORT || '6380')
+                }));
                 
-                // Initialize with standard config first (without password)
-                redisClient = new Redis(redisConfig);
-                
-                // Setup AAD token refresh
-                const refreshAuthToken = async () => {
-                    try {
-                        const token = await getAadTokenForRedis();
-                        if (token) {
-                            await redisClient.auth(token);
-                            console.log('AAD token refreshed for Redis');
-                        }
-                    } catch (err) {
-                        console.error('Error refreshing AAD token:', err);
-                    }
-                };
-                
-                // Initial authentication with proper error handling
-                refreshAuthToken().catch(err => {
-                    console.error('Failed initial AAD authentication:', err);
+                // Create a cluster client
+                redisClient = new Redis.Cluster(hosts, {
+                    redisOptions: {
+                        password: process.env.REDIS_AUTH_MODE === 'aad' ? undefined : process.env.REDIS_PASSWORD,
+                        tls: process.env.NODE_ENV === 'production' || process.env.REDIS_TLS === 'true' 
+                            ? { servername: hosts[0].host } 
+                            : undefined
+                    },
+                    // For better cluster stability
+                    scaleReads: 'slave',
+                    maxRedirections: 3,
+                    retryDelayOnFailover: 300
                 });
                 
-                // Refresh token every 20 minutes (tokens typically last 1 hour)
-                setInterval(() => {
+                console.log('Initialized Redis in cluster mode');
+            } catch (error) {
+                console.error('Failed to initialize Redis cluster mode:', error);
+                console.log('Falling back to in-memory cache due to cluster initialization failure');
+                redisClient = createDummyClient();
+            }
+        } else {
+            // Standard single-instance Redis
+            try {
+                const redisConfig = createRedisConfig();
+                
+                if (process.env.REDIS_AUTH_MODE === 'aad') {
+                    // For AAD authentication, we need to create a custom authentication handler
+                    console.log('Initializing Redis in standard mode with AAD authentication');
+                    
+                    // Initialize with standard config first (without password)
+                    redisClient = new Redis(redisConfig);
+                    
+                    // Setup AAD token refresh
+                    const refreshAuthToken = async () => {
+                        try {
+                            const token = await getAadTokenForRedis();
+                            if (token) {
+                                await redisClient.auth(token);
+                                console.log('AAD token refreshed for Redis');
+                            }
+                        } catch (err) {
+                            console.error('Error refreshing AAD token:', err);
+                        }
+                    };
+                    
+                    // Initial authentication with proper error handling
                     refreshAuthToken().catch(err => {
-                        console.error('Failed to refresh AAD token:', err);
+                        console.error('Failed initial AAD authentication:', err);
                     });
-                }, 20 * 60 * 1000);
-            } else {
-                // Standard key-based authentication or no Redis available
-                if (!process.env.REDIS_HOST || 
-                    process.env.REDIS_HOST === 'localhost' || 
-                    process.env.REDIS_HOST === '127.0.0.1') {
-                    console.log('No Azure Redis configured (REDIS_HOST not set or set to localhost), using in-memory fallback');
-                    console.log(`Current REDIS_HOST value: ${process.env.REDIS_HOST || 'undefined'}`);
-                    redisClient = createDummyClient();
+                    
+                    // Refresh token every 20 minutes (tokens typically last 1 hour)
+                    setInterval(() => {
+                        refreshAuthToken().catch(err => {
+                            console.error('Failed to refresh AAD token:', err);
+                        });
+                    }, 20 * 60 * 1000);
                 } else {
-                    console.log('Initializing Redis with Azure configuration');
+                    console.log('Initializing Redis with Azure configuration and key authentication');
                     redisClient = new Redis(redisConfig);
                     console.log('Initialized Redis in standard mode with key authentication');
                 }
+            } catch (error) {
+                console.error('Failed to initialize Azure Redis:', error);
+                console.log('Falling back to in-memory cache due to Azure Redis initialization failure');
+                redisClient = createDummyClient();
             }
-        } catch (error) {
-            console.error('Failed to initialize Redis:', error);
-            console.log('Falling back to in-memory cache');
-            // Create a dummy client for graceful failure
-            redisClient = createDummyClient();
         }
-    } // End of if (!redisClient)
+    }
 }
 
 // Only add event listeners if not in test environment and not using dummy client

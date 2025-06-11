@@ -6,7 +6,7 @@
       "awayTeam": "Miami Marlins",
       "awayTeamCode": "mia",
       "date": "2025-06-11",
-      "status": "scheduled",
+      "status": "live",
       "time": "11:35 AM"
     },
     {
@@ -15,7 +15,7 @@
       "awayTeam": "Chicago Cubs",
       "awayTeamCode": "chc",
       "date": "2025-06-11",
-      "status": "scheduled",
+      "status": "live",
       "time": "12:05 PM"
     },
     {
@@ -24,7 +24,7 @@
       "awayTeam": "Cincinnati Reds",
       "awayTeamCode": "cin",
       "date": "2025-06-11",
-      "status": "scheduled",
+      "status": "live",
       "time": "12:10 PM"
     },
     {
@@ -46,5 +46,5 @@
       "time": "1:15 PM"
     }
   ],
-  "expires": "2025-06-11T17:10:07.472Z"
+  "expires": "2025-06-11T17:50:08.125Z"
 }
