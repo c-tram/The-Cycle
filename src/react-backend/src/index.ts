@@ -18,8 +18,12 @@ const port = process.env.PORT || 3000;
 
 // Enable CORS with proper configuration for both development and production
 const allowedOrigins = [
-  'http://localhost:5173',
+  'http://localhost:5173',    // React frontend (Vite)
   'http://127.0.0.1:5173',
+  'http://localhost:8080',    // Flutter web frontend (primary)
+  'http://127.0.0.1:8080',
+  'http://localhost:3001',    // Flutter web frontend (alternate port)
+  'http://127.0.0.1:3001',
   ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
 ];
 
