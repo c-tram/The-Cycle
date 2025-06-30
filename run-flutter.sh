@@ -86,8 +86,7 @@ cd ../..
 
 # Prepare Flutter web app
 print_status "Preparing Flutter web application..."
-cd src/the_cycle_flutter
-
+cd src/flutter-frontend
 # Get Flutter dependencies
 print_status "Getting Flutter dependencies..."
 flutter pub get
