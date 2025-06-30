@@ -218,12 +218,12 @@ class TeamBrandingService {
 
   // Get team colors for a given team code
   TeamColors getTeamColors(String teamCode) {
-    return _teamColors[teamCode.toLowerCase()] ?? 
-           const TeamColors(
-             primary: Color(0xFF1565C0), // Default blue
-             secondary: Color(0xFF90A4AE), // Default grey
-             accent: Color(0xFFFFFFFF), // White
-           );
+    return _teamColors[teamCode.toLowerCase()] ??
+        const TeamColors(
+          primary: Color(0xFF1565C0), // Default blue
+          secondary: Color(0xFF90A4AE), // Default grey
+          accent: Color(0xFFFFFFFF), // White
+        );
   }
 
   // Get team logo URL for a given team code
@@ -234,7 +234,7 @@ class TeamBrandingService {
   // Get a themed ColorScheme for a team
   ColorScheme getTeamColorScheme(String teamCode, {bool isDark = false}) {
     final teamColors = getTeamColors(teamCode);
-    
+
     if (isDark) {
       return ColorScheme.dark(
         primary: teamColors.primary,

@@ -15,11 +15,14 @@ class Division {
   factory Division.fromJson(Map<String, dynamic> json) {
     // Backend sends 'division' instead of 'name'
     final divisionName = json['division'] ?? json['name'] ?? 'Unknown Division';
-    
+
     // Extract league from division name
-    final league = divisionName.toLowerCase().contains('american') ? 'AL' : 
-                   divisionName.toLowerCase().contains('national') ? 'NL' : 'Unknown';
-    
+    final league = divisionName.toLowerCase().contains('american')
+        ? 'AL'
+        : divisionName.toLowerCase().contains('national')
+            ? 'NL'
+            : 'Unknown';
+
     return Division(
       name: divisionName,
       league: league,

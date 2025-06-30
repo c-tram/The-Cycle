@@ -11,9 +11,9 @@ import 'connectivity_service.dart';
 class ApiException implements Exception {
   final String message;
   final bool isOfflineError;
-  
+
   ApiException(this.message, {this.isOfflineError = false});
-  
+
   @override
   String toString() => 'ApiException: $message';
 }
@@ -21,14 +21,16 @@ class ApiException implements Exception {
 // Service to handle all API communications with the backend
 class ApiService {
   final ConnectivityService _connectivityService = ConnectivityService();
-  
+
   // Get games data (recent, upcoming, and live games)
   Future<GamesData> getGames() async {
     try {
       // Check for internet connection before making request
-      final hasConnectivity = await _connectivityService.canMakeNetworkRequest();
+      final hasConnectivity =
+          await _connectivityService.canMakeNetworkRequest();
       if (!hasConnectivity) {
-        throw ApiException('No internet connection available', isOfflineError: true);
+        throw ApiException('No internet connection available',
+            isOfflineError: true);
       }
 
       final response = await http.get(
@@ -43,7 +45,8 @@ class ApiService {
         throw ApiException('Failed to load games: ${response.statusCode}');
       }
     } on SocketException {
-      throw ApiException('Network error: Could not connect to server', isOfflineError: true);
+      throw ApiException('Network error: Could not connect to server',
+          isOfflineError: true);
     } catch (e) {
       throw ApiException('Network error: $e');
     }
@@ -53,15 +56,19 @@ class ApiService {
   Future<List<Division>> getStandings() async {
     try {
       // Check for internet connection before making request
-      final hasConnectivity = await _connectivityService.canMakeNetworkRequest();
+      final hasConnectivity =
+          await _connectivityService.canMakeNetworkRequest();
       if (!hasConnectivity) {
-        throw ApiException('No internet connection available', isOfflineError: true);
+        throw ApiException('No internet connection available',
+            isOfflineError: true);
       }
 
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.standingsEndpoint}'),
-      ).timeout(ApiConfig.timeout);
-      
+      final response = await http
+          .get(
+            Uri.parse('${ApiConfig.baseUrl}${ApiConfig.standingsEndpoint}'),
+          )
+          .timeout(ApiConfig.timeout);
+
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         return data.map((json) => Division.fromJson(json)).toList();
@@ -69,7 +76,8 @@ class ApiService {
         throw ApiException('Failed to load standings: ${response.statusCode}');
       }
     } on SocketException {
-      throw ApiException('Network error: Could not connect to server', isOfflineError: true);
+      throw ApiException('Network error: Could not connect to server',
+          isOfflineError: true);
     } catch (e) {
       throw ApiException('Network error: $e');
     }
@@ -79,16 +87,19 @@ class ApiService {
   Future<List<Player>> getTeamRoster(String teamCode) async {
     try {
       // Check for internet connection before making request
-      final hasConnectivity = await _connectivityService.canMakeNetworkRequest();
+      final hasConnectivity =
+          await _connectivityService.canMakeNetworkRequest();
       if (!hasConnectivity) {
-        throw ApiException('No internet connection available', isOfflineError: true);
+        throw ApiException('No internet connection available',
+            isOfflineError: true);
       }
 
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.rosterEndpoint}?team=$teamCode&statType=hitting'),
+        Uri.parse(
+            '${ApiConfig.baseUrl}${ApiConfig.rosterEndpoint}?team=$teamCode&statType=hitting'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(ApiConfig.timeout);
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         // The backend returns a list with team data structure
@@ -102,7 +113,8 @@ class ApiService {
         throw ApiException('Failed to load roster: ${response.statusCode}');
       }
     } on SocketException {
-      throw ApiException('Network error: Could not connect to server', isOfflineError: true);
+      throw ApiException('Network error: Could not connect to server',
+          isOfflineError: true);
     } catch (e) {
       throw ApiException('Network error: $e');
     }
@@ -112,15 +124,18 @@ class ApiService {
   Future<bool> isRedisCacheHealthy() async {
     try {
       // Check for internet connection before making request
-      final hasConnectivity = await _connectivityService.canMakeNetworkRequest();
+      final hasConnectivity =
+          await _connectivityService.canMakeNetworkRequest();
       if (!hasConnectivity) {
         return false; // Cannot check Redis health while offline
       }
 
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.redisHealthEndpoint}'),
-      ).timeout(ApiConfig.timeout);
-      
+      final response = await http
+          .get(
+            Uri.parse('${ApiConfig.baseUrl}${ApiConfig.redisHealthEndpoint}'),
+          )
+          .timeout(ApiConfig.timeout);
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return data['healthy'] == true;

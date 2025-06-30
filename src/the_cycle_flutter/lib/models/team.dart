@@ -20,30 +20,31 @@ class Team {
     // Backend structure for standings is different
     // Backend sends: {team: "Team Name", wins: 48, losses: 35, pct: ".578", gb: "-", last10: "6-4", streak: "W1"}
     // We need to handle both formats: direct team data and nested team data
-    
+
     String teamName;
     String teamCode = '';
     String division = '';
     String league = '';
     TeamRecord? record;
-    
+
     if (json.containsKey('team') && json.containsKey('wins')) {
       // This is standings data from backend
       teamName = json['team'] ?? 'Unknown Team';
-      
+
       // Extract team code from team name (simple mapping)
       teamCode = _getTeamCodeFromName(teamName);
-      
+
       // Create record from backend data
       final wins = json['wins'] ?? 0;
       final losses = json['losses'] ?? 0;
       final pctString = (json['pct'] ?? '0.000').replaceAll('.', '');
       final winPercentage = double.tryParse('0.$pctString') ?? 0.0;
-      
+
       // Parse games behind
       final gbString = json['gb'] ?? '-';
-      final gamesBehind = gbString == '-' ? 0.0 : double.tryParse(gbString) ?? 0.0;
-      
+      final gamesBehind =
+          gbString == '-' ? 0.0 : double.tryParse(gbString) ?? 0.0;
+
       record = TeamRecord(
         wins: wins,
         losses: losses,
@@ -57,9 +58,10 @@ class Team {
       teamCode = json['code'] ?? '';
       division = json['division'] ?? '';
       league = json['league'] ?? '';
-      record = json['record'] != null ? TeamRecord.fromJson(json['record']) : null;
+      record =
+          json['record'] != null ? TeamRecord.fromJson(json['record']) : null;
     }
-    
+
     return Team(
       name: teamName,
       code: teamCode,
@@ -69,7 +71,7 @@ class Team {
       record: record,
     );
   }
-  
+
   // Helper method to get team code from team name
   static String _getTeamCodeFromName(String teamName) {
     final Map<String, String> teamNameToCode = {
@@ -104,8 +106,9 @@ class Team {
       'Toronto Blue Jays': 'tor',
       'Washington Nationals': 'wsh',
     };
-    
-    return teamNameToCode[teamName] ?? teamName.toLowerCase().replaceAll(' ', '');
+
+    return teamNameToCode[teamName] ??
+        teamName.toLowerCase().replaceAll(' ', '');
   }
 
   Map<String, dynamic> toJson() {
@@ -146,7 +149,7 @@ class TeamRecord {
     } else if (json['winPercentage'] != null) {
       winPercentage = json['winPercentage']?.toDouble();
     }
-    
+
     double? gamesBehind;
     if (json['gb'] != null) {
       final gbString = json['gb'].toString();
@@ -154,7 +157,7 @@ class TeamRecord {
     } else if (json['gamesBehind'] != null) {
       gamesBehind = json['gamesBehind']?.toDouble();
     }
-    
+
     return TeamRecord(
       wins: json['wins'] ?? 0,
       losses: json['losses'] ?? 0,

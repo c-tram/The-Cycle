@@ -5,7 +5,8 @@ import '../models/team.dart';
 
 // Service for team performance analytics and game predictions
 class PerformanceAnalyticsService {
-  static final PerformanceAnalyticsService _instance = PerformanceAnalyticsService._internal();
+  static final PerformanceAnalyticsService _instance =
+      PerformanceAnalyticsService._internal();
   factory PerformanceAnalyticsService() => _instance;
   PerformanceAnalyticsService._internal();
 
@@ -15,8 +16,10 @@ class PerformanceAnalyticsService {
     List<Game> recentGames,
     List<Player> roster,
   ) {
-    final teamGames = recentGames.where((game) =>
-        game.homeTeamCode == team.code || game.awayTeamCode == team.code).toList();
+    final teamGames = recentGames
+        .where((game) =>
+            game.homeTeamCode == team.code || game.awayTeamCode == team.code)
+        .toList();
 
     if (teamGames.isEmpty) {
       return TeamPerformanceMetrics.empty();
@@ -44,11 +47,11 @@ class PerformanceAnalyticsService {
     }
 
     final winPercentage = totalGames > 0 ? wins / totalGames : 0.0;
-    final avgRunsScored = runsScoredPerGame.isNotEmpty 
-        ? runsScoredPerGame.reduce((a, b) => a + b) / runsScoredPerGame.length 
+    final avgRunsScored = runsScoredPerGame.isNotEmpty
+        ? runsScoredPerGame.reduce((a, b) => a + b) / runsScoredPerGame.length
         : 0.0;
-    final avgRunsAllowed = runsAllowedPerGame.isNotEmpty 
-        ? runsAllowedPerGame.reduce((a, b) => a + b) / runsAllowedPerGame.length 
+    final avgRunsAllowed = runsAllowedPerGame.isNotEmpty
+        ? runsAllowedPerGame.reduce((a, b) => a + b) / runsAllowedPerGame.length
         : 0.0;
 
     // Calculate team batting and pitching stats
@@ -77,13 +80,13 @@ class PerformanceAnalyticsService {
   // Predict game outcome
   GamePrediction predictGame(Game upcomingGame, Team homeTeam, Team awayTeam,
       TeamPerformanceMetrics homeMetrics, TeamPerformanceMetrics awayMetrics) {
-    
     // Factors that influence the prediction
     double homeAdvantage = 0.54; // Home teams win ~54% of games
     double homeWinProb = homeAdvantage;
 
     // Adjust based on win percentage
-    homeWinProb += (homeMetrics.winPercentage - awayMetrics.winPercentage) * 0.3;
+    homeWinProb +=
+        (homeMetrics.winPercentage - awayMetrics.winPercentage) * 0.3;
 
     // Adjust based on run differential
     final homeRunDiff = homeMetrics.runDifferential;
@@ -94,16 +97,21 @@ class PerformanceAnalyticsService {
     homeWinProb += (homeMetrics.momentum - awayMetrics.momentum) * 0.1;
 
     // Adjust based on batting vs pitching matchup
-    final homeOffenseVsAwayPitching = homeMetrics.teamBattingAverage - awayMetrics.teamERA * 0.1;
-    final awayOffenseVsHomePitching = awayMetrics.teamBattingAverage - homeMetrics.teamERA * 0.1;
-    homeWinProb += (homeOffenseVsAwayPitching - awayOffenseVsHomePitching) * 0.2;
+    final homeOffenseVsAwayPitching =
+        homeMetrics.teamBattingAverage - awayMetrics.teamERA * 0.1;
+    final awayOffenseVsHomePitching =
+        awayMetrics.teamBattingAverage - homeMetrics.teamERA * 0.1;
+    homeWinProb +=
+        (homeOffenseVsAwayPitching - awayOffenseVsHomePitching) * 0.2;
 
     // Clamp probability between 0.1 and 0.9
     homeWinProb = homeWinProb.clamp(0.1, 0.9);
 
     // Predict score
-    final predictedHomeScore = _predictScore(homeMetrics.averageRunsScored, awayMetrics.teamERA);
-    final predictedAwayScore = _predictScore(awayMetrics.averageRunsScored, homeMetrics.teamERA);
+    final predictedHomeScore =
+        _predictScore(homeMetrics.averageRunsScored, awayMetrics.teamERA);
+    final predictedAwayScore =
+        _predictScore(awayMetrics.averageRunsScored, homeMetrics.teamERA);
 
     return GamePrediction(
       homeWinProbability: homeWinProb,
@@ -111,7 +119,8 @@ class PerformanceAnalyticsService {
       predictedHomeScore: predictedHomeScore,
       predictedAwayScore: predictedAwayScore,
       confidence: _calculateConfidence(homeMetrics, awayMetrics),
-      keyFactors: _identifyKeyFactors(homeTeam, awayTeam, homeMetrics, awayMetrics),
+      keyFactors:
+          _identifyKeyFactors(homeTeam, awayTeam, homeMetrics, awayMetrics),
     );
   }
 
@@ -121,9 +130,11 @@ class PerformanceAnalyticsService {
     String teamCode,
     PerformanceChartType chartType,
   ) {
-    final teamGames = games.where((game) =>
-        (game.homeTeamCode == teamCode || game.awayTeamCode == teamCode) &&
-        game.status == GameStatus.completed).toList();
+    final teamGames = games
+        .where((game) =>
+            (game.homeTeamCode == teamCode || game.awayTeamCode == teamCode) &&
+            game.status == GameStatus.completed)
+        .toList();
 
     switch (chartType) {
       case PerformanceChartType.winLoss:
@@ -215,11 +226,12 @@ class PerformanceAnalyticsService {
     return adjustedRuns.round().clamp(0, 15);
   }
 
-  double _calculateConfidence(TeamPerformanceMetrics home, TeamPerformanceMetrics away) {
+  double _calculateConfidence(
+      TeamPerformanceMetrics home, TeamPerformanceMetrics away) {
     // Confidence is higher when teams have more games played and larger performance gaps
     final gamesSample = min(home.totalGames, away.totalGames);
     final performanceGap = (home.winPercentage - away.winPercentage).abs();
-    
+
     return (gamesSample / 50.0 + performanceGap).clamp(0.1, 0.9);
   }
 
@@ -241,7 +253,8 @@ class PerformanceAnalyticsService {
 
     if (homeMetrics.runDifferential > awayMetrics.runDifferential + 1.0) {
       factors.add('${homeTeam.name} has better run differential');
-    } else if (awayMetrics.runDifferential > homeMetrics.runDifferential + 1.0) {
+    } else if (awayMetrics.runDifferential >
+        homeMetrics.runDifferential + 1.0) {
       factors.add('${awayTeam.name} has better run differential');
     }
 
@@ -250,7 +263,8 @@ class PerformanceAnalyticsService {
     return factors;
   }
 
-  List<PerformanceDataPoint> _generateWinLossChart(List<Game> games, String teamCode) {
+  List<PerformanceDataPoint> _generateWinLossChart(
+      List<Game> games, String teamCode) {
     final points = <PerformanceDataPoint>[];
     int wins = 0;
     int totalGames = 0;
@@ -264,7 +278,7 @@ class PerformanceAnalyticsService {
       if (teamScore != null && opponentScore != null) {
         totalGames++;
         if (teamScore > opponentScore) wins++;
-        
+
         points.add(PerformanceDataPoint(
           x: totalGames.toDouble(),
           y: totalGames > 0 ? wins / totalGames : 0.0,
@@ -277,9 +291,10 @@ class PerformanceAnalyticsService {
     return points;
   }
 
-  List<PerformanceDataPoint> _generateRunsScoredChart(List<Game> games, String teamCode) {
+  List<PerformanceDataPoint> _generateRunsScoredChart(
+      List<Game> games, String teamCode) {
     final points = <PerformanceDataPoint>[];
-    
+
     for (int i = 0; i < games.length; i++) {
       final game = games[i];
       final isHome = game.homeTeamCode == teamCode;
@@ -298,9 +313,10 @@ class PerformanceAnalyticsService {
     return points;
   }
 
-  List<PerformanceDataPoint> _generateRunDifferentialChart(List<Game> games, String teamCode) {
+  List<PerformanceDataPoint> _generateRunDifferentialChart(
+      List<Game> games, String teamCode) {
     final points = <PerformanceDataPoint>[];
-    
+
     for (int i = 0; i < games.length; i++) {
       final game = games[i];
       final isHome = game.homeTeamCode == teamCode;
@@ -321,10 +337,11 @@ class PerformanceAnalyticsService {
     return points;
   }
 
-  List<PerformanceDataPoint> _generateMomentumChart(List<Game> games, String teamCode) {
+  List<PerformanceDataPoint> _generateMomentumChart(
+      List<Game> games, String teamCode) {
     final points = <PerformanceDataPoint>[];
     final List<bool> results = [];
-    
+
     for (final game in games) {
       final isHome = game.homeTeamCode == teamCode;
       final teamScore = isHome ? game.homeScore : game.awayScore;
@@ -339,7 +356,7 @@ class PerformanceAnalyticsService {
     for (int i = 4; i < results.length; i++) {
       final recentResults = results.sublist(i - 4, i + 1);
       final momentum = recentResults.where((result) => result).length / 5.0;
-      
+
       points.add(PerformanceDataPoint(
         x: i.toDouble(),
         y: momentum,

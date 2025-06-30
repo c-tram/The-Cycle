@@ -21,33 +21,41 @@ class Player {
   factory Player.fromJson(Map<String, dynamic> json) {
     // Handle both the new backend format and potential future nested format
     PlayerStats? stats;
-    
+
     if (json['stats'] != null) {
       // Nested stats format
       stats = PlayerStats.fromJson(json['stats']);
     } else {
       // Backend sends stats as flat fields, convert to PlayerStats object
       stats = PlayerStats(
-        avg: double.tryParse(json['avg']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
+        avg: double.tryParse(
+            json['avg']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
         homeRuns: int.tryParse(json['hr']?.toString() ?? '0'),
         rbi: int.tryParse(json['rbi']?.toString() ?? '0'),
         runs: int.tryParse(json['runs']?.toString() ?? '0'),
         hits: null, // Not provided in backend response
-        obp: double.tryParse(json['obp']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
-        slg: double.tryParse(json['slg']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
-        ops: double.tryParse(json['ops']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
-        era: double.tryParse(json['era']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
+        obp: double.tryParse(
+            json['obp']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
+        slg: double.tryParse(
+            json['slg']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
+        ops: double.tryParse(
+            json['ops']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
+        era: double.tryParse(
+            json['era']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
         wins: int.tryParse(json['wins']?.toString() ?? '0'),
         losses: null, // Not provided in current backend response
         strikeouts: int.tryParse(json['strikeouts']?.toString() ?? '0'),
-        whip: double.tryParse(json['whip']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
+        whip: double.tryParse(
+            json['whip']?.toString().replaceAll(RegExp(r'[^\d\.]'), '') ?? '0'),
         saves: null, // Not provided in current backend response
         inningsPitched: null, // Not provided in current backend response
       );
     }
-    
+
     return Player(
-      id: json['id']?.toString() ?? json['name']?.toString() ?? 'unknown', // Use name as fallback ID
+      id: json['id']?.toString() ??
+          json['name']?.toString() ??
+          'unknown', // Use name as fallback ID
       name: json['name'] ?? 'Unknown Player',
       team: json['team'] ?? 'Unknown Team',
       teamCode: json['teamCode'] ?? '',
@@ -81,7 +89,7 @@ class PlayerStats {
   final double? obp;
   final double? slg;
   final double? ops;
-  
+
   // Pitching stats
   final double? era;
   final int? wins;

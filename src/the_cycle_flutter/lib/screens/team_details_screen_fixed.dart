@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../models/team.dart';
 import '../models/game.dart';
 import '../models/player.dart';
@@ -29,7 +30,8 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
   late TabController _tabController;
   final TeamBrandingService _brandingService = TeamBrandingService();
   final ApiService _apiService = ApiService();
-  final PerformanceAnalyticsService _analyticsService = PerformanceAnalyticsService();
+  final PerformanceAnalyticsService _analyticsService =
+      PerformanceAnalyticsService();
 
   Team? _team;
   List<Player> _roster = [];
@@ -60,7 +62,8 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
       });
 
       final gamesProvider = Provider.of<GamesProvider>(context, listen: false);
-      final standingsProvider = Provider.of<StandingsProvider>(context, listen: false);
+      final standingsProvider =
+          Provider.of<StandingsProvider>(context, listen: false);
 
       // Load basic data
       await gamesProvider.loadTeamGames(widget.teamId);
@@ -70,9 +73,9 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
       final allDivisions = standingsProvider.divisions ?? [];
       for (final division in allDivisions) {
         final foundTeam = division.teams.cast<Team?>().firstWhere(
-          (team) => team?.code.toLowerCase() == widget.teamId.toLowerCase(),
-          orElse: () => null,
-        );
+              (team) => team?.code.toLowerCase() == widget.teamId.toLowerCase(),
+              orElse: () => null,
+            );
         if (foundTeam != null) {
           _team = foundTeam;
           break;
@@ -140,7 +143,7 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
       'ari': 'Arizona Diamondbacks',
       'col': 'Colorado Rockies',
     };
-    
+
     return teamNames[code.toLowerCase()] ?? code.toUpperCase();
   }
 
@@ -159,7 +162,7 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
 
     // Get team colors and theme
     final teamColors = _brandingService.getTeamColors(widget.teamId);
-    final teamTheme = _brandingService.getTeamTheme(widget.teamId, 
+    final teamTheme = _brandingService.getTeamTheme(widget.teamId,
         isDark: Theme.of(context).brightness == Brightness.dark);
 
     return Theme(
@@ -207,7 +210,8 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(40),
                             child: CachedNetworkImage(
-                              imageUrl: _brandingService.getTeamLogoUrl(widget.teamId),
+                              imageUrl: _brandingService
+                                  .getTeamLogoUrl(widget.teamId),
                               fit: BoxFit.contain,
                               placeholder: (context, url) => Icon(
                                 Icons.sports_baseball,
@@ -305,7 +309,7 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
         children: [
           const OfflineBanner(),
           const SizedBox(height: 16),
-          
+
           // Team information card
           Card(
             child: Padding(
@@ -316,21 +320,27 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
                   Text(
                     'Team Information',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: teamColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
+                          color: teamColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   if (_team != null) ...[
                     _buildInfoRow('Division', _team!.division),
                     _buildInfoRow('League', _team!.league),
                     if (_team!.record != null) ...[
-                      _buildInfoRow('Record', '${_team!.record!.wins}-${_team!.record!.losses}'),
+                      _buildInfoRow('Record',
+                          '${_team!.record!.wins}-${_team!.record!.losses}'),
                       if (_team!.record!.winPercentage != null)
-                        _buildInfoRow('Win %', _team!.record!.winPercentage!.toStringAsFixed(3)),
+                        _buildInfoRow('Win %',
+                            _team!.record!.winPercentage!.toStringAsFixed(3)),
                       if (_team!.record!.gamesBehind != null)
-                        _buildInfoRow('Games Behind',
-                          _team!.record!.gamesBehind == 0.0 ? '-' : _team!.record!.gamesBehind!.toStringAsFixed(1)),
+                        _buildInfoRow(
+                            'Games Behind',
+                            _team!.record!.gamesBehind == 0.0
+                                ? '-'
+                                : _team!.record!.gamesBehind!
+                                    .toStringAsFixed(1)),
                     ],
                   ],
                   _buildInfoRow('Players', '${_roster.length}'),
@@ -342,9 +352,9 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Recent games card
           Card(
             child: Padding(
@@ -355,21 +365,28 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
                   Text(
                     'Recent Games',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: teamColors.primary,
-                      fontWeight: FontWeight.bold,
-                    ),
+                          color: teamColors.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 16),
                   Consumer<GamesProvider>(
                     builder: (context, gamesProvider, _) {
-                      final teamGames = gamesProvider.getTeamGames(widget.teamId) ?? [];
+                      final teamGames = gamesProvider.games
+                          .where((game) =>
+                              game.homeTeamCode == widget.teamId ||
+                              game.awayTeamCode == widget.teamId)
+                          .take(5)
+                          .toList();
 
                       if (teamGames.isEmpty) {
                         return const Text('No recent games found.');
                       }
 
                       return Column(
-                        children: teamGames.take(5).map((game) => _buildGameTile(game, teamColors)).toList(),
+                        children: teamGames
+                            .map((game) => _buildGameTile(game, teamColors))
+                            .toList(),
                       );
                     },
                   ),
@@ -428,7 +445,11 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
   Widget _buildScheduleTab(TeamColors teamColors) {
     return Consumer<GamesProvider>(
       builder: (context, gamesProvider, _) {
-        final teamGames = gamesProvider.getTeamGames(widget.teamId) ?? [];
+        final teamGames = gamesProvider.games
+            .where((game) =>
+                game.homeTeamCode == widget.teamId ||
+                game.awayTeamCode == widget.teamId)
+            .toList();
 
         if (teamGames.isEmpty) {
           return const Center(
@@ -452,15 +473,22 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
   Widget _buildAnalyticsTab(TeamColors teamColors) {
     return Consumer<GamesProvider>(
       builder: (context, gamesProvider, _) {
-        final teamGames = gamesProvider.getTeamGames(widget.teamId) ?? [];
+        final teamGames = gamesProvider.teamGames
+            .where((game) =>
+                game.homeTeamCode == widget.teamId ||
+                game.awayTeamCode == widget.teamId)
+            .toList();
 
-        if (teamGames.isEmpty || _team == null) {
+        if (teamGames.isEmpty) {
           return const Center(
             child: Text('No data available for analytics.'),
           );
         }
 
-        final analytics = _analyticsService.calculateTeamPerformance(_team!, teamGames, _roster);
+        final analytics = _analyticsService.calculateTeamPerformance(
+            teamGames, widget.teamId);
+        final chartData = _analyticsService.generatePerformanceCharts(
+            teamGames, widget.teamId);
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -476,25 +504,31 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
                     children: [
                       Text(
                         'Performance Metrics',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: teamColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  color: teamColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                       ),
                       const SizedBox(height: 16),
-                      _buildInfoRow('Win Percentage', analytics.winPercentage.toStringAsFixed(3)),
-                      _buildInfoRow('Average Runs Scored', analytics.averageRunsScored.toStringAsFixed(1)),
-                      _buildInfoRow('Average Runs Allowed', analytics.averageRunsAllowed.toStringAsFixed(1)),
-                      _buildInfoRow('Run Differential', analytics.runDifferential.toStringAsFixed(1)),
-                      _buildInfoRow('Team Momentum', analytics.momentum.toStringAsFixed(2)),
+                      _buildInfoRow('Win Rate',
+                          '${(analytics.winRate * 100).toStringAsFixed(1)}%'),
+                      _buildInfoRow('Avg Runs Scored',
+                          analytics.avgRunsScored.toStringAsFixed(1)),
+                      _buildInfoRow('Avg Runs Allowed',
+                          analytics.avgRunsAllowed.toStringAsFixed(1)),
+                      _buildInfoRow('Run Differential',
+                          analytics.runDifferential.toStringAsFixed(1)),
+                      _buildInfoRow('Current Momentum',
+                          analytics.momentum.toStringAsFixed(1)),
                     ],
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
-              // Simple performance chart (placeholder)
+
+              // Win/Loss chart
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -503,24 +537,29 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
                     children: [
                       Text(
                         'Recent Performance',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: teamColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  color: teamColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                       ),
                       const SizedBox(height: 16),
-                      Container(
-                        height: 100,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: teamColors.primary),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Performance Chart\n(Coming Soon)',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: teamColors.primary),
+                      SizedBox(
+                        height: 200,
+                        child: LineChart(
+                          LineChartData(
+                            gridData: const FlGridData(show: true),
+                            titlesData: const FlTitlesData(show: true),
+                            borderData: FlBorderData(show: true),
+                            lineBarsData: [
+                              LineChartBarData(
+                                spots: chartData.winLossData,
+                                isCurved: true,
+                                color: teamColors.primary,
+                                barWidth: 3,
+                                dotData: const FlDotData(show: true),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -528,9 +567,9 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 16),
-              
+
               // Game predictions
               Card(
                 child: Padding(
@@ -540,13 +579,15 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
                     children: [
                       Text(
                         'Upcoming Game Predictions',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          color: teamColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  color: teamColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                ),
                       ),
                       const SizedBox(height: 16),
-                      const Text('AI-powered predictions based on team performance analytics coming soon...'),
+                      const Text(
+                          'AI-powered predictions based on team performance analytics coming soon...'),
                     ],
                   ),
                 ),
@@ -595,7 +636,7 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
             color: teamColors.primary,
           ),
         ),
-        subtitle: Text(game.date),
+        subtitle: Text(game.dateTime.toString().split(' ')[0]),
         trailing: gameResult.isNotEmpty
             ? Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -635,34 +676,34 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
   // Get top hitter from roster
   String _getTopHitter() {
     if (_roster.isEmpty) return 'N/A';
-    
+
     Player? topHitter;
     double topAvg = 0.0;
-    
+
     for (final player in _roster) {
       if (player.stats?.avg != null && player.stats!.avg! > topAvg) {
         topAvg = player.stats!.avg!;
         topHitter = player;
       }
     }
-    
+
     return topHitter?.name ?? 'N/A';
   }
 
   // Get top power hitter from roster
   String _getTopPowerHitter() {
     if (_roster.isEmpty) return 'N/A';
-    
+
     Player? topPowerHitter;
     int topHR = 0;
-    
+
     for (final player in _roster) {
       if (player.stats?.homeRuns != null && player.stats!.homeRuns! > topHR) {
         topHR = player.stats!.homeRuns!;
         topPowerHitter = player;
       }
     }
-    
+
     return topPowerHitter?.name ?? 'N/A';
   }
 }

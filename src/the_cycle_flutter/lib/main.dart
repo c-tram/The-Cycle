@@ -26,18 +26,18 @@ import 'config/app_config.dart';
 void main() async {
   // Ensure Flutter is initialized
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Initialize services
   await NotificationService().initialize();
   await ConnectivityService().initialize();
-  
+
   // Set preferred orientations
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
-  
+
   runApp(const TheCycleApp());
 }
 
@@ -50,7 +50,7 @@ class TheCycleApp extends StatefulWidget {
 
 class _TheCycleAppState extends State<TheCycleApp> {
   final AutoRefreshManager _autoRefreshManager = AutoRefreshManager();
-  
+
   @override
   void dispose() {
     _autoRefreshManager.dispose();
@@ -62,15 +62,17 @@ class _TheCycleAppState extends State<TheCycleApp> {
     // Only initialize once
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final gamesProvider = Provider.of<GamesProvider>(context, listen: false);
-      final standingsProvider = Provider.of<StandingsProvider>(context, listen: false);
-      final preferencesProvider = Provider.of<UserPreferencesProvider>(context, listen: false);
-      
+      final standingsProvider =
+          Provider.of<StandingsProvider>(context, listen: false);
+      final preferencesProvider =
+          Provider.of<UserPreferencesProvider>(context, listen: false);
+
       _autoRefreshManager.initialize(
         gamesProvider: gamesProvider,
         standingsProvider: standingsProvider,
         preferencesProvider: preferencesProvider,
       );
-      
+
       // Setup notifications based on user preferences
       preferencesProvider.setupNotifications(gamesProvider);
     });
@@ -90,7 +92,7 @@ class _TheCycleAppState extends State<TheCycleApp> {
         builder: (context) {
           // Initialize auto refresh manager once providers are created
           _initAutoRefreshManager(context);
-          
+
           return Consumer<ThemeProvider>(
             builder: (context, themeProvider, child) {
               return MaterialApp(
@@ -124,8 +126,10 @@ class _TheCycleAppState extends State<TheCycleApp> {
                 ),
                 darkTheme: ThemeData(
                   primarySwatch: Colors.blue,
-                  primaryColor: const Color(0xFF1976D2), // Lighter Blue for dark mode
-                  scaffoldBackgroundColor: const Color(0xFF121212), // Dark background
+                  primaryColor:
+                      const Color(0xFF1976D2), // Lighter Blue for dark mode
+                  scaffoldBackgroundColor:
+                      const Color(0xFF121212), // Dark background
                   brightness: Brightness.dark,
                   appBarTheme: const AppBarTheme(
                     backgroundColor: Color(0xFF1976D2),
@@ -150,7 +154,8 @@ class _TheCycleAppState extends State<TheCycleApp> {
                   '/standings': (context) => const StandingsScreen(),
                   '/settings': (context) => const SettingsScreen(),
                   '/team': (context) {
-                    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>;
+                    final args = ModalRoute.of(context)?.settings.arguments
+                        as Map<String, dynamic>;
                     return TeamDetailsScreen(teamId: args['teamId']);
                   },
                 },
