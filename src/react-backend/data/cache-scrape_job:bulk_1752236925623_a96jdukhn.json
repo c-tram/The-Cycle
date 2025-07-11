@@ -1,0 +1,16 @@
+{
+  "data": {
+    "id": "bulk_1752236925623_a96jdukhn",
+    "startDate": "2025-07-11",
+    "endDate": "2025-07-11",
+    "status": "completed",
+    "progress": {
+      "total": 0,
+      "completed": 0,
+      "failed": 0
+    },
+    "startTime": "2025-07-11T12:28:45.623Z",
+    "endTime": "2025-07-11T12:28:45.628Z"
+  },
+  "expires": "2025-07-18T12:28:45.628Z"
+}

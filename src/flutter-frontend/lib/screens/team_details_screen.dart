@@ -10,6 +10,9 @@ import '../services/team_branding_service.dart';
 import '../services/api_service.dart';
 import '../services/performance_analytics_service.dart';
 import '../widgets/offline_banner.dart';
+import '../widgets/charts/win_loss_chart.dart';
+import '../widgets/charts/runs_chart.dart';
+import '../widgets/charts/momentum_chart.dart';
 
 // Enhanced screen to show detailed team information with team branding
 class TeamDetailsScreen extends StatefulWidget {
@@ -466,10 +469,81 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
     return Consumer<GamesProvider>(
       builder: (context, gamesProvider, _) {
         final teamGames = gamesProvider.getTeamGames(widget.teamId) ?? [];
+        final allGames = gamesProvider.allGames;
+        final completedTeamGames = teamGames
+            .where((game) => game.status == GameStatus.completed)
+            .toList();
+
+        // Debug information
+        print('DEBUG: Team ID: ${widget.teamId}');
+        print('DEBUG: Total games in provider: ${allGames.length}');
+        print('DEBUG: Team games found: ${teamGames.length}');
+        print('DEBUG: Completed team games: ${completedTeamGames.length}');
 
         if (teamGames.isEmpty || _team == null) {
-          return const Center(
-            child: Text('No data available for analytics.'),
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.analytics, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No data available for analytics',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Team: ${widget.teamId}',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                ),
+                Text(
+                  'Total games loaded: ${allGames.length}',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                ),
+                Text(
+                  'Team games found: ${teamGames.length}',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () async {
+                    await gamesProvider.loadTeamGames(widget.teamId);
+                  },
+                  child: const Text('Reload Game Data'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (completedTeamGames.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.schedule, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No completed games for analytics',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 18),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Found ${teamGames.length} total games',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                ),
+                Text(
+                  'Upcoming: ${teamGames.where((g) => g.status == GameStatus.scheduled).length}',
+                  style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Analytics will be available after games are completed',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                ),
+              ],
+            ),
           );
         }
 
@@ -514,41 +588,8 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
 
               const SizedBox(height: 16),
 
-              // Simple performance chart (placeholder)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Recent Performance',
-                        style:
-                            Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  color: teamColors.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                      ),
-                      const SizedBox(height: 16),
-                      Container(
-                        height: 100,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: teamColors.primary),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Performance Chart\n(Coming Soon)',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: teamColors.primary),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              // Interactive Performance Charts
+              _buildPerformanceCharts(teamGames, teamColors),
 
               const SizedBox(height: 16),
 
@@ -578,6 +619,112 @@ class _TeamDetailsScreenState extends State<TeamDetailsScreen>
           ),
         );
       },
+    );
+  }
+
+  // Build interactive performance charts
+  Widget _buildPerformanceCharts(List<Game> teamGames, TeamColors teamColors) {
+    // Generate chart data
+    final chartData =
+        _analyticsService.generateAllCharts(teamGames, widget.teamId);
+    final runsAllowedData =
+        _analyticsService.generateRunsAllowedChart(teamGames, widget.teamId);
+
+    return Column(
+      children: [
+        // Win/Loss Trend Chart
+        WinLossChart(
+          data: chartData[PerformanceChartType.winLoss] ?? [],
+          teamColors: teamColors,
+        ),
+        const SizedBox(height: 16),
+
+        // Runs Scored vs Allowed Chart
+        RunsChart(
+          runsScoredData: chartData[PerformanceChartType.runsScored] ?? [],
+          runsAllowedData: runsAllowedData,
+          teamColors: teamColors,
+        ),
+        const SizedBox(height: 16),
+
+        // Team Momentum Chart
+        MomentumChart(
+          data: chartData[PerformanceChartType.momentum] ?? [],
+          teamColors: teamColors,
+        ),
+        const SizedBox(height: 16),
+
+        // Run Differential Chart
+        Card(
+          elevation: 4,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Run Differential Trend',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: teamColors.primary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                if (chartData[PerformanceChartType.runDifferential]
+                        ?.isNotEmpty ==
+                    true)
+                  Container(
+                    height: 300,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount:
+                          chartData[PerformanceChartType.runDifferential]!
+                              .length,
+                      itemBuilder: (context, index) {
+                        final point = chartData[
+                            PerformanceChartType.runDifferential]![index];
+                        final isPositive = point.y >= 0;
+                        return Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Container(
+                                width: 24,
+                                height: (point.y.abs() * 10).clamp(5, 200),
+                                decoration: BoxDecoration(
+                                  color: isPositive
+                                      ? teamColors.primary.withOpacity(0.8)
+                                      : Colors.red.withOpacity(0.8),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                point.label,
+                                style: const TextStyle(fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                else
+                  Container(
+                    height: 200,
+                    child: Center(
+                      child: Text(
+                        'No run differential data available',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

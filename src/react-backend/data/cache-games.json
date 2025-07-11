@@ -2,103 +2,397 @@
   "data": {
     "recent": [
       {
-        "homeTeam": "Cleveland Guardians",
-        "homeTeamCode": "cle",
-        "awayTeam": "St. Louis Cardinals",
-        "awayTeamCode": "stl",
-        "date": "2025-06-29",
-        "status": "completed",
-        "homeScore": 0,
-        "awayScore": 7
-      },
-      {
-        "homeTeam": "Pittsburgh Pirates",
-        "homeTeamCode": "pit",
+        "homeTeam": "Baltimore Orioles",
+        "homeTeamCode": "bal",
         "awayTeam": "New York Mets",
         "awayTeamCode": "nym",
-        "date": "2025-06-29",
+        "date": "2025-07-10",
         "status": "completed",
-        "homeScore": 12,
+        "homeScore": 3,
         "awayScore": 1
       },
       {
         "homeTeam": "Baltimore Orioles",
         "homeTeamCode": "bal",
-        "awayTeam": "Tampa Bay Rays",
-        "awayTeamCode": "tb",
-        "date": "2025-06-29",
+        "awayTeam": "New York Mets",
+        "awayTeamCode": "nym",
+        "date": "2025-07-10",
         "status": "completed",
-        "homeScore": 5,
-        "awayScore": 1
+        "homeScore": 7,
+        "awayScore": 3
+      },
+      {
+        "homeTeam": "Minnesota Twins",
+        "homeTeamCode": "min",
+        "awayTeam": "Chicago Cubs",
+        "awayTeamCode": "chc",
+        "date": "2025-07-10",
+        "status": "completed",
+        "homeScore": 1,
+        "awayScore": 8
+      },
+      {
+        "homeTeam": "Cincinnati Reds",
+        "homeTeamCode": "cin",
+        "awayTeam": "Miami Marlins",
+        "awayTeamCode": "mia",
+        "date": "2025-07-10",
+        "status": "completed",
+        "homeScore": 6,
+        "awayScore": 0
+      },
+      {
+        "homeTeam": "New York Yankees",
+        "homeTeamCode": "nyy",
+        "awayTeam": "Seattle Mariners",
+        "awayTeamCode": "sea",
+        "date": "2025-07-10",
+        "status": "completed",
+        "homeScore": 6,
+        "awayScore": 5
       },
       {
         "homeTeam": "Boston Red Sox",
         "homeTeamCode": "bos",
-        "awayTeam": "Toronto Blue Jays",
-        "awayTeamCode": "tor",
-        "date": "2025-06-29",
+        "awayTeam": "Tampa Bay Rays",
+        "awayTeamCode": "tb",
+        "date": "2025-07-10",
         "status": "completed",
-        "homeScore": 3,
-        "awayScore": 5
+        "homeScore": 4,
+        "awayScore": 3
       },
       {
-        "homeTeam": "Atlanta Braves",
-        "homeTeamCode": "atl",
-        "awayTeam": "Philadelphia Phillies",
-        "awayTeamCode": "phi",
-        "date": "2025-06-29",
+        "homeTeam": "St. Louis Cardinals",
+        "homeTeamCode": "stl",
+        "awayTeam": "Washington Nationals",
+        "awayTeamCode": "wsh",
+        "date": "2025-07-10",
         "status": "completed",
-        "homeScore": 1,
-        "awayScore": 2
+        "homeScore": 8,
+        "awayScore": 1
+      },
+      {
+        "homeTeam": "Athletics",
+        "homeTeamCode": "oak",
+        "awayTeam": "Atlanta Braves",
+        "awayTeamCode": "atl",
+        "date": "2025-07-11",
+        "status": "completed",
+        "homeScore": 5,
+        "awayScore": 4
+      },
+      {
+        "homeTeam": "Los Angeles Angels",
+        "homeTeamCode": "laa",
+        "awayTeam": "Texas Rangers",
+        "awayTeamCode": "tex",
+        "date": "2025-07-11",
+        "status": "completed",
+        "homeScore": 4,
+        "awayScore": 11
+      },
+      {
+        "homeTeam": "San Diego Padres",
+        "homeTeamCode": "sd",
+        "awayTeam": "Arizona Diamondbacks",
+        "awayTeamCode": "ari",
+        "date": "2025-07-11",
+        "status": "completed",
+        "homeScore": 4,
+        "awayScore": 3
+      },
+      {
+        "homeTeam": "Chicago White Sox",
+        "homeTeamCode": "cws",
+        "awayTeam": "Cleveland Guardians",
+        "awayTeamCode": "cle",
+        "date": "2025-07-10",
+        "status": "completed",
+        "homeScore": 0,
+        "awayScore": 0
       }
     ],
     "upcoming": [
       {
-        "homeTeam": "Philadelphia Phillies",
-        "homeTeamCode": "phi",
-        "awayTeam": "San Diego Padres",
-        "awayTeamCode": "sd",
-        "date": "2025-06-30",
+        "homeTeam": "Chicago White Sox",
+        "homeTeamCode": "cws",
+        "awayTeam": "Cleveland Guardians",
+        "awayTeamCode": "cle",
+        "date": "2025-07-11",
         "status": "scheduled",
-        "time": "5:35 PM"
+        "time": "2:10 PM"
       },
       {
-        "homeTeam": "Pittsburgh Pirates",
-        "homeTeamCode": "pit",
-        "awayTeam": "St. Louis Cardinals",
-        "awayTeamCode": "stl",
-        "date": "2025-06-30",
+        "homeTeam": "Chicago White Sox",
+        "homeTeamCode": "cws",
+        "awayTeam": "Cleveland Guardians",
+        "awayTeamCode": "cle",
+        "date": "2025-07-12",
         "status": "scheduled",
-        "time": "5:40 PM"
+        "time": "7:10 PM"
       },
       {
-        "homeTeam": "Toronto Blue Jays",
-        "homeTeamCode": "tor",
-        "awayTeam": "New York Yankees",
-        "awayTeamCode": "nyy",
-        "date": "2025-06-30",
+        "homeTeam": "Baltimore Orioles",
+        "homeTeamCode": "bal",
+        "awayTeam": "Miami Marlins",
+        "awayTeamCode": "mia",
+        "date": "2025-07-11",
         "status": "scheduled",
-        "time": "6:07 PM"
+        "time": "6:05 PM"
       },
       {
-        "homeTeam": "Boston Red Sox",
-        "homeTeamCode": "bos",
-        "awayTeam": "Cincinnati Reds",
-        "awayTeamCode": "cin",
-        "date": "2025-06-30",
+        "homeTeam": "New York Yankees",
+        "homeTeamCode": "nyy",
+        "awayTeam": "Chicago Cubs",
+        "awayTeamCode": "chc",
+        "date": "2025-07-11",
+        "status": "scheduled",
+        "time": "6:05 PM"
+      },
+      {
+        "homeTeam": "Cincinnati Reds",
+        "homeTeamCode": "cin",
+        "awayTeam": "Colorado Rockies",
+        "awayTeamCode": "col",
+        "date": "2025-07-11",
         "status": "scheduled",
         "time": "6:10 PM"
       },
       {
-        "homeTeam": "Tampa Bay Rays",
-        "homeTeamCode": "tb",
-        "awayTeam": "Athletics",
-        "awayTeamCode": "oak",
-        "date": "2025-06-30",
+        "homeTeam": "Detroit Tigers",
+        "homeTeamCode": "det",
+        "awayTeam": "Seattle Mariners",
+        "awayTeamCode": "sea",
+        "date": "2025-07-11",
+        "status": "scheduled",
+        "time": "6:10 PM"
+      },
+      {
+        "homeTeam": "Boston Red Sox",
+        "homeTeamCode": "bos",
+        "awayTeam": "Tampa Bay Rays",
+        "awayTeamCode": "tb",
+        "date": "2025-07-11",
+        "status": "scheduled",
+        "time": "6:10 PM"
+      },
+      {
+        "homeTeam": "Kansas City Royals",
+        "homeTeamCode": "kc",
+        "awayTeam": "New York Mets",
+        "awayTeamCode": "nym",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "7:10 PM"
+      },
+      {
+        "homeTeam": "Houston Astros",
+        "homeTeamCode": "hou",
+        "awayTeam": "Texas Rangers",
+        "awayTeamCode": "tex",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "7:10 PM"
+      },
+      {
+        "homeTeam": "Minnesota Twins",
+        "homeTeamCode": "min",
+        "awayTeam": "Pittsburgh Pirates",
+        "awayTeamCode": "pit",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "7:10 PM"
+      },
+      {
+        "homeTeam": "Milwaukee Brewers",
+        "homeTeamCode": "mil",
+        "awayTeam": "Washington Nationals",
+        "awayTeamCode": "wsh",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "7:10 PM"
+      },
+      {
+        "homeTeam": "St. Louis Cardinals",
+        "homeTeamCode": "stl",
+        "awayTeam": "Atlanta Braves",
+        "awayTeamCode": "atl",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "7:15 PM"
+      },
+      {
+        "homeTeam": "Los Angeles Angels",
+        "homeTeamCode": "laa",
+        "awayTeam": "Arizona Diamondbacks",
+        "awayTeamCode": "ari",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "8:38 PM"
+      },
+      {
+        "homeTeam": "San Diego Padres",
+        "homeTeamCode": "sd",
+        "awayTeam": "Philadelphia Phillies",
+        "awayTeamCode": "phi",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "8:40 PM"
+      },
+      {
+        "homeTeam": "Athletics",
+        "homeTeamCode": "oak",
+        "awayTeam": "Toronto Blue Jays",
+        "awayTeamCode": "tor",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "9:05 PM"
+      },
+      {
+        "homeTeam": "San Francisco Giants",
+        "homeTeamCode": "sf",
+        "awayTeam": "Los Angeles Dodgers",
+        "awayTeamCode": "lad",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "9:15 PM"
+      },
+      {
+        "homeTeam": "New York Yankees",
+        "homeTeamCode": "nyy",
+        "awayTeam": "Chicago Cubs",
+        "awayTeamCode": "chc",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "12:05 PM"
+      },
+      {
+        "homeTeam": "Detroit Tigers",
+        "homeTeamCode": "det",
+        "awayTeam": "Seattle Mariners",
+        "awayTeamCode": "sea",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "12:10 PM"
+      },
+      {
+        "homeTeam": "Minnesota Twins",
+        "homeTeamCode": "min",
+        "awayTeam": "Pittsburgh Pirates",
+        "awayTeamCode": "pit",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "1:10 PM"
+      },
+      {
+        "homeTeam": "St. Louis Cardinals",
+        "homeTeamCode": "stl",
+        "awayTeam": "Atlanta Braves",
+        "awayTeamCode": "atl",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "1:15 PM"
+      },
+      {
+        "homeTeam": "San Francisco Giants",
+        "homeTeamCode": "sf",
+        "awayTeam": "Los Angeles Dodgers",
+        "awayTeamCode": "lad",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "3:05 PM"
+      },
+      {
+        "homeTeam": "Baltimore Orioles",
+        "homeTeamCode": "bal",
+        "awayTeam": "Miami Marlins",
+        "awayTeamCode": "mia",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "3:05 PM"
+      },
+      {
+        "homeTeam": "Cincinnati Reds",
+        "homeTeamCode": "cin",
+        "awayTeam": "Colorado Rockies",
+        "awayTeamCode": "col",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "3:10 PM"
+      },
+      {
+        "homeTeam": "Kansas City Royals",
+        "homeTeamCode": "kc",
+        "awayTeam": "New York Mets",
+        "awayTeamCode": "nym",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "3:10 PM"
+      },
+      {
+        "homeTeam": "Boston Red Sox",
+        "homeTeamCode": "bos",
+        "awayTeam": "Tampa Bay Rays",
+        "awayTeamCode": "tb",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "3:10 PM"
+      },
+      {
+        "homeTeam": "Chicago White Sox",
+        "homeTeamCode": "cws",
+        "awayTeam": "Cleveland Guardians",
+        "awayTeamCode": "cle",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "3:10 PM"
+      },
+      {
+        "homeTeam": "Milwaukee Brewers",
+        "homeTeamCode": "mil",
+        "awayTeam": "Washington Nationals",
+        "awayTeamCode": "wsh",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "3:10 PM"
+      },
+      {
+        "homeTeam": "Houston Astros",
+        "homeTeamCode": "hou",
+        "awayTeam": "Texas Rangers",
+        "awayTeamCode": "tex",
+        "date": "2025-07-12",
         "status": "scheduled",
         "time": "6:35 PM"
+      },
+      {
+        "homeTeam": "San Diego Padres",
+        "homeTeamCode": "sd",
+        "awayTeam": "Philadelphia Phillies",
+        "awayTeamCode": "phi",
+        "date": "2025-07-12",
+        "status": "scheduled",
+        "time": "6:35 PM"
+      },
+      {
+        "homeTeam": "Los Angeles Angels",
+        "homeTeamCode": "laa",
+        "awayTeam": "Arizona Diamondbacks",
+        "awayTeamCode": "ari",
+        "date": "2025-07-13",
+        "status": "scheduled",
+        "time": "8:38 PM"
+      },
+      {
+        "homeTeam": "Athletics",
+        "homeTeamCode": "oak",
+        "awayTeam": "Toronto Blue Jays",
+        "awayTeamCode": "tor",
+        "date": "2025-07-13",
+        "status": "scheduled",
+        "time": "9:05 PM"
       }
     ]
   },
-  "expires": "2025-06-30T22:57:52.371Z"
+  "expires": "2025-07-11T19:40:24.990Z"
 }

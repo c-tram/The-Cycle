@@ -1,0 +1,27 @@
+{
+  "data": {
+    "id": "daily_1751538328086_504l99h1c",
+    "date": "2025-07-03",
+    "type": "incremental",
+    "status": "completed",
+    "dataTypes": [
+      "games",
+      "player_stats",
+      "team_stats",
+      "standings",
+      "transactions",
+      "injuries",
+      "weather",
+      "live_data"
+    ],
+    "progress": {
+      "totalTasks": 8,
+      "completedTasks": 8,
+      "currentTask": "Processing live data"
+    },
+    "startTime": "2025-07-03T10:25:28.086Z",
+    "endTime": "2025-07-03T10:25:28.092Z",
+    "lastUpdate": "2025-07-03T10:25:28.092Z"
+  },
+  "expires": "2025-07-04T10:25:28.092Z"
+}

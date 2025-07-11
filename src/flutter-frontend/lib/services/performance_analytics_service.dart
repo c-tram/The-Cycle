@@ -2,6 +2,7 @@ import 'dart:math';
 import '../models/game.dart';
 import '../models/player.dart';
 import '../models/team.dart';
+import 'api_service.dart';
 
 // Service for team performance analytics and game predictions
 class PerformanceAnalyticsService {
@@ -9,6 +10,83 @@ class PerformanceAnalyticsService {
       PerformanceAnalyticsService._internal();
   factory PerformanceAnalyticsService() => _instance;
   PerformanceAnalyticsService._internal();
+
+  final ApiService _apiService = ApiService();
+
+  // Get comprehensive analytics data from backend
+  Future<Map<String, dynamic>?> getComprehensiveAnalytics(
+      String teamCode) async {
+    try {
+      return await _apiService.getTeamAnalytics(teamCode);
+    } catch (e) {
+      print('Error fetching comprehensive analytics: $e');
+      return null;
+    }
+  }
+
+  // Generate chart data with comprehensive backend data
+  Future<Map<String, List<dynamic>>> generateComprehensiveCharts(
+      String teamCode) async {
+    try {
+      final analytics = await getComprehensiveAnalytics(teamCode);
+      if (analytics == null) {
+        // Fallback to local calculation
+        return {};
+      }
+
+      final charts = <String, List<dynamic>>{};
+
+      // Win/Loss chart data
+      if (analytics['winLoss'] != null) {
+        charts['winLoss'] = (analytics['winLoss'] as List)
+            .map((data) => {
+                  'date': data['date'],
+                  'winPercentage': data['winPercentage'],
+                  'gameNumber': data['gameNumber'],
+                })
+            .toList();
+      }
+
+      // Runs chart data
+      if (analytics['runs'] != null) {
+        charts['runs'] = (analytics['runs'] as List)
+            .map((data) => {
+                  'date': data['date'],
+                  'runsScored': data['runsScored'],
+                  'runsAllowed': data['runsAllowed'],
+                  'runDifferential': data['runDifferential'],
+                })
+            .toList();
+      }
+
+      // Momentum chart data
+      if (analytics['momentum'] != null) {
+        charts['momentum'] = (analytics['momentum'] as List)
+            .map((data) => {
+                  'date': data['date'],
+                  'momentum': data['momentum'],
+                  'trend': data['trend'],
+                })
+            .toList();
+      }
+
+      return charts;
+    } catch (e) {
+      print('Error generating comprehensive charts: $e');
+      return {};
+    }
+  }
+
+  // Get comprehensive team data for enhanced analytics
+  Future<Map<String, dynamic>?> getComprehensiveTeamData(
+      String teamCode) async {
+    try {
+      return await _apiService.getComprehensiveTeamData(teamCode);
+    } catch (e) {
+      print('Error fetching comprehensive team data: $e');
+      return null;
+    }
+  }
 
   // Calculate team performance metrics
   TeamPerformanceMetrics calculateTeamPerformance(
@@ -148,6 +226,201 @@ class PerformanceAnalyticsService {
     }
   }
 
+  // Chart generation methods
+  List<PerformanceDataPoint> _generateWinLossChart(
+      List<Game> teamGames, String teamCode) {
+    final points = <PerformanceDataPoint>[];
+    int wins = 0;
+    int totalGames = 0;
+
+    // Sort games by date for chronological order
+    teamGames.sort((a, b) => a.date.compareTo(b.date));
+
+    for (int i = 0; i < teamGames.length; i++) {
+      final game = teamGames[i];
+      if (game.status == GameStatus.completed) {
+        totalGames++;
+        final isHome = game.homeTeamCode == teamCode;
+        final teamScore = isHome ? game.homeScore : game.awayScore;
+        final opponentScore = isHome ? game.awayScore : game.homeScore;
+
+        if (teamScore != null &&
+            opponentScore != null &&
+            teamScore > opponentScore) {
+          wins++;
+        }
+
+        final winPercentage = totalGames > 0 ? wins / totalGames : 0.0;
+        points.add(PerformanceDataPoint(
+          x: i.toDouble(),
+          y: winPercentage,
+          date: DateTime.parse(game.date),
+          label: _formatDateLabel(game.date),
+        ));
+      }
+    }
+
+    return points;
+  }
+
+  List<PerformanceDataPoint> _generateRunsScoredChart(
+      List<Game> teamGames, String teamCode) {
+    final points = <PerformanceDataPoint>[];
+
+    // Sort games by date for chronological order
+    teamGames.sort((a, b) => a.date.compareTo(b.date));
+
+    for (int i = 0; i < teamGames.length; i++) {
+      final game = teamGames[i];
+      if (game.status == GameStatus.completed) {
+        final isHome = game.homeTeamCode == teamCode;
+        final teamScore = isHome ? game.homeScore : game.awayScore;
+
+        if (teamScore != null) {
+          points.add(PerformanceDataPoint(
+            x: i.toDouble(),
+            y: teamScore.toDouble(),
+            date: DateTime.parse(game.date),
+            label: _formatDateLabel(game.date),
+          ));
+        }
+      }
+    }
+
+    return points;
+  }
+
+  List<PerformanceDataPoint> _generateRunsAllowedChart(
+      List<Game> teamGames, String teamCode) {
+    final points = <PerformanceDataPoint>[];
+
+    // Sort games by date for chronological order
+    teamGames.sort((a, b) => a.date.compareTo(b.date));
+
+    for (int i = 0; i < teamGames.length; i++) {
+      final game = teamGames[i];
+      if (game.status == GameStatus.completed) {
+        final isHome = game.homeTeamCode == teamCode;
+        final opponentScore = isHome ? game.awayScore : game.homeScore;
+
+        if (opponentScore != null) {
+          points.add(PerformanceDataPoint(
+            x: i.toDouble(),
+            y: opponentScore.toDouble(),
+            date: DateTime.parse(game.date),
+            label: _formatDateLabel(game.date),
+          ));
+        }
+      }
+    }
+
+    return points;
+  }
+
+  List<PerformanceDataPoint> _generateRunDifferentialChart(
+      List<Game> teamGames, String teamCode) {
+    final points = <PerformanceDataPoint>[];
+
+    // Sort games by date for chronological order
+    teamGames.sort((a, b) => a.date.compareTo(b.date));
+
+    for (int i = 0; i < teamGames.length; i++) {
+      final game = teamGames[i];
+      if (game.status == GameStatus.completed) {
+        final isHome = game.homeTeamCode == teamCode;
+        final teamScore = isHome ? game.homeScore : game.awayScore;
+        final opponentScore = isHome ? game.awayScore : game.homeScore;
+
+        if (teamScore != null && opponentScore != null) {
+          final differential = teamScore - opponentScore;
+          points.add(PerformanceDataPoint(
+            x: i.toDouble(),
+            y: differential.toDouble(),
+            date: DateTime.parse(game.date),
+            label: _formatDateLabel(game.date),
+          ));
+        }
+      }
+    }
+
+    return points;
+  }
+
+  List<PerformanceDataPoint> _generateMomentumChart(
+      List<Game> teamGames, String teamCode) {
+    final points = <PerformanceDataPoint>[];
+
+    // Sort games by date for chronological order
+    teamGames.sort((a, b) => a.date.compareTo(b.date));
+
+    // Calculate rolling momentum using a sliding window
+    const windowSize = 10;
+
+    for (int i = 0; i < teamGames.length; i++) {
+      final game = teamGames[i];
+      if (game.status == GameStatus.completed) {
+        // Calculate momentum based on recent games up to this point
+        final startIndex = (i - windowSize + 1).clamp(0, i + 1);
+        final recentGames = teamGames.sublist(startIndex, i + 1);
+        final momentum = _calculateMomentum(recentGames, teamCode);
+
+        points.add(PerformanceDataPoint(
+          x: i.toDouble(),
+          y: momentum,
+          date: DateTime.parse(game.date),
+          label: _formatDateLabel(game.date),
+        ));
+      }
+    }
+
+    return points;
+  }
+
+  String _formatDateLabel(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.month}/${date.day}';
+    } catch (e) {
+      return dateStr.substring(5, 10); // fallback to MM-DD format
+    }
+  }
+
+  // Helper method to generate multiple chart types at once
+  Map<PerformanceChartType, List<PerformanceDataPoint>> generateAllCharts(
+    List<Game> games,
+    String teamCode,
+  ) {
+    final teamGames = games
+        .where((game) =>
+            (game.homeTeamCode == teamCode || game.awayTeamCode == teamCode) &&
+            game.status == GameStatus.completed)
+        .toList();
+
+    return {
+      PerformanceChartType.winLoss: _generateWinLossChart(teamGames, teamCode),
+      PerformanceChartType.runsScored:
+          _generateRunsScoredChart(teamGames, teamCode),
+      PerformanceChartType.runDifferential:
+          _generateRunDifferentialChart(teamGames, teamCode),
+      PerformanceChartType.momentum:
+          _generateMomentumChart(teamGames, teamCode),
+    };
+  }
+
+  // Helper method to get runs allowed data
+  List<PerformanceDataPoint> generateRunsAllowedChart(
+    List<Game> games,
+    String teamCode,
+  ) {
+    final teamGames = games
+        .where((game) =>
+            (game.homeTeamCode == teamCode || game.awayTeamCode == teamCode) &&
+            game.status == GameStatus.completed)
+        .toList();
+
+    return _generateRunsAllowedChart(teamGames, teamCode);
+  }
+
   // Helper methods
   TeamBattingStats _calculateTeamBattingStats(List<Player> roster) {
     if (roster.isEmpty) return TeamBattingStats.empty();
@@ -261,111 +534,6 @@ class PerformanceAnalyticsService {
     factors.add('Home field advantage');
 
     return factors;
-  }
-
-  List<PerformanceDataPoint> _generateWinLossChart(
-      List<Game> games, String teamCode) {
-    final points = <PerformanceDataPoint>[];
-    int wins = 0;
-    int totalGames = 0;
-
-    for (int i = 0; i < games.length; i++) {
-      final game = games[i];
-      final isHome = game.homeTeamCode == teamCode;
-      final teamScore = isHome ? game.homeScore : game.awayScore;
-      final opponentScore = isHome ? game.awayScore : game.homeScore;
-
-      if (teamScore != null && opponentScore != null) {
-        totalGames++;
-        if (teamScore > opponentScore) wins++;
-
-        points.add(PerformanceDataPoint(
-          x: totalGames.toDouble(),
-          y: totalGames > 0 ? wins / totalGames : 0.0,
-          date: DateTime.tryParse(game.date) ?? DateTime.now(),
-          label: '${wins}-${totalGames - wins}',
-        ));
-      }
-    }
-
-    return points;
-  }
-
-  List<PerformanceDataPoint> _generateRunsScoredChart(
-      List<Game> games, String teamCode) {
-    final points = <PerformanceDataPoint>[];
-
-    for (int i = 0; i < games.length; i++) {
-      final game = games[i];
-      final isHome = game.homeTeamCode == teamCode;
-      final teamScore = isHome ? game.homeScore : game.awayScore;
-
-      if (teamScore != null) {
-        points.add(PerformanceDataPoint(
-          x: i.toDouble(),
-          y: teamScore.toDouble(),
-          date: DateTime.tryParse(game.date) ?? DateTime.now(),
-          label: '$teamScore runs',
-        ));
-      }
-    }
-
-    return points;
-  }
-
-  List<PerformanceDataPoint> _generateRunDifferentialChart(
-      List<Game> games, String teamCode) {
-    final points = <PerformanceDataPoint>[];
-
-    for (int i = 0; i < games.length; i++) {
-      final game = games[i];
-      final isHome = game.homeTeamCode == teamCode;
-      final teamScore = isHome ? game.homeScore : game.awayScore;
-      final opponentScore = isHome ? game.awayScore : game.homeScore;
-
-      if (teamScore != null && opponentScore != null) {
-        final differential = teamScore - opponentScore;
-        points.add(PerformanceDataPoint(
-          x: i.toDouble(),
-          y: differential.toDouble(),
-          date: DateTime.tryParse(game.date) ?? DateTime.now(),
-          label: '${differential > 0 ? '+' : ''}$differential',
-        ));
-      }
-    }
-
-    return points;
-  }
-
-  List<PerformanceDataPoint> _generateMomentumChart(
-      List<Game> games, String teamCode) {
-    final points = <PerformanceDataPoint>[];
-    final List<bool> results = [];
-
-    for (final game in games) {
-      final isHome = game.homeTeamCode == teamCode;
-      final teamScore = isHome ? game.homeScore : game.awayScore;
-      final opponentScore = isHome ? game.awayScore : game.homeScore;
-
-      if (teamScore != null && opponentScore != null) {
-        results.add(teamScore > opponentScore);
-      }
-    }
-
-    // Calculate rolling momentum (5-game window)
-    for (int i = 4; i < results.length; i++) {
-      final recentResults = results.sublist(i - 4, i + 1);
-      final momentum = recentResults.where((result) => result).length / 5.0;
-
-      points.add(PerformanceDataPoint(
-        x: i.toDouble(),
-        y: momentum,
-        date: DateTime.tryParse(games[i].date) ?? DateTime.now(),
-        label: '${(momentum * 100).toInt()}%',
-      ));
-    }
-
-    return points;
   }
 }
 

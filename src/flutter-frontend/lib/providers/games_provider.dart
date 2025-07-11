@@ -10,7 +10,7 @@ class GamesProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
   final CacheService _cacheService = CacheService();
   final ConnectivityService _connectivityService = ConnectivityService();
-  
+
   GamesData? _games;
   bool _isLoading = false;
   String? _error;
@@ -20,11 +20,11 @@ class GamesProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isOffline => _isOffline;
-  
+
   List<Game> get recentGames => _games?.recentGames ?? [];
   List<Game> get upcomingGames => _games?.upcomingGames ?? [];
   List<Game> get liveGames => _games?.liveGames ?? [];
-  
+
   // Returns all games in a single list
   List<Game> get allGames {
     List<Game> all = [];
@@ -38,43 +38,47 @@ class GamesProvider with ChangeNotifier {
 
   // Map to store team-specific games
   final Map<String, List<Game>> _teamGamesCache = {};
-  
+
   // Get games for a specific team
   List<Game>? getTeamGames(String teamId) {
     return _teamGamesCache[teamId];
   }
-  
+
   // Load games for a specific team
   Future<void> loadTeamGames(String teamId) async {
     // Check if we already have all games loaded
     if (allGames.isEmpty) {
       await loadGames();
     }
-    
+
     // Filter games for the specific team (using team code)
-    final teamGames = allGames.where((game) =>
-      game.homeTeamCode == teamId || game.awayTeamCode == teamId
-    ).toList();
-    
+    final teamGames = allGames
+        .where((game) =>
+            game.homeTeamCode == teamId || game.awayTeamCode == teamId)
+        .toList();
+
     // Sort games by date (most recent first)
     teamGames.sort((a, b) => b.date.compareTo(a.date));
-    
+
     // Cache the result
     _teamGamesCache[teamId] = teamGames;
-    
+
     // Notify listeners
     notifyListeners();
   }
 
   // Load games from API or cache
-  Future<void> loadGames({bool forceRefresh = false}) async {
+  Future<void> loadGames(
+      {bool forceRefresh = false,
+      bool comprehensive = false,
+      String? teamCode}) async {
     // Try cache first (unless force refresh is requested)
     if (!forceRefresh) {
       final cached = await _cacheService.getCachedGames();
       if (cached != null) {
         _games = cached;
         notifyListeners();
-        
+
         // If we have a cache hit, only continue to API if we're online and we want fresh data
         if (!await _connectivityService.canMakeNetworkRequest()) {
           _isOffline = true;
@@ -90,25 +94,29 @@ class GamesProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Hit the API
-      final gamesData = await _apiService.getGames();
+      // Hit the API with comprehensive and team parameters
+      final gamesData = await _apiService.getGames(
+        comprehensive: comprehensive,
+        teamCode: teamCode,
+      );
       _games = gamesData;
-      
+
       // Cache locally for offline support
       await _cacheService.cacheGames(gamesData);
-      
+
       _error = null;
       _isOffline = false;
     } catch (e) {
       // Check if it's an offline error
       if (e is ApiException && e.isOfflineError) {
         _isOffline = true;
-        
+
         // If we already loaded data from cache, don't show error
         if (_games != null) {
           _error = null;
         } else {
-          _error = 'You are offline. Please connect to the internet and try again.';
+          _error =
+              'You are offline. Please connect to the internet and try again.';
         }
       } else {
         _isOffline = false;
@@ -125,10 +133,10 @@ class GamesProvider with ChangeNotifier {
   Future<void> refreshGames() async {
     await loadGames(forceRefresh: true);
   }
-  
+
   // Check if there's any live game
   bool get hasLiveGames => liveGames.isNotEmpty;
-  
+
   // Get a game by its unique identifiers
   Game? getGameByTeams({
     required String homeTeamCode,
@@ -137,10 +145,10 @@ class GamesProvider with ChangeNotifier {
   }) {
     try {
       return allGames.firstWhere(
-        (game) => 
-          game.homeTeamCode == homeTeamCode && 
-          game.awayTeamCode == awayTeamCode && 
-          game.date == date,
+        (game) =>
+            game.homeTeamCode == homeTeamCode &&
+            game.awayTeamCode == awayTeamCode &&
+            game.date == date,
       );
     } catch (e) {
       return null;
@@ -148,19 +156,17 @@ class GamesProvider with ChangeNotifier {
   }
 
   // Setup notifications for games
-  Future<void> setupNotifications(String? favoriteTeamId, bool enableNotifications) async {
+  Future<void> setupNotifications(
+      String? favoriteTeamId, bool enableNotifications) async {
     if (allGames.isEmpty) {
       await loadGames();
     }
-    
+
     // Get the notification service
     final notificationService = NotificationService();
-    
+
     // Setup notifications based on user preferences
     await notificationService.setupNotificationsForUser(
-      favoriteTeamId, 
-      allGames, 
-      enableNotifications
-    );
+        favoriteTeamId, allGames, enableNotifications);
   }
 }

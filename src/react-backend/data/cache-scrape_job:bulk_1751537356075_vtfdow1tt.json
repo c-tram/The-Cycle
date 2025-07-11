@@ -1,0 +1,16 @@
+{
+  "data": {
+    "id": "bulk_1751537356075_vtfdow1tt",
+    "startDate": "2025-07-03",
+    "endDate": "2025-07-03",
+    "status": "completed",
+    "progress": {
+      "total": 0,
+      "completed": 0,
+      "failed": 0
+    },
+    "startTime": "2025-07-03T10:09:16.075Z",
+    "endTime": "2025-07-03T10:09:16.154Z"
+  },
+  "expires": "2025-07-10T10:09:16.154Z"
+}

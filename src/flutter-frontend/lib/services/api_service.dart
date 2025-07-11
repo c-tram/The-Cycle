@@ -23,7 +23,8 @@ class ApiService {
   final ConnectivityService _connectivityService = ConnectivityService();
 
   // Get games data (recent, upcoming, and live games)
-  Future<GamesData> getGames() async {
+  Future<GamesData> getGames(
+      {bool comprehensive = false, String? teamCode}) async {
     try {
       // Check for internet connection before making request
       final hasConnectivity =
@@ -33,8 +34,25 @@ class ApiService {
             isOfflineError: true);
       }
 
+      // Build URL with comprehensive and team parameters
+      var url = '${ApiConfig.baseUrl}${ApiConfig.gamesEndpoint}';
+      final queryParams = <String, String>{};
+
+      if (comprehensive) {
+        queryParams['comprehensive'] = 'true';
+      }
+
+      if (teamCode != null && teamCode.isNotEmpty) {
+        queryParams['team'] = teamCode;
+      }
+
+      if (queryParams.isNotEmpty) {
+        url += '?' +
+            queryParams.entries.map((e) => '${e.key}=${e.value}').join('&');
+      }
+
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.gamesEndpoint}'),
+        Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
       ).timeout(ApiConfig.timeout);
 
@@ -43,6 +61,104 @@ class ApiService {
         return GamesData.fromJson(data);
       } else {
         throw ApiException('Failed to load games: ${response.statusCode}');
+      }
+    } on SocketException {
+      throw ApiException('Network error: Could not connect to server',
+          isOfflineError: true);
+    } catch (e) {
+      throw ApiException('Network error: $e');
+    }
+  }
+
+  // Get comprehensive team analytics data for charts
+  Future<Map<String, dynamic>> getTeamAnalytics(String teamCode) async {
+    try {
+      final hasConnectivity =
+          await _connectivityService.canMakeNetworkRequest();
+      if (!hasConnectivity) {
+        throw ApiException('No internet connection available',
+            isOfflineError: true);
+      }
+
+      final response = await http.get(
+        Uri.parse(
+            '${ApiConfig.baseUrl}/api/comprehensive/analytics/team/$teamCode'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(ApiConfig.timeout);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return data['analytics'];
+        } else {
+          throw ApiException('API returned error: ${data['error']}');
+        }
+      } else {
+        throw ApiException(
+            'Failed to load team analytics: ${response.statusCode}');
+      }
+    } on SocketException {
+      throw ApiException('Network error: Could not connect to server',
+          isOfflineError: true);
+    } catch (e) {
+      throw ApiException('Network error: $e');
+    }
+  }
+
+  // Get comprehensive team data (roster, stats, etc.)
+  Future<Map<String, dynamic>> getComprehensiveTeamData(String teamCode) async {
+    try {
+      final hasConnectivity =
+          await _connectivityService.canMakeNetworkRequest();
+      if (!hasConnectivity) {
+        throw ApiException('No internet connection available',
+            isOfflineError: true);
+      }
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/comprehensive/team/$teamCode'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(ApiConfig.timeout);
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          return data['data'];
+        } else {
+          throw ApiException('API returned error: ${data['error']}');
+        }
+      } else {
+        throw ApiException(
+            'Failed to load comprehensive team data: ${response.statusCode}');
+      }
+    } on SocketException {
+      throw ApiException('Network error: Could not connect to server',
+          isOfflineError: true);
+    } catch (e) {
+      throw ApiException('Network error: $e');
+    }
+  }
+
+  // Get comprehensive service status
+  Future<Map<String, dynamic>> getComprehensiveServiceStatus() async {
+    try {
+      final hasConnectivity =
+          await _connectivityService.canMakeNetworkRequest();
+      if (!hasConnectivity) {
+        throw ApiException('No internet connection available',
+            isOfflineError: true);
+      }
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/api/comprehensive/status'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(ApiConfig.timeout);
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw ApiException(
+            'Failed to get service status: ${response.statusCode}');
       }
     } on SocketException {
       throw ApiException('Network error: Could not connect to server',

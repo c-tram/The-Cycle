@@ -12,6 +12,9 @@ import playersRouter from './routes/v1/players';
 import boxScoresRouter from './routes/v2/boxScores';
 import { TEAM_ID_MAP, TEAM_NAME_MAP } from './constants/teams';
 import redisCache from './services/redisCache';
+import comprehensiveMLBDataService from './services/comprehensiveMLBDataService';
+import comprehensiveDataScheduler from './services/comprehensiveDataScheduler';
+import comprehensiveRouter from './routes/comprehensive';
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -145,19 +148,60 @@ interface TeamRoster {
 // Use absolute path for static files
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Mount v1 API routes
-app.use('/api/v1/players', playersRouter);
+// Parse JSON bodies for POST requests
+app.use(express.json());
 
-// Mount v2 API routes
-app.use('/api/v2/boxScores', boxScoresRouter);
-
-// Add timeout handler to all routes
+// Add timeout handler to all routes BEFORE mounting routers
 const ROUTE_TIMEOUT = 90000;
 app.use((req, res, next) => {
   res.setTimeout(ROUTE_TIMEOUT, () => {
     res.status(408).json({ error: 'Request timeout', timeoutMs: ROUTE_TIMEOUT });
   });
   next();
+});
+
+// Mount v1 API routes
+app.use('/api/v1/players', playersRouter);
+
+// Mount v2 API routes
+app.use('/api/v2/boxScores', boxScoresRouter);
+
+// Mount comprehensive data routes for massive analytics
+app.use('/api/comprehensive', comprehensiveRouter);
+console.log('✅ Comprehensive routes mounted at /api/comprehensive');
+
+// Debug route to test basic app functionality
+app.get('/api/debug', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Basic Express routing is working!',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Comprehensive data scheduler is automatically initialized in constructor
+console.log('✅ Comprehensive data scheduler initialized with automatic jobs');
+
+// Add a simple test endpoint for comprehensive data
+app.get('/api/comprehensive-test', async (req, res) => {
+  try {
+    console.log('🧪 Testing comprehensive service...');
+    const allGames = await comprehensiveMLBDataService.getAllGames();
+    res.json({
+      success: true,
+      message: 'Comprehensive service is working!',
+      totalGames: allGames.length,
+      sampleGame: allGames[0] || null,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('💥 Comprehensive service test failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Comprehensive service test failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 // Example: /api/roster?team=nyy&statType=hitting&period=season
@@ -462,7 +506,114 @@ async function fetchTeamRosterFromAPI(teamAbbr: string, period: string, statType
 app.get('/api/games', (req, res) => {
   (async () => {
     try {
-      // Try MLB Stats API first
+      // Check if comprehensive data is requested
+      const comprehensive = req.query.comprehensive === 'true';
+      const teamCode = req.query.team as string;
+      
+      if (comprehensive) {
+        console.log('🔥 Comprehensive games data requested');
+        
+        try {
+          if (teamCode) {
+            // Get all games for specific team
+            const teamGames = await comprehensiveMLBDataService.getTeamGames(teamCode);
+            
+            // Convert to legacy format for compatibility
+            const recent = teamGames
+              .filter(g => g.status.isCompleted)
+              .slice(-10) // Last 10 completed games
+              .map(game => ({
+                homeTeam: game.teams.home.team.name,
+                homeTeamCode: game.teams.home.team.abbreviation?.toLowerCase() || 'unk',
+                awayTeam: game.teams.away.team.name,
+                awayTeamCode: game.teams.away.team.abbreviation?.toLowerCase() || 'unk',
+                homeScore: game.teams.home.score,
+                awayScore: game.teams.away.score,
+                date: game.gameDate.split('T')[0],
+                status: 'completed' as const
+              }));
+              
+            const upcoming = teamGames
+              .filter(g => !g.status.isCompleted && !g.status.isInProgress)
+              .slice(0, 10) // Next 10 upcoming games
+              .map(game => ({
+                homeTeam: game.teams.home.team.name,
+                homeTeamCode: game.teams.home.team.abbreviation?.toLowerCase() || 'unk',
+                awayTeam: game.teams.away.team.name,
+                awayTeamCode: game.teams.away.team.abbreviation?.toLowerCase() || 'unk',
+                date: game.gameDate.split('T')[0],
+                time: new Date(game.gameDate).toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                }),
+                status: 'scheduled' as const
+              }));
+              
+            console.log(`✅ Returning ${recent.length} recent + ${upcoming.length} upcoming games for ${teamCode.toUpperCase()}`);
+            return res.json({ recent, upcoming, live: [], comprehensive: true, team: teamCode.toUpperCase() });
+            
+          } else {
+            // Get all games across league
+            const allGames = await comprehensiveMLBDataService.getAllGames();
+            
+            // Convert to legacy format but with more games
+            const recent = allGames
+              .filter(g => g.status.isCompleted)
+              .slice(-50) // Last 50 completed games
+              .map(game => ({
+                homeTeam: game.teams.home.team.name,
+                homeTeamCode: game.teams.home.team.abbreviation?.toLowerCase() || 'unk',
+                awayTeam: game.teams.away.team.name,
+                awayTeamCode: game.teams.away.team.abbreviation?.toLowerCase() || 'unk',
+                homeScore: game.teams.home.score,
+                awayScore: game.teams.away.score,
+                date: game.gameDate.split('T')[0],
+                status: 'completed' as const
+              }));
+              
+            const upcoming = allGames
+              .filter(g => !g.status.isCompleted && !g.status.isInProgress)
+              .slice(0, 50) // Next 50 upcoming games
+              .map(game => ({
+                homeTeam: game.teams.home.team.name,
+                homeTeamCode: game.teams.home.team.abbreviation?.toLowerCase() || 'unk',
+                awayTeam: game.teams.away.team.name,
+                awayTeamCode: game.teams.away.team.abbreviation?.toLowerCase() || 'unk',
+                date: game.gameDate.split('T')[0],
+                time: new Date(game.gameDate).toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                }),
+                status: 'scheduled' as const
+              }));
+              
+            const live = allGames
+              .filter(g => g.status.isInProgress)
+              .map(game => ({
+                homeTeam: game.teams.home.team.name,
+                homeTeamCode: game.teams.home.team.abbreviation?.toLowerCase() || 'unk',
+                awayTeam: game.teams.away.team.name,
+                awayTeamCode: game.teams.away.team.abbreviation?.toLowerCase() || 'unk',
+                homeScore: game.teams.home.score,
+                awayScore: game.teams.away.score,
+                date: game.gameDate.split('T')[0],
+                status: 'live' as const
+              }));
+              
+            console.log(`✅ Returning comprehensive data: ${recent.length} recent + ${upcoming.length} upcoming + ${live.length} live games`);
+            return res.json({ recent, upcoming, live, comprehensive: true, totalGames: allGames.length });
+          }
+          
+        } catch (comprehensiveError) {
+          console.error('💥 Comprehensive data error, falling back to regular scraping:', comprehensiveError);
+          // Fall through to regular scraping
+        }
+      }
+      
+      // Regular (limited) data fetching
+      console.log('📋 Regular games data requested (limited to 5 recent/upcoming)');
       try {
         const games = await scrapeGames();
         return res.json(games);

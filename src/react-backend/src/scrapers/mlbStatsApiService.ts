@@ -304,8 +304,8 @@ export async function fetchGamesFromAPI(): Promise<GameData> {
     console.log(`Successfully fetched ${recent.length} recent games and ${upcoming.length} upcoming games`);
     
     return {
-      recent: recent.slice(0, 5), // Limit to 5 recent games
-      upcoming: upcoming.slice(0, 5) // Limit to 5 upcoming games
+      recent, // Return all recent games
+      upcoming // Return all upcoming games
     };
     
   } catch (error) {
