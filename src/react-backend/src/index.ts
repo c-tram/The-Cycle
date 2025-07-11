@@ -27,6 +27,8 @@ const allowedOrigins = [
   'http://127.0.0.1:8080',
   'http://localhost:3001',    // Flutter web frontend (alternate port)
   'http://127.0.0.1:3001',
+  'http://localhost:5173',    // Add Docker Compose frontend
+  'http://frontend:5173',     // Add Docker Compose service name
   ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : [])
 ];
 
@@ -36,7 +38,8 @@ app.use(cors({
     if (process.env.NODE_ENV === 'production') {
       return callback(null, true);
     }
-    if (allowedOrigins.includes(origin)) {
+    // Accept requests from Docker Compose frontend container
+    if (allowedOrigins.includes(origin) || origin?.startsWith('http://frontend:')) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));

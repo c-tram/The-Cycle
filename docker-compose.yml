@@ -17,14 +17,12 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=
-      - REDIS_TLS=false
-      - NODE_ENV=development
-      - PORT=3000
-    depends_on:
-      - redis
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_TLS: ${REDIS_TLS}
+      NODE_ENV: development
+      PORT: 3000
     ports:
       - "3000:3000"
     working_dir: /usr/src/app/src/react-backend
@@ -35,7 +33,7 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - VITE_API_URL=http://localhost:5001/api
+      - VITE_API_URL=http://localhost:3000/api
     depends_on:
       - backend
     ports:

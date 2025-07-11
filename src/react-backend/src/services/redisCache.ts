@@ -27,7 +27,7 @@ function createRedisConfig(): RedisOptions {
         host: process.env.REDIS_HOST!,
         port: parseInt(process.env.REDIS_PORT || '6380'),
         password: process.env.REDIS_AUTH_MODE === 'aad' ? undefined : process.env.REDIS_PASSWORD,
-        // Enable TLS for Azure Redis
+        // Remove username for standard Azure Redis (only access key needed)
         tls: process.env.REDIS_TLS === 'true' 
             ? { servername: process.env.REDIS_HOST } 
             : undefined,

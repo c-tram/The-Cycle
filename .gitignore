@@ -1,3 +1,2 @@
 # Ignore local/dev run scripts and sensitive infra files
 run-docker.sh
-secrets.txt
