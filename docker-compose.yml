@@ -21,10 +21,10 @@ services:
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_TLS: ${REDIS_TLS}
-      NODE_ENV: development
-      PORT: ${BACKEND_PORT:-3000}
+      NODE_ENV: production
+      PORT: ${PORT:-80}
     ports:
-      - "${BACKEND_PORT:-3000}:3000"
+      - "80:80"
     working_dir: /usr/src/app/src/react-backend
     command: node dist/index.js
 
