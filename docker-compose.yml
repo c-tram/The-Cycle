@@ -21,10 +21,10 @@ services:
       REDIS_PORT: ${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_TLS: ${REDIS_TLS}
-      NODE_ENV: production
-      PORT: ${PORT:-80}
+      NODE_ENV: development
+      PORT: ${PORT:-3000}
     ports:
-      - "80:80"
+      - "3000:3000"
     working_dir: /usr/src/app/src/react-backend
     command: node dist/index.js
 
@@ -33,7 +33,7 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - VITE_API_URL=https://thecycle-fxfta3e4g2cyg7c6.canadacentral-01.azurewebsites.net/api
+      - VITE_API_URL=http://localhost:3000/api
     depends_on:
       - backend
     ports:
