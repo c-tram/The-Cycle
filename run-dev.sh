@@ -11,7 +11,7 @@ set -e
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Docker Build Configured for Azure Redis: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Small changes to pipeline setup. Testing will be done locally and there is no more dev slot. Only a production slot: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Push to GitHub remote first (always works)
 echo "Pushing to GitHub..."

@@ -113,99 +113,11 @@ stages:
           NODE_ENV=production
         tags: |
           $(tag)
-- stage: Test
-  displayName: Run tests
+
+- stage: Deploy
+  displayName: Deploy to production slot
   dependsOn: Build
   condition: succeeded('Build')
-  jobs:
-  - job: Test
-    displayName: Run unit and integration tests
-    variables:
-      CI: 'true'
-      AZURE_PIPELINE: 'true'
-      NODE_OPTIONS: '--max-old-space-size=4096'
-      TEST_TIMEOUT: '60000'
-    pool:
-      vmImage: $(vmImageName)
-    steps:
-    - script: |
-        npm ci
-        npm run test
-      displayName: Run backend tests
-      workingDirectory: src/react-backend
-    - script: |
-        npm ci
-        npm run test
-      displayName: Run frontend tests
-      workingDirectory: src/react-frontend
-
-- stage: DeployDev
-  displayName: Deploy to thecycle-dev slot
-  dependsOn: [Build, Test]
-  condition: succeeded('Test')
-  jobs:
-  - job: DeployDev
-    displayName: Deploy to thecycle-dev slot
-    variables:
-      REDIS_HOST: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_HOST']]
-      REDIS_PORT: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_PORT']]
-      REDIS_PASSWORD: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_PASSWORD']]
-      REDIS_AUTH_MODE: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_AUTH_MODE']]
-    pool:
-      vmImage: $(vmImageName)
-    steps:
-    - task: AzureWebAppContainer@1
-      displayName: Deploy to thecycle-dev slot
-      inputs:
-        azureSubscription: $(AZURE_SUBSCRIPTION)
-        appName: TheCycle
-        slotName: dev
-        imageName: $(containerRegistry)/$(imageRepository):$(tag)
-    
-    - task: AzureAppServiceSettings@1
-      displayName: 'Configure App Service Settings'
-      inputs:
-        azureSubscription: $(AZURE_SUBSCRIPTION)
-        appName: TheCycle
-        slotName: 'dev'
-        appSettings: |
-          [
-            {
-              "name": "REDIS_HOST",
-              "value": "$(REDIS_HOST)",
-              "slotSetting": false
-            },
-            {
-              "name": "REDIS_PORT",
-              "value": "$(REDIS_PORT)",
-              "slotSetting": false
-            },
-            {
-              "name": "REDIS_PASSWORD",
-              "value": "$(REDIS_PASSWORD)",
-              "slotSetting": false
-            },
-            {
-              "name": "REDIS_AUTH_MODE",
-              "value": "$(REDIS_AUTH_MODE)",
-              "slotSetting": false
-            },
-            {
-              "name": "REDIS_TLS",
-              "value": "true",
-              "slotSetting": false
-            },
-            {
-              "name": "NODE_ENV",
-              "value": "production",
-              "slotSetting": false
-            }
-          ]
-
-- stage: DeployProd
-  displayName: Deploy to production slot
-  dependsOn: DeployDev
-  condition: and(succeeded('DeployDev'), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
   jobs:
   - deployment: DeployProd
     displayName: Deploy to production slot
@@ -215,7 +127,6 @@ stages:
       REDIS_PORT: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_PORT']]
       REDIS_PASSWORD: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_PASSWORD']]
       REDIS_AUTH_MODE: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_AUTH_MODE']]
-    # Manual approval can be configured in Azure DevOps for this environment
     pool:
       vmImage: $(vmImageName)
     strategy:
@@ -228,7 +139,6 @@ stages:
               azureSubscription: $(AZURE_SUBSCRIPTION)
               appName: TheCycle
               imageName: $(containerRegistry)/$(imageRepository):$(tag)
-              
           - task: AzureAppServiceSettings@1
             displayName: 'Configure App Service Settings'
             inputs:
@@ -236,34 +146,10 @@ stages:
               appName: TheCycle
               appSettings: |
                 [
-                  {
-                    "name": "REDIS_HOST",
-                    "value": "$(REDIS_HOST)",
-                    "slotSetting": false
-                  },
-                  {
-                    "name": "REDIS_PORT",
-                    "value": "$(REDIS_PORT)",
-                    "slotSetting": false
-                  },
-                  {
-                    "name": "REDIS_PASSWORD",
-                    "value": "$(REDIS_PASSWORD)",
-                    "slotSetting": false
-                  },
-                  {
-                    "name": "REDIS_AUTH_MODE",
-                    "value": "$(REDIS_AUTH_MODE)",
-                    "slotSetting": false
-                  },
-                  {
-                    "name": "REDIS_TLS",
-                    "value": "true",
-                    "slotSetting": false
-                  },
-                  {
-                    "name": "NODE_ENV",
-                    "value": "production",
-                    "slotSetting": false
-                  }
+                  {"name": "REDIS_HOST", "value": "$(REDIS_HOST)", "slotSetting": false},
+                  {"name": "REDIS_PORT", "value": "$(REDIS_PORT)", "slotSetting": false},
+                  {"name": "REDIS_PASSWORD", "value": "$(REDIS_PASSWORD)", "slotSetting": false},
+                  {"name": "REDIS_AUTH_MODE", "value": "$(REDIS_AUTH_MODE)", "slotSetting": false},
+                  {"name": "REDIS_TLS", "value": "true", "slotSetting": false},
+                  {"name": "NODE_ENV", "value": "production", "slotSetting": false}
                 ]
