@@ -292,28 +292,28 @@ async function waitForRedisReady(timeoutMs: number = 30000): Promise<boolean> {
  * @param expirationMinutes Minutes until the cache expires
  */
 export async function cacheData<T>(key: string, data: T, expirationMinutes: number = 60): Promise<void> {
+    // Force expiration to 60 minutes (1 hour)
+    expirationMinutes = 60;
     const cacheItem = {
         data,
         expires: new Date(Date.now() + expirationMinutes * 60 * 1000).toISOString()
     };
-    
     try {
-        // Wait for Redis to be ready (important for AAD authentication)
         const isReady = await waitForRedisReady();
         if (!isReady) {
             console.warn('Redis not ready, skipping cache operation');
             return;
         }
-        
+        console.log(`[REDIS] Attempting to set key: cache:${key} | Value:`, cacheItem);
         await redisClient.set(
             `cache:${key}`,
             JSON.stringify(cacheItem),
             'EX',
             expirationMinutes * 60
         );
+        console.log(`[REDIS] Successfully set key: cache:${key}`);
     } catch (error) {
-        console.error(`Error caching data for key ${key}:`, error);
-        // Fallback to memory cache or file cache if needed
+        console.error(`[REDIS] Error caching data for key cache:${key}:`, error);
     }
 }
 
@@ -324,29 +324,22 @@ export async function cacheData<T>(key: string, data: T, expirationMinutes: numb
  */
 export async function getCachedData<T>(key: string): Promise<T | null> {
     try {
-        // Wait for Redis to be ready (important for AAD authentication)
         const isReady = await waitForRedisReady();
         if (!isReady) {
-            console.warn('Redis not ready, returning null for cache lookup');
+            console.warn('Redis not ready, skipping get operation');
             return null;
         }
-        
-        const cacheItem = await redisClient.get(`cache:${key}`);
-        if (!cacheItem) {
+        console.log(`[REDIS] Attempting to get key: cache:${key}`);
+        const raw = await redisClient.get(`cache:${key}`);
+        if (!raw) {
+            console.log(`[REDIS] Cache miss for key: cache:${key}`);
             return null;
         }
-
-        const { data, expires } = JSON.parse(cacheItem);
-        
-        // Check if cache has expired (redundant with Redis TTL but kept for consistency)
-        if (new Date(expires) < new Date()) {
-            await redisClient.del(`cache:${key}`);
-            return null;
-        }
-
-        return data as T;
+        const cacheItem = JSON.parse(raw);
+        console.log(`[REDIS] Cache hit for key: cache:${key} | Value:`, cacheItem);
+        return cacheItem.data as T;
     } catch (error) {
-        console.error(`Error retrieving cache for key ${key}:`, error);
+        console.error(`[REDIS] Error retrieving data for key cache:${key}:`, error);
         return null;
     }
 }

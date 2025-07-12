@@ -208,105 +208,29 @@ app.get('/api/comprehensive-test', async (req, res) => {
 });
 
 // Example: /api/roster?team=nyy&statType=hitting&period=season
-app.get('/api/roster', (req, res) => {
-  (async () => {
+app.get('/api/roster', async (req, res) => {
+  try {
     const teamAbbr = (req.query.team as string)?.toLowerCase() || 'nyy';
     const requestedStatType = (req.query.statType as string)?.toLowerCase() || 'hitting';
     const season = (req.query.season as string) || '2025';
     const period = (req.query.period as string)?.toLowerCase() || 'season';
-    
-    // Normalize statType - 'batting' should be treated as 'hitting' for MLB API
     const statType = requestedStatType === 'batting' ? 'hitting' : requestedStatType;
-    
-    console.log(`API Request - Team: ${teamAbbr}, RequestedStatType: ${requestedStatType}, NormalizedStatType: ${statType}, Period: ${period}`);
-    
-    try {
-      // Calculate cache key and TTL based on period
-      const cacheKey = `player-stats-${teamAbbr}-${statType}-${period}.json`;
-      const cacheTTL = ((p: string) => {
-        switch (p) {
-          case 'season': return 120; // 2 hours
-          case '30day': return 60;   // 1 hour
-          case '7day': return 30;    // 30 minutes 
-          case '1day': return 15;    // 15 minutes
-          default: return 60;
-        }
-      })(period);
-      
-      // Try cache first
-      const cachedData = retrieveData<PlayerStats[]>(cacheKey);
-      if (cachedData && cachedData.length > 0) {
-        console.log('Returning cached data for', teamAbbr);
-        const filteredData = cachedData.filter(player => 
-          (statType === 'hitting' && player.position !== 'P') || 
-          (statType === 'pitching' && player.position === 'P')
-        );
-
-        return res.json([{
-          teamName: TEAM_NAME_MAP[teamAbbr.toUpperCase()] || 'Unknown Team',
-          teamCode: teamAbbr.toUpperCase(),
-          players: filteredData.map(player => ({
-            name: player.name,
-            position: player.position,
-            team: player.team,
-            avg: player.avg,
-            hr: player.hr,
-            rbi: player.rbi,
-            runs: player.runs,
-            sb: player.sb,
-            obp: player.obp,
-            slg: player.slg,
-            ops: player.ops,
-            era: player.era,
-            whip: player.whip,
-            wins: player.wins,
-            strikeouts: player.strikeouts
-          }))
-        }]);
-      }
-      
-      // If not in cache, fetch from API
-      const rosterData = await fetchTeamRosterFromAPI(teamAbbr, period, statType as 'hitting' | 'pitching');
-      
-      if (rosterData && rosterData[0]) {
-        // Format and cache response
-        const response = {
-          teamName: rosterData[0].teamName,
-          teamCode: rosterData[0].teamCode,
-          players: rosterData[0].players.map(player => ({
-            name: player.name,
-            position: player.position,
-            team: player.team,
-            avg: player.avg,
-            hr: player.hr,
-            rbi: player.rbi,
-            runs: player.runs,
-            sb: player.sb,
-            obp: player.obp,
-            slg: player.slg,
-            ops: player.ops,
-            era: player.era,
-            whip: player.whip,
-            wins: player.wins,
-            strikeouts: player.strikeouts
-          }))
-        };
-
-        // Cache the formatted data
-        storeData(cacheKey, response.players);
-
-        return res.json([response]);
-      } else {
-        res.json({ error: 'No data found' });
-      }
-    } catch (error: any) {
-      // If it's a team-specific error, return 400, otherwise 500
-      const statusCode = error.message?.includes('Unknown team abbreviation') || 
-                        error.message?.includes('Invalid team abbreviation') ? 400 : 500;
-      console.error('Error fetching roster:', error);
-      res.status(statusCode).json({ error: error.message });
+    const cacheKey = `player-stats-${teamAbbr}-${statType}-${period}.json`;
+    // Try Redis cache first
+    const cachedRoster = await redisCache.getCachedData(cacheKey);
+    if (cachedRoster) {
+      console.log(`[API] Serving /api/roster for ${teamAbbr} from Redis cache`);
+      return res.json(cachedRoster);
     }
-  })();
+    // Fetch fresh data if not cached
+    console.log(`[API] No cache for /api/roster (${teamAbbr}), fetching from API`);
+    const rosterData = await fetchTeamRosterFromAPI(teamAbbr, period, statType as 'hitting' | 'pitching');
+    await redisCache.cacheData(cacheKey, rosterData);
+    return res.json(rosterData);
+  } catch (err) {
+    console.error('Error in /api/roster:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Function to fetch team roster using MLB Stats API or cache
@@ -506,196 +430,76 @@ async function fetchTeamRosterFromAPI(teamAbbr: string, period: string, statType
 }
 
 // Get recent and upcoming games
-app.get('/api/games', (req, res) => {
-  (async () => {
-    try {
-      // Check if comprehensive data is requested
-      const comprehensive = req.query.comprehensive === 'true';
-      const teamCode = req.query.team as string;
-      
-      if (comprehensive) {
-        console.log('🔥 Comprehensive games data requested');
-        
-        try {
-          if (teamCode) {
-            // Get all games for specific team
-            const teamGames = await comprehensiveMLBDataService.getTeamGames(teamCode);
-            
-            // Convert to legacy format for compatibility
-            const recent = teamGames
-              .filter(g => g.status.isCompleted)
-              .slice(-10) // Last 10 completed games
-              .map(game => ({
-                homeTeam: game.teams.home.team.name,
-                homeTeamCode: game.teams.home.team.abbreviation?.toLowerCase() || 'unk',
-                awayTeam: game.teams.away.team.name,
-                awayTeamCode: game.teams.away.team.abbreviation?.toLowerCase() || 'unk',
-                homeScore: game.teams.home.score,
-                awayScore: game.teams.away.score,
-                date: game.gameDate.split('T')[0],
-                status: 'completed' as const
-              }));
-              
-            const upcoming = teamGames
-              .filter(g => !g.status.isCompleted && !g.status.isInProgress)
-              .slice(0, 10) // Next 10 upcoming games
-              .map(game => ({
-                homeTeam: game.teams.home.team.name,
-                homeTeamCode: game.teams.home.team.abbreviation?.toLowerCase() || 'unk',
-                awayTeam: game.teams.away.team.name,
-                awayTeamCode: game.teams.away.team.abbreviation?.toLowerCase() || 'unk',
-                date: game.gameDate.split('T')[0],
-                time: new Date(game.gameDate).toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                }),
-                status: 'scheduled' as const
-              }));
-              
-            console.log(`✅ Returning ${recent.length} recent + ${upcoming.length} upcoming games for ${teamCode.toUpperCase()}`);
-            return res.json({ recent, upcoming, live: [], comprehensive: true, team: teamCode.toUpperCase() });
-            
-          } else {
-            // Get all games across league
-            const allGames = await comprehensiveMLBDataService.getAllGames();
-            
-            // Convert to legacy format but with more games
-            const recent = allGames
-              .filter(g => g.status.isCompleted)
-              .slice(-50) // Last 50 completed games
-              .map(game => ({
-                homeTeam: game.teams.home.team.name,
-                homeTeamCode: game.teams.home.team.abbreviation?.toLowerCase() || 'unk',
-                awayTeam: game.teams.away.team.name,
-                awayTeamCode: game.teams.away.team.abbreviation?.toLowerCase() || 'unk',
-                homeScore: game.teams.home.score,
-                awayScore: game.teams.away.score,
-                date: game.gameDate.split('T')[0],
-                status: 'completed' as const
-              }));
-              
-            const upcoming = allGames
-              .filter(g => !g.status.isCompleted && !g.status.isInProgress)
-              .slice(0, 50) // Next 50 upcoming games
-              .map(game => ({
-                homeTeam: game.teams.home.team.name,
-                homeTeamCode: game.teams.home.team.abbreviation?.toLowerCase() || 'unk',
-                awayTeam: game.teams.away.team.name,
-                awayTeamCode: game.teams.away.team.abbreviation?.toLowerCase() || 'unk',
-                date: game.gameDate.split('T')[0],
-                time: new Date(game.gameDate).toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-                }),
-                status: 'scheduled' as const
-              }));
-              
-            const live = allGames
-              .filter(g => g.status.isInProgress)
-              .map(game => ({
-                homeTeam: game.teams.home.team.name,
-                homeTeamCode: game.teams.home.team.abbreviation?.toLowerCase() || 'unk',
-                awayTeam: game.teams.away.team.name,
-                awayTeamCode: game.teams.away.team.abbreviation?.toLowerCase() || 'unk',
-                homeScore: game.teams.home.score,
-                awayScore: game.teams.away.score,
-                date: game.gameDate.split('T')[0],
-                status: 'live' as const
-              }));
-              
-            console.log(`✅ Returning comprehensive data: ${recent.length} recent + ${upcoming.length} upcoming + ${live.length} live games`);
-            return res.json({ recent, upcoming, live, comprehensive: true, totalGames: allGames.length });
-          }
-          
-        } catch (comprehensiveError) {
-          console.error('💥 Comprehensive data error, falling back to regular scraping:', comprehensiveError);
-          // Fall through to regular scraping
-        }
-      }
-      
-      // Regular (limited) data fetching
-      console.log('📋 Regular games data requested (limited to 5 recent/upcoming)');
-      try {
-        const games = await scrapeGames();
-        return res.json(games);
-      } catch (error) {
-        console.error('Error fetching games from MLB Stats API:', error);
-        // Return a 500 error if both attempts fail
-        res.status(500).json({ error: 'Failed to fetch games data' });
-      }
-    } catch (error) {
-      console.error('Error in /api/games endpoint:', error);
-      res.status(500).json({ error: 'Internal server error' });
+app.get('/api/games', async (req, res) => {
+  try {
+    // Try Redis cache first
+    const cachedGames = await redisCache.getCachedData('games');
+    if (cachedGames) {
+      console.log('[API] Serving /api/games from Redis cache');
+      return res.json(cachedGames);
     }
-  })();
+    // Fetch fresh data if not cached
+    console.log('[API] No cache for /api/games, fetching from API');
+    const games = await scrapeGames();
+    await redisCache.cacheData('games', games);
+    return res.json(games);
+  } catch (err) {
+    console.error('Error in /api/games:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-// GET /api/standings
-app.get('/api/standings', (req, res) => {
-  (async () => {
-    try {
-      console.log('Fetching standings data...');
-      
-      // Try to get cached standings first
-      const cachedStandings = retrieveData('standings.json');
-      if (cachedStandings) {
-        console.log('Returning cached standings data');
-        return res.json(cachedStandings);
-      }
-
-      // Try MLB Stats API first
-      try {
-        console.log('Fetching standings from MLB Stats API...');
-        const apiStandings = await fetchStandingsFromAPI();
-        if (apiStandings.length > 0) {
-          storeData('standings.json', apiStandings);
-          return res.json(apiStandings);
-        }
-      } catch (apiError) {
-        console.error('MLB Stats API error:', apiError);
-      }
-
-      // Fallback to scraping
-      console.log('Falling back to standings scraper...');
-      const scrapedStandings = await scrapeStandings();
-      storeData('standings.json', scrapedStandings);
-      res.json(scrapedStandings);
-      
-    } catch (error: any) {
-      console.error('Error in standings route:', error);
-      res.status(500).json({
-        error: 'Failed to fetch standings',
-        message: error?.message || 'Unknown error'
-      });
+// Example: /api/standings
+app.get('/api/standings', async (req, res) => {
+  try {
+    // Try Redis cache first
+    const cachedStandings = await redisCache.getCachedData('standings.json');
+    if (cachedStandings) {
+      console.log('[API] Serving /api/standings from Redis cache');
+      return res.json(cachedStandings);
     }
-  })();
+    // Fetch fresh data if not cached
+    console.log('[API] No cache for /api/standings, fetching from API');
+    const apiStandings = await fetchStandingsFromAPI();
+    if (apiStandings.length > 0) {
+      await redisCache.cacheData('standings.json', apiStandings);
+      return res.json(apiStandings);
+    }
+    res.status(404).json({ error: 'No standings data found' });
+  } catch (err) {
+    console.error('Error in /api/standings:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Get trend data for a specific stat category
-app.get('/api/trends', (req, res) => {
-  (async () => {
-    try {
-      const statCategory = req.query.stat as string;
-      let trendData;
-
-      try {
-        trendData = await scrapeTrendData(statCategory);
-      } catch (error) {
-        console.error('Error fetching trend data:', error);
-        // Return mock data if scraping fails
-        trendData = {
-          [statCategory]: Array(30).fill(0).map(() => Math.random())
-        };
-      }
-
-      res.json(trendData);
-    } catch (error) {
-      console.error('Error in /api/trends endpoint:', error);
-      res.status(500).json({ error: 'Internal server error' });
+app.get('/api/trends', async (req, res) => {
+  try {
+    const statCategory = req.query.stat as string;
+    const cacheKey = `trend-${statCategory}`;
+    // Try Redis cache first
+    const cachedTrend = await redisCache.getCachedData(cacheKey);
+    if (cachedTrend) {
+      console.log(`[API] Serving /api/trends for ${statCategory} from Redis cache`);
+      return res.json(cachedTrend);
     }
-  })();
+    // Fetch fresh data if not cached
+    console.log(`[API] No cache for /api/trends (${statCategory}), fetching from API`);
+    let trendData;
+    try {
+      trendData = await scrapeTrendData(statCategory);
+    } catch (error) {
+      console.error('Error fetching trend data:', error);
+      trendData = {
+        [statCategory]: Array(30).fill(0).map(() => Math.random())
+      };
+    }
+    await redisCache.cacheData(cacheKey, trendData);
+    res.json(trendData);
+  } catch (err) {
+    console.error('Error in /api/trends:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // Redis health check endpoint
@@ -712,6 +516,39 @@ app.get('/api/health/redis', async (req, res) => {
     });
   }
 });
+
+// On startup, pre-warm cache for key endpoints if not already cached
+(async () => {
+  try {
+    // Standings
+    const cachedStandings = await redisCache.getCachedData('standings.json');
+    if (!cachedStandings) {
+      console.log('[Startup] No cached standings, fetching from API...');
+      const apiStandings = await fetchStandingsFromAPI();
+      if (apiStandings.length > 0) {
+        await redisCache.cacheData('standings.json', apiStandings);
+        console.log('[Startup] Cached fresh standings data');
+      }
+    } else {
+      console.log('[Startup] Standings already cached');
+    }
+
+    // Games
+    const cachedGames = await redisCache.getCachedData('games');
+    if (!cachedGames) {
+      console.log('[Startup] No cached games, fetching from API...');
+      const games = await scrapeGames();
+      await redisCache.cacheData('games', games);
+      console.log('[Startup] Cached fresh games data');
+    } else {
+      console.log('[Startup] Games already cached');
+    }
+
+    // You can add similar logic for roster/trends if desired
+  } catch (err) {
+    console.error('[Startup] Error pre-warming cache:', err);
+  }
+})();
 
 // Start the server
 app.listen(port, () => {
