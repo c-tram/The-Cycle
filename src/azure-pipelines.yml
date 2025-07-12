@@ -151,5 +151,6 @@ stages:
                   {"name": "REDIS_PASSWORD", "value": "$(REDIS_PASSWORD)", "slotSetting": false},
                   {"name": "REDIS_AUTH_MODE", "value": "$(REDIS_AUTH_MODE)", "slotSetting": false},
                   {"name": "REDIS_TLS", "value": "true", "slotSetting": false},
-                  {"name": "NODE_ENV", "value": "production", "slotSetting": false}
+                  {"name": "NODE_ENV", "value": "production", "slotSetting": false},
+                  {"name": "WEBSITES_PORT", "value": "80", "slotSetting": false}
                 ]
