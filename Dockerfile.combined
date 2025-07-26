@@ -1,0 +1,37 @@
+# Multi-stage build for combined frontend and backend with nginx
+FROM node:18-alpine AS backend-build
+WORKDIR /app
+COPY src/express-backend/package*.json ./
+RUN npm ci --only=production
+
+FROM node:18-alpine AS frontend-build
+WORKDIR /app
+COPY src/web-frontend/package*.json ./
+RUN npm ci
+COPY src/web-frontend/ ./
+RUN npm run build
+
+# Final stage with nginx
+FROM nginx:alpine
+# Install Node.js in nginx container
+RUN apk add --no-cache nodejs npm
+
+# Copy nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Copy frontend build
+COPY --from=frontend-build /app/build /usr/share/nginx/html
+
+# Copy backend
+COPY --from=backend-build /app/node_modules /app/node_modules
+COPY src/express-backend/src /app/src
+COPY src/express-backend/package*.json /app/
+
+# Create startup script
+RUN echo '#!/bin/sh' > /start.sh && \
+    echo 'cd /app && node src/server.js &' >> /start.sh && \
+    echo 'nginx -g "daemon off;"' >> /start.sh && \
+    chmod +x /start.sh
+
+EXPOSE 80
+CMD ["/start.sh"]

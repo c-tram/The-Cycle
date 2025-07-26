@@ -94,45 +94,20 @@ stages:
   displayName: Build and push stage
   dependsOn: Infrastructure
   jobs:
-  - job: BuildImages
-    displayName: Build All Images
+  - job: BuildApp
+    displayName: Build Combined Application
     pool:
       vmImage: $(vmImageName)
     steps:
     - task: Docker@2
-      displayName: Build and push backend image
+      displayName: Build and push combined app image
       inputs:
         command: buildAndPush
-        repository: $(imageRepository)-backend
-        dockerfile: $(dockerfilePath)
+        repository: $(imageRepository)
+        dockerfile: $(Build.SourcesDirectory)/Dockerfile.combined
         containerRegistry: $(dockerRegistryServiceConnection)
         buildArgs: |
-          SERVICE=backend
           NODE_ENV=production
-        tags: |
-          $(tag)
-    
-    - task: Docker@2
-      displayName: Build and push frontend image
-      inputs:
-        command: buildAndPush
-        repository: $(imageRepository)-frontend
-        dockerfile: $(dockerfilePath)
-        containerRegistry: $(dockerRegistryServiceConnection)
-        buildArgs: |
-          SERVICE=frontend
-          NODE_ENV=production
-          GENERATE_SOURCEMAP=false
-        tags: |
-          $(tag)
-    
-    - task: Docker@2
-      displayName: Build and push nginx image
-      inputs:
-        command: buildAndPush
-        repository: $(imageRepository)-nginx
-        dockerfile: $(Build.SourcesDirectory)/nginx.Dockerfile
-        containerRegistry: $(dockerRegistryServiceConnection)
         tags: |
           $(tag)
 
@@ -142,7 +117,7 @@ stages:
   condition: succeeded('Build')
   jobs:
   - job: DeployApp
-    displayName: Deploy Combined App to production slot
+    displayName: Deploy App to production slot
     pool:
       vmImage: $(vmImageName)
     variables:
@@ -151,29 +126,13 @@ stages:
       REDIS_PASSWORD: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_PASSWORD']]
       REDIS_AUTH_MODE: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_AUTH_MODE']]
     steps:
-    - task: PowerShell@2
-      displayName: 'Prepare docker-compose for deployment'
-      inputs:
-        targetType: 'inline'
-        script: |
-          $content = Get-Content "$(Build.SourcesDirectory)/docker-compose.prod.yml" -Raw
-          $content = $content -replace '\$\{CONTAINER_REGISTRY\}', '$(containerRegistry)'
-          $content = $content -replace '\$\{IMAGE_REPOSITORY\}', '$(imageRepository)'
-          $content = $content -replace '\$\{IMAGE_TAG\}', '$(tag)'
-          $content = $content -replace '\$\{REDIS_HOST\}', '$(REDIS_HOST)'
-          $content = $content -replace '\$\{REDIS_PORT\}', '$(REDIS_PORT)'
-          $content = $content -replace '\$\{REDIS_PASSWORD\}', '$(REDIS_PASSWORD)'
-          $content = $content -replace '\$\{REDIS_TLS\}', 'true'
-          $content = $content -replace '\$\{REDIS_AUTH_MODE\}', '$(REDIS_AUTH_MODE)'
-          Set-Content "$(Build.SourcesDirectory)/docker-compose.deploy.yml" -Value $content
-          Write-Host "Docker compose file prepared for deployment"
-    
     - task: AzureWebAppContainer@1
-      displayName: Deploy multi-container app
+      displayName: Deploy single container app
       inputs:
         azureSubscription: $(AZURE_SUBSCRIPTION)
         appName: TheCycle
-        multicontainerConfigFile: $(Build.SourcesDirectory)/docker-compose.deploy.yml
+        imageName: $(containerRegistry)/$(imageRepository):$(tag)
+        
     - task: AzureAppServiceSettings@1
       displayName: 'Configure App Service Settings'
       inputs:
@@ -190,3 +149,23 @@ stages:
             {"name": "WEBSITES_PORT", "value": "80", "slotSetting": false},
             {"name": "REACT_APP_API_URL", "value": "/api", "slotSetting": false}
           ]
+        
+    - task: AzureCLI@2
+      displayName: 'Restart App Service and check status'
+      inputs:
+        azureSubscription: $(AZURE_SUBSCRIPTION)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Restarting App Service..."
+          az webapp restart --name TheCycle --resource-group Main
+          
+          echo "Waiting for restart..."
+          sleep 30
+          
+          echo "Checking App Service status..."
+          az webapp show --name TheCycle --resource-group Main --query "state" -o tsv
+          
+          echo "Getting App Service URL..."
+          URL=$(az webapp show --name TheCycle --resource-group Main --query "defaultHostName" -o tsv)
+          echo "App URL: https://$URL"
