@@ -1,3 +1,5 @@
+https://thecycle-fxfta3e4g2cyg7c6.canadacentral-01.azurewebsites.net/
+
 # The Cycle - Professional MLB Analytics Platform
 
 > Enterprise-grade baseball analytics dashboard with comprehensive statistics, advanced insights, and professional scouting tools
