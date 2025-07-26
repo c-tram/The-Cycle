@@ -1,0 +1,192 @@
+# Docker
+# Build and push an image to Azure Container Registry
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- main
+
+resources:
+- repo: self
+
+variables:
+  # Service connection for Azure Container Registry (set in Azure DevOps UI)
+  dockerRegistryServiceConnection: $(DOCKER_REGISTRY_SERVICE_CONNECTION)
+  # Name of the image repository
+  imageRepository: $(IMAGE_REPOSITORY)
+  # Container registry URL
+  containerRegistry: $(CONTAINER_REGISTRY)
+  # Path to the Dockerfile (corrected path)
+  dockerfilePath: $(Build.SourcesDirectory)/Dockerfile
+  # Tag for the image
+  tag: $(IMAGE_TAG)
+  # Redis configuration
+  redisName: '$(REDIS_NAME)'
+  redisResourceGroup: '$(RESOURCE_GROUP_NAME)'
+  redisLocation: '$(LOCATION)'
+  redisSku: '$(SKU)'
+  redisFamily: '$(FAMILY)'
+  redisCapacity: '$(CAPACITY)'
+
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+
+stages:
+- stage: Infrastructure
+  displayName: Setup Infrastructure
+  jobs:
+  - job: SetupRedis
+    displayName: Setup Redis Cache
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: AzureCLI@2
+      displayName: 'Create or update Redis Cache'
+      inputs:
+        azureSubscription: $(AZURE_SUBSCRIPTION)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Check if Redis cache exists
+          if az redis show --name $(redisName) --resource-group $(redisResourceGroup) &> /dev/null; then
+            echo "Redis cache $(redisName) already exists."
+          else
+            echo "Creating Redis cache $(redisName)..."
+            az redis create \
+              --name $(redisName) \
+              --resource-group $(redisResourceGroup) \
+              --location $(redisLocation) \
+              --sku $(redisSku) \
+              --vm-size "$(redisFamily)$(redisCapacity)" \
+              --enable-non-ssl-port false \
+              --minimum-tls-version 1.2 \
+              --redis-configuration "aad-enabled=true,maxclients=1000,maxmemory-reserved=125,maxfragmentationmemory-reserved=125,maxmemory-delta=125"
+          fi
+          
+          # Get Redis connection information
+          REDIS_HOST=$(az redis show --name $(redisName) --resource-group $(redisResourceGroup) --query hostName -o tsv)
+          REDIS_PORT=$(az redis show --name $(redisName) --resource-group $(redisResourceGroup) --query sslPort -o tsv)
+          
+          # Check if key authentication is disabled (AAD auth is used)
+          ACCESS_KEY_DISABLED=$(az redis show --name $(redisName) --resource-group $(redisResourceGroup) --query properties.disableAccessKeyAuthentication -o tsv)
+          AAD_ENABLED=$(az redis show --name $(redisName) --resource-group $(redisResourceGroup) --query "properties.redisConfiguration.aad-enabled" -o tsv)
+          
+          if [[ "$ACCESS_KEY_DISABLED" == "true" && "$AAD_ENABLED" == "true" ]]; then
+            echo "Azure AD authentication is enabled for Redis cache $(redisName)"
+            REDIS_AUTH_MODE="aad"
+            # For AAD auth, we'll use managed identity
+            REDIS_PASSWORD=""
+          else
+            echo "Standard key authentication is used for Redis cache $(redisName)"
+            REDIS_AUTH_MODE="key"
+            # Get the primary access key
+            REDIS_PASSWORD=$(az redis list-keys --name $(redisName) --resource-group $(redisResourceGroup) --query primaryKey -o tsv || echo "")
+          fi
+          
+          # Set pipeline variables for later use
+          echo "##vso[task.setvariable variable=REDIS_HOST;isOutput=true]$REDIS_HOST"
+          echo "##vso[task.setvariable variable=REDIS_PORT;isOutput=true]$REDIS_PORT"
+          echo "##vso[task.setvariable variable=REDIS_PASSWORD;isOutput=true]$REDIS_PASSWORD"
+          echo "##vso[task.setvariable variable=REDIS_AUTH_MODE;isOutput=true]$REDIS_AUTH_MODE"
+        addSpnToEnvironment: true
+      name: redisInfo
+
+- stage: Build
+  displayName: Build and push stage
+  dependsOn: Infrastructure
+  jobs:
+  - job: BuildImages
+    displayName: Build All Images
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: Docker@2
+      displayName: Build and push backend image
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)-backend
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        buildArgs: |
+          SERVICE=backend
+          NODE_ENV=production
+        tags: |
+          $(tag)
+    
+    - task: Docker@2
+      displayName: Build and push frontend image
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)-frontend
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        buildArgs: |
+          SERVICE=frontend
+          NODE_ENV=production
+          GENERATE_SOURCEMAP=false
+        tags: |
+          $(tag)
+    
+    - task: Docker@2
+      displayName: Build and push nginx image
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)-nginx
+        dockerfile: $(Build.SourcesDirectory)/nginx.Dockerfile
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+
+- stage: Deploy
+  displayName: Deploy to production slot
+  dependsOn: Build
+  condition: succeeded('Build')
+  jobs:
+  - job: DeployApp
+    displayName: Deploy Combined App to production slot
+    pool:
+      vmImage: $(vmImageName)
+    variables:
+      REDIS_HOST: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_HOST']]
+      REDIS_PORT: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_PORT']]
+      REDIS_PASSWORD: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_PASSWORD']]
+      REDIS_AUTH_MODE: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_AUTH_MODE']]
+    steps:
+    - task: PowerShell@2
+      displayName: 'Prepare docker-compose for deployment'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $content = Get-Content "$(Build.SourcesDirectory)/docker-compose.prod.yml" -Raw
+          $content = $content -replace '\$\{CONTAINER_REGISTRY\}', '$(containerRegistry)'
+          $content = $content -replace '\$\{IMAGE_REPOSITORY\}', '$(imageRepository)'
+          $content = $content -replace '\$\{IMAGE_TAG\}', '$(tag)'
+          $content = $content -replace '\$\{REDIS_HOST\}', '$(REDIS_HOST)'
+          $content = $content -replace '\$\{REDIS_PORT\}', '$(REDIS_PORT)'
+          $content = $content -replace '\$\{REDIS_PASSWORD\}', '$(REDIS_PASSWORD)'
+          $content = $content -replace '\$\{REDIS_TLS\}', 'true'
+          $content = $content -replace '\$\{REDIS_AUTH_MODE\}', '$(REDIS_AUTH_MODE)'
+          Set-Content "$(Build.SourcesDirectory)/docker-compose.deploy.yml" -Value $content
+          Write-Host "Docker compose file prepared for deployment"
+    
+    - task: AzureWebAppContainer@1
+      displayName: Deploy multi-container app
+      inputs:
+        azureSubscription: $(AZURE_SUBSCRIPTION)
+        appName: TheCycle
+        multicontainerConfigFile: $(Build.SourcesDirectory)/docker-compose.deploy.yml
+    - task: AzureAppServiceSettings@1
+      displayName: 'Configure App Service Settings'
+      inputs:
+        azureSubscription: $(AZURE_SUBSCRIPTION)
+        appName: TheCycle
+        appSettings: |
+          [
+            {"name": "REDIS_HOST", "value": "$(REDIS_HOST)", "slotSetting": false},
+            {"name": "REDIS_PORT", "value": "$(REDIS_PORT)", "slotSetting": false},
+            {"name": "REDIS_PASSWORD", "value": "$(REDIS_PASSWORD)", "slotSetting": false},
+            {"name": "REDIS_AUTH_MODE", "value": "$(REDIS_AUTH_MODE)", "slotSetting": false},
+            {"name": "REDIS_TLS", "value": "true", "slotSetting": false},
+            {"name": "NODE_ENV", "value": "production", "slotSetting": false},
+            {"name": "WEBSITES_PORT", "value": "80", "slotSetting": false},
+            {"name": "REACT_APP_API_URL", "value": "/api", "slotSetting": false}
+          ]

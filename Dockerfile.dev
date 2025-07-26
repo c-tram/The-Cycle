@@ -1,0 +1,31 @@
+# Development Dockerfile for hot reloading
+ARG SERVICE=backend
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install common dependencies
+RUN apk add --no-cache libc6-compat
+
+# Backend configuration
+FROM node:18-alpine as backend-dev
+WORKDIR /app
+COPY src/express-backend/package*.json ./
+RUN npm install
+COPY src/express-backend/ ./
+EXPOSE 8080
+CMD ["npm", "run", "dev"]
+
+# Frontend configuration  
+FROM node:18-alpine as frontend-dev
+WORKDIR /app
+RUN apk add --no-cache libc6-compat
+COPY src/web-frontend/package*.json ./
+RUN npm install
+COPY src/web-frontend/ ./
+EXPOSE 3001
+CMD ["npm", "start"]
+
+# Select the appropriate service
+FROM ${SERVICE}-dev as final

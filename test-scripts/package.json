@@ -1,0 +1,23 @@
+{
+  "name": "the-cycle-api-tests",
+  "version": "1.0.0",
+  "description": "Test scripts for The Cycle API",
+  "main": "test-api.js",
+  "scripts": {
+    "test": "node test-api.js",
+    "test:health": "node test-api.js health",
+    "test:players": "node test-api.js players",
+    "test:teams": "node test-api.js teams",
+    "test:matchups": "node test-api.js matchups",
+    "test:stats": "node test-api.js stats",
+    "test:all": "node test-api.js all"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "chalk": "^4.1.2"
+  },
+  "devDependencies": {},
+  "keywords": ["api", "testing", "baseball", "mlb"],
+  "author": "",
+  "license": "ISC"
+}
