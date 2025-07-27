@@ -5,6 +5,16 @@ let redisClient = null;
 
 function createRedisClient() {
   if (!redisClient) {
+    // Debug environment variables
+    console.log('🔍 Environment variables debug:', {
+      REDIS_HOST: process.env.REDIS_HOST,
+      REDIS_PORT: process.env.REDIS_PORT,
+      REDIS_PASSWORD: process.env.REDIS_PASSWORD ? '[SET]' : '[NOT SET]',
+      REDIS_TLS: process.env.REDIS_TLS,
+      REDIS_AUTH_MODE: process.env.REDIS_AUTH_MODE,
+      NODE_ENV: process.env.NODE_ENV
+    });
+
     const redisConfig = {
       host: process.env.REDIS_HOST || '127.0.0.1',
       port: parseInt(process.env.REDIS_PORT) || 6380,

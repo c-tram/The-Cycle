@@ -86,9 +86,31 @@ router.get('/', async (req, res) => {
   try {
     const { year = '2025' } = req.query;
     
+    // Test Redis connection first
+    const client = getRedisClient();
+    try {
+      await client.ping();
+      console.log('✅ Redis connection verified for standings');
+    } catch (redisErr) {
+      console.error('❌ Redis connection failed for standings:', redisErr);
+      return res.status(503).json({ 
+        error: 'Database connection unavailable',
+        details: 'Redis cache is not accessible'
+      });
+    }
+    
     // Get team standings from Redis (we'll calculate standings from team stats)
     const pattern = `team:*:${year}:average`;
     const keys = await getKeysByPattern(pattern);
+    
+    if (!keys || keys.length === 0) {
+      return res.status(404).json({ 
+        error: 'No team data found for the specified year',
+        year: year,
+        pattern: pattern
+      });
+    }
+    
     const teams = await getMultipleKeys(keys);
     
     if (!teams || teams.length === 0) {
@@ -206,6 +228,66 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('Error fetching standings:', err);
     res.status(500).json({ error: 'Failed to fetch standings' });
+  }
+});
+
+// GET /api/standings/test - Test route with mock data (doesn't require Redis)
+router.get('/test', async (req, res) => {
+  try {
+    // Mock standings data for testing
+    const mockStandings = {
+      year: 2025,
+      lastUpdated: new Date().toISOString(),
+      divisions: {
+        'AL East': [
+          {
+            teamCode: 'TOR',
+            teamName: 'Toronto Blue Jays',
+            division: 'AL East',
+            league: 'American League',
+            wins: 62,
+            losses: 42,
+            winPct: 0.596,
+            gamesBehind: '—',
+            runsScored: 491,
+            runsAllowed: 448,
+            runDiff: 43,
+            homeRecord: '37-17',
+            awayRecord: '25-25',
+            lastTen: '7-3',
+            streak: 'W3'
+          },
+          {
+            teamCode: 'NYY',
+            teamName: 'New York Yankees',
+            division: 'AL East',
+            league: 'American League',
+            wins: 56,
+            losses: 48,
+            winPct: 0.538,
+            gamesBehind: '6.0',
+            runsScored: 539,
+            runsAllowed: 445,
+            runDiff: 94,
+            homeRecord: '30-21',
+            awayRecord: '26-27',
+            lastTen: '3-7',
+            streak: 'L3'
+          }
+        ]
+      },
+      wildCard: {
+        'American League': [],
+        'National League': []
+      },
+      totalTeams: 2
+    };
+    
+    res.json(mockStandings);
+    
+  } catch (err) {
+    console.error('Error in test standings:', err);
+    res.status(500).json({ error: 'Failed to fetch test standings' });
   }
 });
 

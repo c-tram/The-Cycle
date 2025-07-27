@@ -126,6 +126,19 @@ stages:
       REDIS_PASSWORD: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_PASSWORD']]
       REDIS_AUTH_MODE: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_AUTH_MODE']]
     steps:
+    - task: AzureCLI@2
+      displayName: 'Debug Redis Configuration'
+      inputs:
+        azureSubscription: $(AZURE_SUBSCRIPTION)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "🔍 Debug: Checking Redis variables..."
+          echo "REDIS_HOST: $(REDIS_HOST)"
+          echo "REDIS_PORT: $(REDIS_PORT)"
+          echo "REDIS_PASSWORD: $(if [[ -n '$(REDIS_PASSWORD)' ]]; then echo '[SET]'; else echo '[NOT SET]'; fi)"
+          echo "REDIS_AUTH_MODE: $(REDIS_AUTH_MODE)"
+          
     - task: AzureAppServiceSettings@1
       displayName: 'Configure App Service Settings'
       inputs:
@@ -143,12 +156,32 @@ stages:
             {"name": "REACT_APP_API_URL", "value": "/api", "slotSetting": false}
           ]
         
+    - task: AzureCLI@2
+      displayName: 'Wait for App Settings to Apply'
+      inputs:
+        azureSubscription: $(AZURE_SUBSCRIPTION)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "⏳ Waiting 30 seconds for app settings to apply..."
+          sleep 30
+          echo "✅ App settings should now be applied"
+        
     - task: AzureWebAppContainer@1
       displayName: Deploy single container app
       inputs:
         azureSubscription: $(AZURE_SUBSCRIPTION)
         appName: TheCycle
         imageName: $(containerRegistry)/$(imageRepository):$(tag)
+        appSettings: |
+          -REDIS_HOST "$(REDIS_HOST)"
+          -REDIS_PORT "$(REDIS_PORT)" 
+          -REDIS_PASSWORD "$(REDIS_PASSWORD)"
+          -REDIS_AUTH_MODE "$(REDIS_AUTH_MODE)"
+          -REDIS_TLS "true"
+          -NODE_ENV "production"
+          -WEBSITES_PORT "80"
+          -REACT_APP_API_URL "/api"
         
     - task: AzureCLI@2
       displayName: 'Restart App Service and check status'
@@ -160,8 +193,8 @@ stages:
           echo "Restarting App Service..."
           az webapp restart --name TheCycle --resource-group Main
           
-          echo "Waiting for restart..."
-          sleep 30
+          echo "Waiting for restart and application initialization..."
+          sleep 60
           
           echo "Checking App Service status..."
           az webapp show --name TheCycle --resource-group Main --query "state" -o tsv
@@ -169,3 +202,7 @@ stages:
           echo "Getting App Service URL..."
           URL=$(az webapp show --name TheCycle --resource-group Main --query "defaultHostName" -o tsv)
           echo "App URL: https://$URL"
+          
+          echo "Testing API health endpoint..."
+          sleep 30
+          curl -f "https://$URL/api/health" || echo "Health check failed - app may still be starting"
