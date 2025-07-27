@@ -43,6 +43,7 @@ const teamRoutesV2 = require('./routes/teams_v2');
 const matchupRoutes = require('./routes/matchups');
 const statsRoutes = require('./routes/stats');
 const statsRoutesV2 = require('./routes/stats_v2');
+const standingsRoutes = require('./routes/standings');
 
 // Use routes
 app.use('/api/players', playerRoutes);
@@ -52,6 +53,7 @@ app.use('/api/v2/teams', teamRoutesV2);
 app.use('/api/matchups', matchupRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/v2/stats', statsRoutesV2);
+app.use('/api/standings', standingsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
