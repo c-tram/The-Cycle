@@ -126,13 +126,6 @@ stages:
       REDIS_PASSWORD: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_PASSWORD']]
       REDIS_AUTH_MODE: $[dependencies.Infrastructure.outputs['redisInfo.REDIS_AUTH_MODE']]
     steps:
-    - task: AzureWebAppContainer@1
-      displayName: Deploy single container app
-      inputs:
-        azureSubscription: $(AZURE_SUBSCRIPTION)
-        appName: TheCycle
-        imageName: $(containerRegistry)/$(imageRepository):$(tag)
-        
     - task: AzureAppServiceSettings@1
       displayName: 'Configure App Service Settings'
       inputs:
@@ -149,6 +142,13 @@ stages:
             {"name": "WEBSITES_PORT", "value": "80", "slotSetting": false},
             {"name": "REACT_APP_API_URL", "value": "/api", "slotSetting": false}
           ]
+        
+    - task: AzureWebAppContainer@1
+      displayName: Deploy single container app
+      inputs:
+        azureSubscription: $(AZURE_SUBSCRIPTION)
+        appName: TheCycle
+        imageName: $(containerRegistry)/$(imageRepository):$(tag)
         
     - task: AzureCLI@2
       displayName: 'Restart App Service and check status'

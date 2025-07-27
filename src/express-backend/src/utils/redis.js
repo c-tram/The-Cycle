@@ -5,15 +5,25 @@ let redisClient = null;
 
 function createRedisClient() {
   if (!redisClient) {
-    redisClient = new Redis({
-      host: process.env.REDIS_HOST,
+    const redisConfig = {
+      host: process.env.REDIS_HOST || '127.0.0.1',
       port: parseInt(process.env.REDIS_PORT) || 6380,
       password: process.env.REDIS_PASSWORD,
-      tls: true,
+      tls: process.env.REDIS_TLS === 'true' || process.env.NODE_ENV === 'production',
       retryDelayOnFailover: 100,
       maxRetriesPerRequest: 3,
       lazyConnect: true
+    };
+
+    console.log('🔧 Redis configuration:', {
+      host: redisConfig.host,
+      port: redisConfig.port,
+      tls: redisConfig.tls,
+      hasPassword: !!redisConfig.password,
+      authMode: process.env.REDIS_AUTH_MODE || 'key'
     });
+
+    redisClient = new Redis(redisConfig);
 
     redisClient.on('connect', () => {
       console.log('✅ Redis connected');
