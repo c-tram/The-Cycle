@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box,
   Grid,
@@ -50,9 +50,11 @@ import { themeUtils } from '../theme/theme';
 const Players = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const searchInputRef = useRef(null);
   
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState(null);
   
   // Filters and search
@@ -77,22 +79,52 @@ const Players = () => {
     loadFilterOptions();
   }, [activeCategory, sortBy, sortOrder]);
 
+  // Real-time search and filter effect
   useEffect(() => {
     setPage(0); // Reset to first page when filters change
-  }, [searchTerm, selectedTeams, selectedPositions, activeCategory]);
+    
+    // Debounce the search to avoid too many API calls
+    const searchTimeout = setTimeout(() => {
+      if (searchTerm || selectedTeams.length > 0 || selectedPositions.length > 0) {
+        // Only show search loading for subsequent searches, not initial load
+        setSearchLoading(true);
+        loadPlayers().finally(() => setSearchLoading(false));
+      } else {
+        loadPlayers();
+      }
+    }, 300); // 300ms delay
 
-  const loadPlayers = async () => {
+    return () => clearTimeout(searchTimeout);
+  }, [searchTerm, selectedTeams, selectedPositions]);
+
+  // Debounced API call for real-time search
+  const loadPlayers = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only show main loading for initial load or category changes
+      if (!searchTerm && selectedTeams.length === 0 && selectedPositions.length === 0) {
+        setLoading(true);
+      }
       setError(null);
 
-      const response = await playersApi.getPlayers({
+      // Build API parameters based on current filters
+      const apiParams = {
         category: activeCategory,
         sortBy,
         sortOrder,
         limit: 1000 // Get all players for client-side filtering
-      });
+      };
 
+      // Add team filter if selected
+      if (selectedTeams.length === 1) {
+        apiParams.team = selectedTeams[0];
+      }
+
+      // Add position filter if selected
+      if (selectedPositions.length === 1) {
+        apiParams.position = selectedPositions[0];
+      }
+
+      const response = await playersApi.getPlayers(apiParams);
       setPlayers(response.players || []);
     } catch (err) {
       console.error('Error loading players:', err);
@@ -100,7 +132,7 @@ const Players = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeCategory, sortBy, sortOrder, selectedTeams, selectedPositions, searchTerm]);
 
   const loadFilterOptions = async () => {
     try {
@@ -117,28 +149,28 @@ const Players = () => {
     }
   };
 
-  // Filter and sort players
+  // Filter and sort players with real-time search
   const filteredPlayers = useMemo(() => {
     let filtered = [...players];
 
-    // Search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
+    // Real-time search filter (applied to already loaded data)
+    if (searchTerm && searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(player =>
         player.player.name.toLowerCase().includes(term) ||
         player.player.team.toLowerCase().includes(term)
       );
     }
 
-    // Team filter
-    if (selectedTeams.length > 0) {
+    // Team filter (handled by API for single team, client-side for multiple)
+    if (selectedTeams.length > 1) {
       filtered = filtered.filter(player =>
         selectedTeams.includes(player.player.team)
       );
     }
 
-    // Position filter
-    if (selectedPositions.length > 0) {
+    // Position filter (handled by API for single position, client-side for multiple)
+    if (selectedPositions.length > 1) {
       filtered = filtered.filter(player =>
         selectedPositions.includes(player.player.position)
       );
@@ -254,15 +286,37 @@ const Players = () => {
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                placeholder="Search players or teams..."
+                placeholder="Search players or teams... (real-time)"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                inputRef={searchInputRef}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
                       <Search />
                     </InputAdornment>
-                  )
+                  ),
+                  endAdornment: searchLoading && searchTerm ? (
+                    <InputAdornment position="end">
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ mr: 1 }}>
+                          Searching...
+                        </Typography>
+                      </Box>
+                    </InputAdornment>
+                  ) : null
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    transition: 'all 0.2s ease-in-out',
+                    '&:hover': {
+                      borderColor: theme.palette.primary.main,
+                    },
+                    '&.Mui-focused': {
+                      borderColor: theme.palette.primary.main,
+                      boxShadow: `0 0 0 2px ${alpha(theme.palette.primary.main, 0.1)}`,
+                    }
+                  }
                 }}
               />
             </Grid>
@@ -341,30 +395,69 @@ const Players = () => {
                 <IconButton
                   onClick={() => setViewMode('table')}
                   color={viewMode === 'table' ? 'primary' : 'default'}
+                  title="Table View"
                 >
                   <ViewList />
                 </IconButton>
                 <IconButton
                   onClick={() => setViewMode('cards')}
                   color={viewMode === 'cards' ? 'primary' : 'default'}
+                  title="Card View"
                 >
                   <ViewModule />
                 </IconButton>
-                <IconButton onClick={loadPlayers}>
+                <IconButton 
+                  onClick={loadPlayers}
+                  title="Refresh Data"
+                >
                   <Refresh />
                 </IconButton>
+                {(searchTerm || selectedTeams.length > 0 || selectedPositions.length > 0) && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setSelectedTeams([]);
+                      setSelectedPositions([]);
+                    }}
+                    sx={{ ml: 1, minWidth: 'auto' }}
+                  >
+                    Clear
+                  </Button>
+                )}
               </Box>
             </Grid>
           </Grid>
 
-          {/* Results Summary */}
+          {/* Results Summary with Real-time Status */}
           <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
-            <Typography variant="body2" color="text.secondary">
-              Showing {paginatedPlayers.length} of {filteredPlayers.length} players
-              {searchTerm && ` for "${searchTerm}"`}
-              {selectedTeams.length > 0 && ` • ${selectedTeams.length} team(s) selected`}
-              {selectedPositions.length > 0 && ` • ${selectedPositions.length} position(s) selected`}
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                Showing {paginatedPlayers.length} of {filteredPlayers.length} players
+                {searchTerm && ` for "${searchTerm}"`}
+                {selectedTeams.length > 0 && ` • ${selectedTeams.length} team(s) selected`}
+                {selectedPositions.length > 0 && ` • ${selectedPositions.length} position(s) selected`}
+              </Typography>
+              {searchLoading && (
+                <Chip 
+                  label="Updating..." 
+                  size="small" 
+                  color="primary" 
+                  variant="outlined"
+                  sx={{ ml: 'auto' }}
+                />
+              )}
+              {!searchLoading && !loading && (searchTerm || selectedTeams.length > 0 || selectedPositions.length > 0) && (
+                <Chip 
+                  label="Live Search Active" 
+                  size="small" 
+                  color="success" 
+                  variant="outlined"
+                  sx={{ ml: 'auto' }}
+                />
+              )}
+            </Box>
           </Box>
         </CardContent>
       </Card>
