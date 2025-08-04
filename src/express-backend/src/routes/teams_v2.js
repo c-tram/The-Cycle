@@ -90,6 +90,94 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/teams/standings - League standings with advanced metrics
+router.get('/standings', async (req, res) => {
+  try {
+    const { year = '2025', league, division } = req.query;
+    
+    const pattern = `team:*:${year}:season`;
+    const keys = await getKeysByPattern(pattern);
+    const teamData = await getMultipleKeys(keys);
+    
+    if (teamData.length === 0) {
+      return res.json({ standings: [], year });
+    }
+    
+    let standings = teamData.map(team => {
+      const keyParts = team.key.split(':');
+      const teamId = keyParts[1];
+      const record = team.data.record || { wins: 0, losses: 0 };
+      const winPct = calculateWinPercentage(record);
+      
+      return {
+        id: teamId,
+        name: team.data.name || teamId,
+        league: team.data.league || 'Unknown',
+        division: team.data.division || 'Unknown',
+        wins: record.wins || 0,
+        losses: record.losses || 0,
+        winPercentage: winPct,
+        gamesBack: 0, // Will be calculated later
+        runsScored: team.data.batting?.runs || 0,
+        runsAllowed: team.data.pitching?.earnedRuns || 0,
+        runDifferential: (team.data.batting?.runs || 0) - (team.data.pitching?.earnedRuns || 0),
+        streak: team.data.currentStreak || { type: 'W', count: 1 },
+        homeRecord: team.data.homeRecord || { wins: 0, losses: 0 },
+        awayRecord: team.data.awayRecord || { wins: 0, losses: 0 },
+        lastTen: team.data.lastTenGames || { wins: 5, losses: 5 }
+      };
+    });
+    
+    // Apply filters
+    if (league) {
+      standings = standings.filter(team => team.league.toLowerCase() === league.toLowerCase());
+    }
+    
+    if (division) {
+      standings = standings.filter(team => team.division.toLowerCase() === division.toLowerCase());
+    }
+    
+    // Sort by win percentage (then by run differential as tiebreaker)
+    standings.sort((a, b) => {
+      if (Math.abs(a.winPercentage - b.winPercentage) < 0.001) {
+        return b.runDifferential - a.runDifferential;
+      }
+      return b.winPercentage - a.winPercentage;
+    });
+    
+    // Calculate games back
+    if (standings.length > 0) {
+      const leader = standings[0];
+      const leaderGamesAhead = leader.wins - leader.losses;
+      
+      standings.forEach((team, index) => {
+        if (index === 0) {
+          team.gamesBack = 0;
+        } else {
+          const teamGamesAhead = team.wins - team.losses;
+          team.gamesBack = (leaderGamesAhead - teamGamesAhead) / 2;
+        }
+        team.rank = index + 1;
+      });
+    }
+    
+    res.json({
+      standings,
+      year,
+      filters: { league, division },
+      summary: {
+        totalTeams: standings.length,
+        averageWinPct: standings.reduce((sum, team) => sum + team.winPercentage, 0) / standings.length,
+        highestRunDiff: Math.max(...standings.map(t => t.runDifferential)),
+        lowestRunDiff: Math.min(...standings.map(t => t.runDifferential))
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching standings:', err);
+    res.status(500).json({ error: 'Failed to fetch standings' });
+  }
+});
+
 // GET /api/teams/:teamId - Comprehensive individual team data
 router.get('/:teamId', async (req, res) => {
   try {
@@ -257,94 +345,6 @@ router.get('/:teamId/splits', async (req, res) => {
   } catch (err) {
     console.error('Error fetching team splits:', err);
     res.status(500).json({ error: 'Failed to fetch team splits' });
-  }
-});
-
-// GET /api/teams/standings - League standings with advanced metrics
-router.get('/standings', async (req, res) => {
-  try {
-    const { year = '2025', league, division } = req.query;
-    
-    const pattern = `team:*:${year}:season`;
-    const keys = await getKeysByPattern(pattern);
-    const teamData = await getMultipleKeys(keys);
-    
-    if (teamData.length === 0) {
-      return res.json({ standings: [], year });
-    }
-    
-    let standings = teamData.map(team => {
-      const keyParts = team.key.split(':');
-      const teamId = keyParts[1];
-      const record = team.data.record || { wins: 0, losses: 0 };
-      const winPct = calculateWinPercentage(record);
-      
-      return {
-        id: teamId,
-        name: team.data.name || teamId,
-        league: team.data.league || 'Unknown',
-        division: team.data.division || 'Unknown',
-        wins: record.wins || 0,
-        losses: record.losses || 0,
-        winPercentage: winPct,
-        gamesBack: 0, // Will be calculated later
-        runsScored: team.data.batting?.runs || 0,
-        runsAllowed: team.data.pitching?.earnedRuns || 0,
-        runDifferential: (team.data.batting?.runs || 0) - (team.data.pitching?.earnedRuns || 0),
-        streak: team.data.currentStreak || { type: 'W', count: 1 },
-        homeRecord: team.data.homeRecord || { wins: 0, losses: 0 },
-        awayRecord: team.data.awayRecord || { wins: 0, losses: 0 },
-        lastTen: team.data.lastTenGames || { wins: 5, losses: 5 }
-      };
-    });
-    
-    // Apply filters
-    if (league) {
-      standings = standings.filter(team => team.league.toLowerCase() === league.toLowerCase());
-    }
-    
-    if (division) {
-      standings = standings.filter(team => team.division.toLowerCase() === division.toLowerCase());
-    }
-    
-    // Sort by win percentage (then by run differential as tiebreaker)
-    standings.sort((a, b) => {
-      if (Math.abs(a.winPercentage - b.winPercentage) < 0.001) {
-        return b.runDifferential - a.runDifferential;
-      }
-      return b.winPercentage - a.winPercentage;
-    });
-    
-    // Calculate games back
-    if (standings.length > 0) {
-      const leader = standings[0];
-      const leaderGamesAhead = leader.wins - leader.losses;
-      
-      standings.forEach((team, index) => {
-        if (index === 0) {
-          team.gamesBack = 0;
-        } else {
-          const teamGamesAhead = team.wins - team.losses;
-          team.gamesBack = (leaderGamesAhead - teamGamesAhead) / 2;
-        }
-        team.rank = index + 1;
-      });
-    }
-    
-    res.json({
-      standings,
-      year,
-      filters: { league, division },
-      summary: {
-        totalTeams: standings.length,
-        averageWinPct: standings.reduce((sum, team) => sum + team.winPercentage, 0) / standings.length,
-        highestRunDiff: Math.max(...standings.map(t => t.runDifferential)),
-        lowestRunDiff: Math.min(...standings.map(t => t.runDifferential))
-      }
-    });
-  } catch (err) {
-    console.error('Error fetching standings:', err);
-    res.status(500).json({ error: 'Failed to fetch standings' });
   }
 });
 
