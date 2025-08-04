@@ -11,7 +11,7 @@ echo ""
 # Set environment variables for Redis connection
 export REDIS_HOST="thecycle.redis.cache.windows.net"
 export REDIS_PORT="6380"
-export REDIS_PASSWORD="YDZR6F2GsiwtkRYqwHL2WU47tbRr5nIf5AzCaBd7ItQ="
+export REDIS_PASSWORD="$REDIS_ACCESS_KEY"  # Use environment variable instead of hardcoded secret
 export REDIS_TLS="true"
 export NODE_ENV="production"
 
