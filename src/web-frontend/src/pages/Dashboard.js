@@ -223,10 +223,10 @@ const Dashboard = () => {
             <Grid item xs={12} sm={6} md={3}>
               <SummaryCard
                 title="Games Played"
-                value={summary?.summary?.totalGameDates || 0}
+                value={summary?.summary?.totalGames || 0}
                 icon={<SportsBaseball />}
                 color={theme.palette.success.main}
-                subtitle="Season progress"
+                subtitle={`${summary?.summary?.totalGameDates || 0} days`}
                 trend={{ value: 2.1, positive: true }}
               />
             </Grid>
@@ -248,8 +248,8 @@ const Dashboard = () => {
                 value={summary?.summary?.averagePlayersPerGame || 0}
                 icon={<Timeline />}
                 color={theme.palette.info.main}
-                subtitle="Per game"
-                trend={{ value: 0.3, positive: false }}
+                subtitle={`${summary?.summary?.averageGamesPerDay || 0} games/day`}
+                trend={{ value: 12.4, positive: true }}
               />
             </Grid>
           </Grid>

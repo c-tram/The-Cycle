@@ -24,15 +24,20 @@ router.get('/summary', async (req, res) => {
       getKeysByPattern(`team:*:${year}:????-??-??`)
     ]);
     
-    // Calculate unique dates to get total games
+    // Calculate unique dates and actual games
     const uniqueDates = new Set();
+    const uniqueGameIds = new Set();
+    
     playerGameKeys.forEach(key => {
       const date = key.split(':').pop();
       if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
         uniqueDates.add(date);
       }
     });
-
+    
+    // Calculate actual games by counting team games (each MLB game has 2 teams)
+    const actualGames = Math.round(teamGameKeys.length / 2);
+    
     res.json({
       year,
       summary: {
@@ -41,7 +46,9 @@ router.get('/summary', async (req, res) => {
         totalPlayerGames: playerGameKeys.length,
         totalTeamGames: teamGameKeys.length,
         totalGameDates: uniqueDates.size,
-        averagePlayersPerGame: uniqueDates.size > 0 ? Math.round(playerGameKeys.length / uniqueDates.size) : 0
+        totalGames: actualGames,
+        averagePlayersPerGame: actualGames > 0 ? Math.round(playerGameKeys.length / actualGames) : 0,
+        averageGamesPerDay: uniqueDates.size > 0 ? Math.round(actualGames / uniqueDates.size) : 0
       },
       dataStructure: {
         playerSeasonStats: playerSeasonKeys.length,
