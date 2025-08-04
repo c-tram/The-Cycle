@@ -35,24 +35,25 @@ app.get('/api/redis-health', async (req, res) => {
   }
 });
 
-// Import routes
-const playerRoutes = require('./routes/players');
+// Import v2 routes (improved versions)
 const playerRoutesV2 = require('./routes/players_v2');
-const teamRoutes = require('./routes/teams');
 const teamRoutesV2 = require('./routes/teams_v2');
-const matchupRoutes = require('./routes/matchups');
-const statsRoutes = require('./routes/stats');
 const statsRoutesV2 = require('./routes/stats_v2');
+const matchupRoutes = require('./routes/matchups');
 const standingsRoutes = require('./routes/standings');
 
-// Use routes
-app.use('/api/players', playerRoutes);
+// Use v2 routes as primary API
 app.use('/api/v2/players', playerRoutesV2);
-app.use('/api/teams', teamRoutes);
 app.use('/api/v2/teams', teamRoutesV2);
-app.use('/api/matchups', matchupRoutes);
-app.use('/api/stats', statsRoutes);
 app.use('/api/v2/stats', statsRoutesV2);
+
+// Legacy v1 endpoints redirected to v2 for backward compatibility
+app.use('/api/players', playerRoutesV2);
+app.use('/api/teams', teamRoutesV2);
+app.use('/api/stats', statsRoutesV2);
+
+// Additional routes
+app.use('/api/matchups', matchupRoutes);
 app.use('/api/standings', standingsRoutes);
 
 // Error handling middleware
