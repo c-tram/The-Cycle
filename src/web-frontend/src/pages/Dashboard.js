@@ -16,7 +16,9 @@ import {
   ListItem,
   ListItemText,
   ListItemAvatar,
-  Button
+  Button,
+  LinearProgress,
+  Tooltip
 } from '@mui/material';
 import {
   TrendingUp,
@@ -28,13 +30,16 @@ import {
   Star,
   Timeline,
   Refresh,
-  ArrowForward
+  ArrowForward,
+  EmojiEvents,
+  Speed,
+  LocalFireDepartment
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 // API and utils
-import { statsApi } from '../services/apiService';
+import { statsApi, playersApi, teamsApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
 
 // Chart components (we'll create these)
@@ -48,6 +53,9 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState(null);
   const [leaders, setLeaders] = useState({});
+  const [teams, setTeams] = useState([]);
+  const [topPerformers, setTopPerformers] = useState([]);
+  const [standings, setStandings] = useState([]);
   const [recentUpdates, setRecentUpdates] = useState([]);
   const [error, setError] = useState(null);
 
@@ -60,55 +68,80 @@ const Dashboard = () => {
       setLoading(true);
       setError(null);
 
-      // Load parallel data
+      // Load comprehensive dashboard data using all API endpoints
       const [
         summaryData,
         battingLeaders,
         pitchingLeaders,
         homeRunLeaders,
-        eraLeaders
+        opsLeaders,
+        eraLeaders,
+        strikeoutLeaders,
+        teamsData,
+        standingsData
       ] = await Promise.all([
-        statsApi.getSummary(),
-        statsApi.getLeaders({ category: 'batting', stat: 'avg', limit: 5 }),
-        statsApi.getLeaders({ category: 'pitching', stat: 'era', limit: 5 }),
-        statsApi.getLeaders({ category: 'batting', stat: 'homeRuns', limit: 5 }),
-        statsApi.getLeaders({ category: 'pitching', stat: 'era', limit: 3 })
+        statsApi.getSummary().catch(() => null),
+        statsApi.getLeaders({ category: 'batting', stat: 'avg', limit: 5, minGames: 1, minAtBats: 3 }).catch(() => ({ leaders: [] })),
+        statsApi.getLeaders({ category: 'pitching', stat: 'era', limit: 5, minGames: 1, minInnings: 1 }).catch(() => ({ leaders: [] })),
+        statsApi.getLeaders({ category: 'batting', stat: 'homeRuns', limit: 5, minGames: 1, minAtBats: 3 }).catch(() => ({ leaders: [] })),
+        statsApi.getLeaders({ category: 'batting', stat: 'ops', limit: 5, minGames: 1, minAtBats: 3 }).catch(() => ({ leaders: [] })),
+        statsApi.getLeaders({ category: 'pitching', stat: 'era', limit: 3, minGames: 1, minInnings: 1 }).catch(() => ({ leaders: [] })),
+        statsApi.getLeaders({ category: 'pitching', stat: 'strikeOuts', limit: 5, minGames: 1, minInnings: 1 }).catch(() => ({ leaders: [] })),
+        teamsApi.getTeams({ sortBy: 'winPct', limit: 30 }).catch(() => ({ teams: [] })),
+        teamsApi.getStandings().catch(() => ({ standings: [] }))
       ]);
 
       setSummary(summaryData);
       setLeaders({
-        batting: battingLeaders.leaders,
-        pitching: pitchingLeaders.leaders,
-        homeRuns: homeRunLeaders.leaders,
-        era: eraLeaders.leaders
+        batting: battingLeaders.leaders || [],
+        pitching: pitchingLeaders.leaders || [],
+        homeRuns: homeRunLeaders.leaders || [],
+        ops: opsLeaders.leaders || [],
+        era: eraLeaders.leaders || [],
+        strikeouts: strikeoutLeaders.leaders || []
       });
+      
+      setTeams(teamsData.teams || []);
+      setStandings(standingsData.standings || teamsData.teams?.slice(0, 10) || []);
 
-      // Simulate recent updates
-      setRecentUpdates([
+      // Create top performers from various categories
+      const performers = [
+        ...(battingLeaders.leaders || []).slice(0, 2).map(p => ({ ...p, category: 'Batting Average', icon: 'avg' })),
+        ...(homeRunLeaders.leaders || []).slice(0, 2).map(p => ({ ...p, category: 'Home Runs', icon: 'hr' })),
+        ...(eraLeaders.leaders || []).slice(0, 2).map(p => ({ ...p, category: 'ERA', icon: 'era' }))
+      ];
+      setTopPerformers(performers);
+
+      // Generate recent activity from leaders data
+      const updates = [
         {
           type: 'player',
-          player: 'Aaron Judge',
-          team: 'NYY',
-          stat: 'Home Run',
-          value: '42nd',
-          timestamp: '2 minutes ago'
+          player: battingLeaders.leaders?.[0]?.player?.name || 'Top Hitter',
+          team: battingLeaders.leaders?.[0]?.player?.team || 'MLB',
+          stat: 'Leading AL in Batting',
+          value: `${battingLeaders.leaders?.[0]?.value || '---'}`,
+          timestamp: '1 hour ago',
+          icon: <Star />
+        },
+        {
+          type: 'player',
+          player: homeRunLeaders.leaders?.[0]?.player?.name || 'Power Hitter',
+          team: homeRunLeaders.leaders?.[0]?.player?.team || 'MLB',
+          stat: 'Home Run Leader',
+          value: `${homeRunLeaders.leaders?.[0]?.value || 0} HRs`,
+          timestamp: '2 hours ago',
+          icon: <LocalFireDepartment />
         },
         {
           type: 'team',
-          team: 'NYY',
-          stat: 'Win',
-          value: '7-4 vs BOS',
-          timestamp: '1 hour ago'
-        },
-        {
-          type: 'milestone',
-          player: 'Gerrit Cole',
-          team: 'NYY',
-          stat: '200 Strikeouts',
-          value: 'Season milestone',
-          timestamp: '3 hours ago'
+          team: teamsData.teams?.[0]?.id || 'TOP',
+          stat: 'Best Record',
+          value: `${teamsData.teams?.[0]?.record?.wins || 0}-${teamsData.teams?.[0]?.record?.losses || 0}`,
+          timestamp: '3 hours ago',
+          icon: <EmojiEvents />
         }
-      ]);
+      ];
+      setRecentUpdates(updates);
 
     } catch (err) {
       console.error('Error loading dashboard data:', err);
