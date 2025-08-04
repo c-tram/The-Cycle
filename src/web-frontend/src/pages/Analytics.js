@@ -8,6 +8,7 @@ import {
   Tabs,
   Tab,
   TextField,
+  Autocomplete,
   FormControl,
   InputLabel,
   Select,
@@ -45,17 +46,21 @@ const Analytics = () => {
 
   // Player Analytics State
   const [selectedPlayer, setSelectedPlayer] = useState('');
+  const [playerOptions, setPlayerOptions] = useState([]);
+  const [playerSearchLoading, setPlayerSearchLoading] = useState(false);
   const [playerSplits, setPlayerSplits] = useState(null);
   const [playerTrends, setPlayerTrends] = useState(null);
   const [advancedStats, setAdvancedStats] = useState(null);
 
   // Team Analytics State
   const [selectedTeam, setSelectedTeam] = useState('');
+  const [teamOptions, setTeamOptions] = useState([]);
+  const [teamSearchLoading, setTeamSearchLoading] = useState(false);
   const [teamAnalytics, setTeamAnalytics] = useState(null);
   const [teamSchedule, setTeamSchedule] = useState(null);
 
   // Comparison State
-  const [comparisonPlayers, setComparisonPlayers] = useState(['', '']);
+  const [comparisonPlayers, setComparisonPlayers] = useState([null, null]);
   const [comparisonData, setComparisonData] = useState(null);
 
   // Leaders State
@@ -69,14 +74,71 @@ const Analytics = () => {
     setData(null);
   };
 
+  // Search functions for autocomplete
+  const searchPlayers = async (query) => {
+    if (!query || query.length < 2) {
+      setPlayerOptions([]);
+      return;
+    }
+    
+    setPlayerSearchLoading(true);
+    try {
+      const response = await playersApi.searchPlayers(query, { limit: 20 });
+      const options = response.players?.map(player => ({
+        id: player.id,
+        label: `${player.name} (${player.team}) - ${player.position}`,
+        value: player.id,
+        name: player.name,
+        team: player.team,
+        position: player.position
+      })) || [];
+      setPlayerOptions(options);
+    } catch (error) {
+      console.error('Error searching players:', error);
+      setPlayerOptions([]);
+    } finally {
+      setPlayerSearchLoading(false);
+    }
+  };
+
+  const searchTeams = async (query) => {
+    if (!query || query.length < 1) {
+      setTeamOptions([]);
+      return;
+    }
+    
+    setTeamSearchLoading(true);
+    try {
+      const response = await teamsApi.getTeams();
+      const filteredTeams = response.teams?.filter(team => 
+        team.name?.toLowerCase().includes(query.toLowerCase()) ||
+        team.id?.toLowerCase().includes(query.toLowerCase())
+      ) || [];
+      
+      const options = filteredTeams.map(team => ({
+        id: team.id,
+        label: `${team.name} (${team.id})`,
+        value: team.id,
+        name: team.name
+      }));
+      setTeamOptions(options);
+    } catch (error) {
+      console.error('Error searching teams:', error);
+      setTeamOptions([]);
+    } finally {
+      setTeamSearchLoading(false);
+    }
+  };
+
   const loadPlayerAnalytics = async () => {
     if (!selectedPlayer) return;
     
     setLoading(true);
     try {
+      const playerId = typeof selectedPlayer === 'object' ? selectedPlayer.id : selectedPlayer;
       const [splits, advanced] = await Promise.all([
-        playersApi.getPlayerSplits(selectedPlayer).catch(() => null),
-        statsApi.getAdvancedPlayerStats(selectedPlayer).catch(() => null)
+        playersApi.getPlayerSplits(playerId).catch(() => null),
+        statsApi.getAdvancedPlayerStats(playerId).catch(() => null)
       ]);
       
       setPlayerSplits(splits);
@@ -93,9 +155,10 @@ const Analytics = () => {
     
     setLoading(true);
     try {
+      const teamId = typeof selectedTeam === 'object' ? selectedTeam.id : selectedTeam;
       const [teamData, schedule] = await Promise.all([
-        teamsApi.getTeam(selectedTeam, { includeRoster: 'true' }).catch(() => null),
-        teamsApi.getTeamSchedule(selectedTeam, { limit: 20 }).catch(() => null)
+        teamsApi.getTeam(teamId, { includeRoster: 'true' }).catch(() => null),
+        teamsApi.getTeamSchedule(teamId, { limit: 20 }).catch(() => null)
       ]);
       
       setTeamAnalytics(teamData);
@@ -108,7 +171,9 @@ const Analytics = () => {
   };
 
   const loadComparison = async () => {
-    const validPlayers = comparisonPlayers.filter(p => p.trim());
+    const validPlayers = comparisonPlayers
+      .map(p => typeof p === 'object' ? p.id : p)
+      .filter(p => p && p.trim());
     if (validPlayers.length < 2) return;
     
     setLoading(true);
@@ -199,11 +264,47 @@ const Analytics = () => {
                   <Typography variant="h6" gutterBottom>
                     Select Player
                   </Typography>
-                  <TextField
+                  <Autocomplete
                     fullWidth
-                    label="Player ID (e.g., NYY-Aaron_Judge-2025)"
+                    options={playerOptions}
                     value={selectedPlayer}
-                    onChange={(e) => setSelectedPlayer(e.target.value)}
+                    onChange={(event, newValue) => setSelectedPlayer(newValue)}
+                    onInputChange={(event, newInputValue) => {
+                      if (newInputValue !== (selectedPlayer?.label || '')) {
+                        searchPlayers(newInputValue);
+                      }
+                    }}
+                    loading={playerSearchLoading}
+                    loadingText="Searching players..."
+                    noOptionsText="No players found. Try typing a name or team."
+                    getOptionLabel={(option) => option?.label || ''}
+                    isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Search for player (name, team, position)"
+                        placeholder="e.g., Aaron Judge, NYY, Pitcher"
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {playerSearchLoading ? <LinearProgress /> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props}>
+                        <Box>
+                          <Typography variant="body1">{option.name}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {option.team} • {option.position}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
                     sx={{ mb: 2 }}
                   />
                   <Button
@@ -265,17 +366,49 @@ const Analytics = () => {
                   <Typography variant="h6" gutterBottom>
                     Select Team
                   </Typography>
-                  <FormControl fullWidth sx={{ mb: 2 }}>
-                    <InputLabel>Team</InputLabel>
-                    <Select
-                      value={selectedTeam}
-                      onChange={(e) => setSelectedTeam(e.target.value)}
-                    >
-                      {['NYY', 'BOS', 'LAD', 'SF', 'HOU', 'ATL', 'CHC', 'NYM', 'PHI', 'TB'].map(team => (
-                        <MenuItem key={team} value={team}>{team}</MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <Autocomplete
+                    fullWidth
+                    options={teamOptions}
+                    value={selectedTeam}
+                    onChange={(event, newValue) => setSelectedTeam(newValue)}
+                    onInputChange={(event, newInputValue) => {
+                      if (newInputValue !== (selectedTeam?.label || '')) {
+                        searchTeams(newInputValue);
+                      }
+                    }}
+                    loading={teamSearchLoading}
+                    loadingText="Searching teams..."
+                    noOptionsText="No teams found. Try typing a team name or code."
+                    getOptionLabel={(option) => option?.label || ''}
+                    isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Search for team (name or code)"
+                        placeholder="e.g., Yankees, NYY, Dodgers"
+                        InputProps={{
+                          ...params.InputProps,
+                          endAdornment: (
+                            <>
+                              {teamSearchLoading ? <LinearProgress /> : null}
+                              {params.InputProps.endAdornment}
+                            </>
+                          ),
+                        }}
+                      />
+                    )}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props}>
+                        <Box>
+                          <Typography variant="body1">{option.name}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {option.id}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
+                    sx={{ mb: 2 }}
+                  />
                   <Button
                     variant="contained"
                     onClick={loadTeamAnalytics}
@@ -338,18 +471,62 @@ const Analytics = () => {
                   <Typography variant="h6" gutterBottom>
                     Compare Players
                   </Typography>
-                  <TextField
+                  <Autocomplete
                     fullWidth
-                    label="Player 1 ID"
-                    value={comparisonPlayers[0]}
-                    onChange={(e) => setComparisonPlayers([e.target.value, comparisonPlayers[1]])}
+                    options={playerOptions}
+                    value={comparisonPlayers[0] ? playerOptions.find(p => p.id === (typeof comparisonPlayers[0] === 'object' ? comparisonPlayers[0].id : comparisonPlayers[0])) || null : null}
+                    onChange={(event, newValue) => {
+                      const playerId = newValue ? newValue.id : '';
+                      setComparisonPlayers([playerId, comparisonPlayers[1]]);
+                    }}
+                    onInputChange={(event, newInputValue) => {
+                      if (newInputValue.length > 2) {
+                        searchPlayers(newInputValue);
+                      }
+                    }}
+                    getOptionLabel={(option) => `${option.fullName} (${option.primaryPosition})`}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props}>
+                        <div>
+                          <Typography variant="subtitle1">{option.fullName}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {option.currentTeam?.name} - {option.primaryPosition}
+                          </Typography>
+                        </div>
+                      </Box>
+                    )}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Search Player 1" variant="outlined" />
+                    )}
                     sx={{ mb: 2 }}
                   />
-                  <TextField
+                  <Autocomplete
                     fullWidth
-                    label="Player 2 ID"
-                    value={comparisonPlayers[1]}
-                    onChange={(e) => setComparisonPlayers([comparisonPlayers[0], e.target.value])}
+                    options={playerOptions}
+                    value={comparisonPlayers[1] ? playerOptions.find(p => p.id === (typeof comparisonPlayers[1] === 'object' ? comparisonPlayers[1].id : comparisonPlayers[1])) || null : null}
+                    onChange={(event, newValue) => {
+                      const playerId = newValue ? newValue.id : '';
+                      setComparisonPlayers([comparisonPlayers[0], playerId]);
+                    }}
+                    onInputChange={(event, newInputValue) => {
+                      if (newInputValue.length > 2) {
+                        searchPlayers(newInputValue);
+                      }
+                    }}
+                    getOptionLabel={(option) => `${option.fullName} (${option.primaryPosition})`}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props}>
+                        <div>
+                          <Typography variant="subtitle1">{option.fullName}</Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {option.currentTeam?.name} - {option.primaryPosition}
+                          </Typography>
+                        </div>
+                      </Box>
+                    )}
+                    renderInput={(params) => (
+                      <TextField {...params} label="Search Player 2" variant="outlined" />
+                    )}
                     sx={{ mb: 2 }}
                   />
                   <Button
