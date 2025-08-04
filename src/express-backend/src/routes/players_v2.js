@@ -111,8 +111,8 @@ router.get('/:playerId', async (req, res) => {
     const { playerId } = req.params;
     const { year = '2025', includeGameLog = 'false' } = req.query;
     
-    // Get season stats
-    const seasonKey = `player:${playerId}-${year}:season`;
+    // Get season stats - playerId already includes year, so don't add it again
+    const seasonKey = `player:${playerId}:season`;
     const seasonData = await getRedisClient().get(seasonKey);
     const seasonStats = parseRedisData(seasonData);
     
@@ -149,7 +149,7 @@ router.get('/:playerId', async (req, res) => {
     
     // Include game log if requested
     if (includeGameLog === 'true') {
-      const gameKeys = await getKeysByPattern(`player:${playerId}-${year}:????-??-??`);
+      const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??`);
       const gameData = await getMultipleKeys(gameKeys);
       
       response.gameLog = gameData
@@ -183,7 +183,7 @@ router.get('/:playerId/splits', async (req, res) => {
     const { year = '2025', splitType = 'all' } = req.query;
     
     // Get all games for the player
-    const gameKeys = await getKeysByPattern(`player:${playerId}-${year}:????-??-??`);
+    const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??`);
     const gameData = await getMultipleKeys(gameKeys);
     
     if (gameData.length === 0) {
@@ -217,7 +217,7 @@ router.get('/:playerId/trends', async (req, res) => {
     const { playerId } = req.params;
     const { year = '2025', period = '30' } = req.query;
     
-    const gameKeys = await getKeysByPattern(`player:${playerId}-${year}:????-??-??`);
+    const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??`);
     const gameData = await getMultipleKeys(gameKeys);
     
     if (gameData.length === 0) {
@@ -267,7 +267,7 @@ router.post('/compare', async (req, res) => {
     const comparisons = [];
     
     for (const playerId of players) {
-      const seasonKey = `player:${playerId}-${year}:season`;
+      const seasonKey = `player:${playerId}:season`;
       const seasonData = await getRedisClient().get(seasonKey);
       const seasonStats = parseRedisData(seasonData);
       
@@ -291,7 +291,7 @@ router.post('/compare', async (req, res) => {
         
         // Add advanced metrics if requested
         if (metrics === 'advanced') {
-          const gameKeys = await getKeysByPattern(`player:${playerId}-${year}:????-??-??`);
+          const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??`);
           const gameData = await getMultipleKeys(gameKeys);
           playerComparison.advanced = calculateAdvancedMetrics(seasonStats, gameData);
         }
