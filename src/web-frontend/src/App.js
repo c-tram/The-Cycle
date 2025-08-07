@@ -16,6 +16,7 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import Dashboard from './pages/Dashboard';
 import Players from './pages/Players';
 import PlayerDetail from './pages/PlayerDetail';
+import PlayerProfile from './pages/PlayerProfile';
 import Teams from './pages/Teams';
 import TeamDetail from './pages/TeamDetail';
 import Standings from './pages/Standings';
@@ -140,6 +141,7 @@ function App() {
 
                     {/* Players section */}
                     <Route path="/players" element={<Players />} />
+                    <Route path="/players/:team/:playerName/:year" element={<PlayerProfile />} />
                     <Route path="/players/:playerId" element={<PlayerDetail />} />
 
                     {/* Teams section */}

@@ -17,7 +17,8 @@ router.get('/', async (req, res) => {
       status = 'active',
       sortBy = 'name',
       minGames = 0,
-      category = 'batting'
+      category = 'batting',
+      playerType = 'all' // Add player type filter
     } = req.query;
     
     let pattern;
@@ -48,6 +49,7 @@ router.get('/', async (req, res) => {
           gameCount: player.data.gameCount,
           position: player.data.position || 'Unknown',
           status: player.data.status || 'active',
+          playerType: player.data.playerType || 'Unknown', // Add player type
           stats: {
             batting: player.data.batting || {},
             pitching: player.data.pitching || {},
@@ -65,13 +67,16 @@ router.get('/', async (req, res) => {
         p.stats.fielding.primaryPosition?.toLowerCase().includes(position.toLowerCase())
       );
     }
-    
+
+    // Apply player type filter
+    if (playerType !== 'all') {
+      players = players.filter(p => p.playerType === playerType);
+    }
+
     // Apply status filter
     if (status !== 'all') {
       players = players.filter(p => p.status === status);
-    }
-    
-    // Sort players
+    }    // Sort players
     players.sort((a, b) => {
       switch (sortBy) {
         case 'name':
@@ -92,10 +97,11 @@ router.get('/', async (req, res) => {
     res.json({
       players,
       count: players.length,
-      filters: { team, year, position, status, minGames, sortBy },
+      filters: { team, year, position, status, minGames, sortBy, playerType },
       available: {
         teams: [...new Set(players.map(p => p.team))].sort(),
         positions: [...new Set(players.map(p => p.position))].filter(p => p !== 'Unknown').sort(),
+        playerTypes: [...new Set(players.map(p => p.playerType))].filter(p => p !== 'Unknown').sort(),
         years: [year]
       }
     });

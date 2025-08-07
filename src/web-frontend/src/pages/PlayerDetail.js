@@ -48,7 +48,7 @@ import { themeUtils } from '../theme/theme';
 const PlayerDetail = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { playerId } = useParams();
+  const { team, playerName, year } = useParams();
   
   const [player, setPlayer] = useState(null);
   const [playerStats, setPlayerStats] = useState(null);
@@ -59,15 +59,18 @@ const PlayerDetail = () => {
   const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
-    if (playerId) {
+    if (team && playerName && year) {
       loadPlayerData();
     }
-  }, [playerId]);
+  }, [team, playerName, year]);
 
   const loadPlayerData = async () => {
     try {
       setLoading(true);
       setError(null);
+
+      // Construct player identifier from URL params
+      const playerId = `${team}/${playerName.replace(/_/g, ' ')}/${year}`;
 
       const [
         playerResponse,
@@ -139,8 +142,8 @@ const PlayerDetail = () => {
           </Button>
           
           <Card elevation={0} sx={{ 
-            background: `linear-gradient(135deg, ${alpha(themeUtils.getTeamColor(player.team), 0.05)}, ${alpha(themeUtils.getTeamColor(player.team), 0.02)})`,
-            border: `1px solid ${alpha(themeUtils.getTeamColor(player.team), 0.2)}`
+            background: `linear-gradient(135deg, ${alpha(themeUtils.getTeamColor(player?.team || team) || '#1976d2', 0.05)}, ${alpha(themeUtils.getTeamColor(player?.team || team) || '#1976d2', 0.02)})`,
+            border: `1px solid ${alpha(themeUtils.getTeamColor(player?.team || team) || '#1976d2', 0.2)}`
           }}>
             <CardContent sx={{ p: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -148,13 +151,13 @@ const PlayerDetail = () => {
                   sx={{
                     width: 80,
                     height: 80,
-                    backgroundColor: themeUtils.getTeamColor(player.team),
+                    backgroundColor: themeUtils.getTeamColor(player?.team || team) || '#1976d2',
                     mr: 3,
                     fontSize: '1.5rem',
                     fontWeight: 700
                   }}
                 >
-                  {player.team}
+                  {player.team || team}
                 </Avatar>
                 
                 <Box sx={{ flex: 1 }}>
@@ -166,8 +169,8 @@ const PlayerDetail = () => {
                     <Chip
                       label={`#${player.jerseyNumber || '---'}`}
                       sx={{
-                        backgroundColor: themeUtils.getTeamColor(player.team),
-                        color: 'white',
+                        backgroundColor: themeUtils.getTeamColor(player?.team || team) || '#1976d2',
+                        color: '#ffffff',
                         fontWeight: 700
                       }}
                     />
@@ -179,8 +182,8 @@ const PlayerDetail = () => {
                     <Chip
                       label={player.team}
                       sx={{
-                        backgroundColor: alpha(themeUtils.getTeamColor(player.team), 0.1),
-                        color: themeUtils.getTeamColor(player.team),
+                        backgroundColor: alpha(themeUtils.getTeamColor(player?.team || team) || '#1976d2', 0.1),
+                        color: themeUtils.getTeamColor(player?.team || team) || '#1976d2',
                         fontWeight: 600
                       }}
                     />

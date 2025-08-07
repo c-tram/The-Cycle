@@ -473,12 +473,30 @@ export const teamColors = {
 // Statistical performance color scales
 export const statColors = {
   // Batting average color scale
-  average: {
+  avg: {
     excellent: baseColors.success[600],  // .300+
     good: baseColors.success[400],       // .280-.299
     average: baseColors.warning[500],    // .250-.279
     poor: baseColors.error[400],         // .220-.249
     terrible: baseColors.error[600]      // <.220
+  },
+
+  // On-base percentage color scale
+  obp: {
+    excellent: baseColors.success[600],  // .380+
+    good: baseColors.success[400],       // .340-.379
+    average: baseColors.warning[500],    // .310-.339
+    poor: baseColors.error[400],         // .280-.309
+    terrible: baseColors.error[600]      // <.280
+  },
+
+  // Slugging percentage color scale
+  slg: {
+    excellent: baseColors.success[600],  // .500+
+    good: baseColors.success[400],       // .450-.499
+    average: baseColors.warning[500],    // .400-.449
+    poor: baseColors.error[400],         // .350-.399
+    terrible: baseColors.error[600]      // <.350
   },
   
   // ERA color scale (lower is better)
@@ -513,15 +531,42 @@ export const statColors = {
 export const themeUtils = {
   // Get color based on statistical performance
   getStatColor: (value, statType, theme) => {
-    const scale = statColors[statType];
+    // Safety check for theme object
+    if (!theme || !theme.palette || !theme.palette.text) {
+      return '#000000'; // fallback color
+    }
+    
+    // Safety check for statType parameter
+    if (!statType || typeof statType !== 'string') {
+      return theme.palette.text.primary;
+    }
+    
+    // Extract the actual stat name from nested paths like 'stats.batting.avg' -> 'avg'
+    const actualStatType = statType.includes('.') ? statType.split('.').pop() : statType;
+    
+    const scale = statColors[actualStatType];
     if (!scale) return theme.palette.text.primary;
 
-    switch (statType) {
-      case 'average':
+    switch (actualStatType) {
+      case 'avg':
         if (value >= 0.300) return scale.excellent;
         if (value >= 0.280) return scale.good;
         if (value >= 0.250) return scale.average;
         if (value >= 0.220) return scale.poor;
+        return scale.terrible;
+
+      case 'obp':
+        if (value >= 0.380) return scale.excellent;
+        if (value >= 0.340) return scale.good;
+        if (value >= 0.310) return scale.average;
+        if (value >= 0.280) return scale.poor;
+        return scale.terrible;
+
+      case 'slg':
+        if (value >= 0.500) return scale.excellent;
+        if (value >= 0.450) return scale.good;
+        if (value >= 0.400) return scale.average;
+        if (value >= 0.350) return scale.poor;
         return scale.terrible;
       
       case 'era':
@@ -552,7 +597,9 @@ export const themeUtils = {
 
   // Get team primary color
   getTeamColor: (teamId) => {
-    return teamColors[teamId?.toUpperCase()] || baseColors.neutral[500];
+    if (!teamId) return baseColors.neutral[500];
+    const color = teamColors[teamId?.toUpperCase()];
+    return color || baseColors.neutral[500];
   },
 
   // Get contrasting text color

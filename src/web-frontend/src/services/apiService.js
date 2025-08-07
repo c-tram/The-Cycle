@@ -122,7 +122,8 @@ export const playersApi = {
       status = 'active',
       sortBy = 'name',
       minGames = 0,
-      category = 'batting'
+      category = 'batting',
+      playerType = 'all' // Add playerType filtering
     } = params;
 
     const queryParams = new URLSearchParams({
@@ -131,6 +132,7 @@ export const playersApi = {
       sortBy,
       minGames: minGames.toString(),
       category,
+      playerType,
       ...(team && { team }),
       ...(position && { position })
     });
@@ -140,16 +142,37 @@ export const playersApi = {
   },
 
   // Comprehensive individual player data
-  getPlayer: async (playerId, params = {}) => {
+  getPlayer: async (team, playerName, year = '2025') => {
+    const playerId = `${team}-${playerName}-${year}`;
+    const response = await apiClient.get(`/v2/players/${playerId}`);
+    return response.data;
+  },
+
+  // Player game log
+  getPlayerGames: async (team, playerName, year = '2025') => {
+    const playerId = `${team}-${playerName}-${year}`;
+    const response = await apiClient.get(`/v2/players/${playerId}/games`);
+    return response.data;
+  },
+
+  // Player vs team matchups
+  getPlayerVsTeam: async (team, playerName, year, opponent) => {
+    const playerId = `${team}-${playerName}-${year}`;
+    const response = await apiClient.get(`/v2/players/${playerId}/vs/${opponent}`);
+    return response.data;
+  },
+
+  // Legacy method
+  getPlayerById: async (playerId, params = {}) => {
     const { year = '2025', includeGameLog = 'false' } = params;
     const response = await apiClient.get(`/v2/players/${playerId}?year=${year}&includeGameLog=${includeGameLog}`);
     return response.data;
   },
 
   // Player situational splits
-  getPlayerSplits: async (playerId, params = {}) => {
-    const { year = '2025', splitType = 'all' } = params;
-    const response = await apiClient.get(`/v2/players/${playerId}/splits?year=${year}&splitType=${splitType}`);
+  getPlayerSplits: async (team, playerName, year = '2025', splitType = 'all') => {
+    const playerId = `${team}-${playerName}-${year}`;
+    const response = await apiClient.get(`/v2/players/${playerId}/splits?splitType=${splitType}`);
     return response.data;
   },
 
