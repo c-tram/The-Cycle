@@ -9,6 +9,7 @@ src/express-backend/scripts/
 # Docker scripts with potential secrets
 run-docker.sh
 run-docker
+run-local.sh
 
 # Dependencies
 node_modules/

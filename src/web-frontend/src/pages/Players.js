@@ -30,7 +30,12 @@ import {
   OutlinedInput,
   Checkbox,
   ListItemText,
-  Divider
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Stack
 } from '@mui/material';
 import {
   Search,
@@ -40,10 +45,14 @@ import {
   ViewList,
   ViewModule,
   ArrowUpward,
-  ArrowDownward
+  ArrowDownward,
+  DateRange,
+  TrendingUp,
+  Analytics
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isValid } from 'date-fns';
 
 // API and utils
 import { playersApi } from '../services/apiService';
@@ -72,6 +81,12 @@ const Players = () => {
   const [sortOrder, setSortOrder] = useState('desc');
   const [dateRange, setDateRange] = useState('all'); // 'all', 'custom', or predefined ranges
   
+  // Enhanced date range functionality
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
+  const [dateRangeStats, setDateRangeStats] = useState(null); // For analytics
+  
   // View options
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
   const [page, setPage] = useState(0);
@@ -80,6 +95,107 @@ const Players = () => {
 
   // Available teams and positions
   const [teams, setTeams] = useState([]);
+
+  // Helper function to get date range for API calls
+  const getDateRangeParams = useCallback(() => {
+    const currentDate = new Date();
+    
+    switch (dateRange) {
+      case 'today':
+        return {
+          startDate: format(currentDate, 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'last1':
+        return {
+          startDate: format(subDays(currentDate, 1), 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'last3':
+        return {
+          startDate: format(subDays(currentDate, 3), 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'last7':
+        return {
+          startDate: format(subDays(currentDate, 7), 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'last14':
+        return {
+          startDate: format(subDays(currentDate, 14), 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'last30':
+        return {
+          startDate: format(subDays(currentDate, 30), 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'thisWeek':
+        return {
+          startDate: format(startOfWeek(currentDate), 'yyyy-MM-dd'),
+          endDate: format(endOfWeek(currentDate), 'yyyy-MM-dd')
+        };
+      case 'thisMonth':
+        return {
+          startDate: format(startOfMonth(currentDate), 'yyyy-MM-dd'),
+          endDate: format(endOfMonth(currentDate), 'yyyy-MM-dd')
+        };
+      case 'august':
+        return {
+          startDate: '2025-08-01',
+          endDate: '2025-08-31'
+        };
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          return {
+            startDate: customStartDate,
+            endDate: customEndDate
+          };
+        }
+        return null;
+      default:
+        return null;
+    }
+  }, [dateRange, customStartDate, customEndDate]);
+
+  // Get human-readable date range description
+  const getDateRangeDescription = useCallback(() => {
+    const params = getDateRangeParams();
+    if (!params) return 'Full Season';
+    
+    const { startDate, endDate } = params;
+    
+    switch (dateRange) {
+      case 'today': return 'Today';
+      case 'last1': return 'Last 1 Day';
+      case 'last3': return 'Last 3 Days';
+      case 'last7': return 'Last 7 Days';
+      case 'last14': return 'Last 14 Days';
+      case 'last30': return 'Last 30 Days';
+      case 'thisWeek': return 'This Week';
+      case 'thisMonth': return 'This Month';
+      case 'august': return 'August 2025';
+      case 'custom': return `${startDate} to ${endDate}`;
+      default: return 'Full Season';
+    }
+  }, [dateRange, getDateRangeParams]);
+
+  // Handle custom date range selection
+  const handleCustomDateRange = () => {
+    if (!customStartDate || !customEndDate) {
+      alert('Please select both start and end dates');
+      return;
+    }
+    
+    if (new Date(customStartDate) > new Date(customEndDate)) {
+      alert('Start date must be before end date');
+      return;
+    }
+    
+    setDateRange('custom');
+    setShowCustomDateDialog(false);
+  };
 
   useEffect(() => {
     loadPlayers();
@@ -126,32 +242,11 @@ const Players = () => {
       }
 
       // Add date range filter if not 'all'
-      if (dateRange !== 'all') {
+      const dateParams = getDateRangeParams();
+      if (dateParams) {
+        apiParams.startDate = dateParams.startDate;
+        apiParams.endDate = dateParams.endDate;
         apiParams.dateRange = dateRange;
-        
-        // Convert date range to actual dates for API
-        const currentDate = new Date();
-        switch (dateRange) {
-          case 'last7':
-            apiParams.startDate = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            apiParams.endDate = currentDate.toISOString().split('T')[0];
-            break;
-          case 'last14':
-            apiParams.startDate = new Date(currentDate.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            apiParams.endDate = currentDate.toISOString().split('T')[0];
-            break;
-          case 'last30':
-            apiParams.startDate = new Date(currentDate.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-            apiParams.endDate = currentDate.toISOString().split('T')[0];
-            break;
-          case 'august':
-            apiParams.startDate = '2025-08-01';
-            apiParams.endDate = '2025-08-31';
-            break;
-          default:
-            // For custom ranges, we'll handle this in a future enhancement
-            break;
-        }
       }
 
       const response = await playersApi.getPlayers(apiParams);
@@ -169,7 +264,7 @@ const Players = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeCategory, sortBy, sortOrder, selectedTeams, searchTerm, dateRange]);
+  }, [activeCategory, sortBy, sortOrder, selectedTeams, searchTerm, dateRange, customStartDate, customEndDate, getDateRangeParams]);
 
   // Filter and sort players with real-time search
   const filteredPlayers = useMemo(() => {
@@ -545,27 +640,62 @@ const Players = () => {
               </FormControl>
             </Grid>
 
-            {/* Date Range Filter */}
-            <Grid item xs={12} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Date Range</InputLabel>
-                <Select
-                  value={dateRange}
-                  onChange={(e) => setDateRange(e.target.value)}
-                  label="Date Range"
-                >
-                  <MenuItem value="all">Full Season</MenuItem>
-                  <MenuItem value="last7">Last 7 Days</MenuItem>
-                  <MenuItem value="last14">Last 14 Days</MenuItem>
-                  <MenuItem value="last30">Last 30 Days</MenuItem>
-                  <MenuItem value="august">August 2025</MenuItem>
-                  <MenuItem value="custom">Custom Range</MenuItem>
-                </Select>
-              </FormControl>
+            {/* Enhanced Date Range Filter */}
+            <Grid item xs={12} md={3}>
+              <Stack direction="row" spacing={1}>
+                <FormControl fullWidth>
+                  <InputLabel>Date Range</InputLabel>
+                  <Select
+                    value={dateRange}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'custom') {
+                        setShowCustomDateDialog(true);
+                      } else {
+                        setDateRange(value);
+                      }
+                    }}
+                    label="Date Range"
+                    startAdornment={
+                      <InputAdornment position="start">
+                        <DateRange fontSize="small" />
+                      </InputAdornment>
+                    }
+                  >
+                    <MenuItem value="all">Full Season</MenuItem>
+                    <Divider />
+                    <MenuItem value="today">Today</MenuItem>
+                    <MenuItem value="last1">Last 1 Day</MenuItem>
+                    <MenuItem value="last3">Last 3 Days</MenuItem>
+                    <MenuItem value="last7">Last 7 Days</MenuItem>
+                    <MenuItem value="last14">Last 14 Days</MenuItem>
+                    <MenuItem value="last30">Last 30 Days</MenuItem>
+                    <Divider />
+                    <MenuItem value="thisWeek">This Week</MenuItem>
+                    <MenuItem value="thisMonth">This Month</MenuItem>
+                    <MenuItem value="august">August 2025</MenuItem>
+                    <Divider />
+                    <MenuItem value="custom">Custom Range...</MenuItem>
+                  </Select>
+                </FormControl>
+                {dateRange !== 'all' && (
+                  <IconButton
+                    size="small"
+                    onClick={() => {
+                      // TODO: Implement analytics view for selected date range
+                      console.log('Analytics for:', getDateRangeDescription());
+                    }}
+                    title="View Analytics for Date Range"
+                    color="primary"
+                  >
+                    <TrendingUp />
+                  </IconButton>
+                )}
+              </Stack>
             </Grid>
 
             {/* View Mode */}
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={1}>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <IconButton
                   onClick={() => setViewMode('table')}
@@ -595,6 +725,8 @@ const Players = () => {
                       setSearchTerm('');
                       setSelectedTeams([]);
                       setDateRange('all');
+                      setCustomStartDate('');
+                      setCustomEndDate('');
                     }}
                     sx={{ ml: 1, minWidth: 'auto' }}
                   >
@@ -612,11 +744,7 @@ const Players = () => {
                 Showing {paginatedPlayers.length} of {categoryFilteredPlayers.length} players
                 {searchTerm && ` for "${searchTerm}"`}
                 {selectedTeams.length > 0 && ` • ${selectedTeams.length} team(s) selected`}
-                {dateRange !== 'all' && ` • ${dateRange === 'last7' ? 'Last 7 days' : 
-                  dateRange === 'last14' ? 'Last 14 days' : 
-                  dateRange === 'last30' ? 'Last 30 days' : 
-                  dateRange === 'august' ? 'August 2025' : 
-                  'Custom date range'}`}
+                {dateRange !== 'all' && ` • ${getDateRangeDescription()}`}
               </Typography>
               {searchLoading && (
                 <Chip 
@@ -701,6 +829,72 @@ const Players = () => {
           rowsPerPageOptions={[10, 25, 50, 100]}
         />
       </Card>
+
+      {/* Custom Date Range Dialog */}
+      <Dialog 
+        open={showCustomDateDialog} 
+        onClose={() => setShowCustomDateDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DateRange color="primary" />
+            Custom Date Range
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 2 }}>
+            <TextField
+              label="Start Date"
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              inputProps={{
+                max: format(new Date(), 'yyyy-MM-dd'), // Can't select future dates
+                min: '2025-03-01' // Start of 2025 season
+              }}
+            />
+            <TextField
+              label="End Date"
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              inputProps={{
+                max: format(new Date(), 'yyyy-MM-dd'), // Can't select future dates
+                min: customStartDate || '2025-03-01' // Can't be before start date
+              }}
+            />
+            {customStartDate && customEndDate && (
+              <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Selected Range: {format(new Date(customStartDate), 'MMM dd, yyyy')} - {format(new Date(customEndDate), 'MMM dd, yyyy')}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Duration: {Math.ceil((new Date(customEndDate) - new Date(customStartDate)) / (1000 * 60 * 60 * 24)) + 1} days
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowCustomDateDialog(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCustomDateRange} 
+            variant="contained"
+            disabled={!customStartDate || !customEndDate}
+            startIcon={<Analytics />}
+          >
+            Apply Range
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

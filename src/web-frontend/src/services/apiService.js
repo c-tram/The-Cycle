@@ -123,7 +123,10 @@ export const playersApi = {
       sortBy = 'name',
       minGames = 0,
       category = 'batting',
-      playerType = 'all' // Add playerType filtering
+      playerType = 'all', // Add playerType filtering
+      startDate, // Add date range support
+      endDate,   // Add date range support
+      dateRange  // Add date range support
     } = params;
 
     const queryParams = new URLSearchParams({
@@ -134,7 +137,10 @@ export const playersApi = {
       category,
       playerType,
       ...(team && { team }),
-      ...(position && { position })
+      ...(position && { position }),
+      ...(startDate && { startDate }),
+      ...(endDate && { endDate }),
+      ...(dateRange && { dateRange })
     });
 
     const response = await apiClient.get(`/v2/players?${queryParams}`);

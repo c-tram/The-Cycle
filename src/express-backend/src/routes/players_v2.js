@@ -18,18 +18,122 @@ router.get('/', async (req, res) => {
       sortBy = 'name',
       minGames = 0,
       category = 'batting',
-      playerType = 'all' // Add player type filter
+      playerType = 'all', // Add player type filter
+      startDate, // Add date range support
+      endDate,   // Add date range support
+      dateRange  // Add date range support
     } = req.query;
+    
+    // Determine if we need to use date range filtering
+    const useCustomDateRange = startDate && endDate;
     
     let pattern;
     if (team) {
-      pattern = `player:${team.toUpperCase()}-*-${year}:season`;
+      pattern = `player:${team.toUpperCase()}-*-${year}:${useCustomDateRange ? '????-??-??' : 'season'}`;
     } else {
-      pattern = `player:*-${year}:season`;
+      pattern = `player:*-${year}:${useCustomDateRange ? '????-??-??' : 'season'}`;
     }
     
     const keys = await getKeysByPattern(pattern);
-    const playerData = await getMultipleKeys(keys);
+    let playerData;
+    
+    if (useCustomDateRange) {
+      // Filter game keys by date range
+      const filteredKeys = keys.filter(key => {
+        const datePart = key.split(':').pop();
+        // Check if this is a date key (YYYY-MM-DD format)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(datePart)) return false;
+        return datePart >= startDate && datePart <= endDate;
+      });
+      
+      playerData = await getMultipleKeys(filteredKeys);
+      
+      // Aggregate data by player for the date range
+      const playerAggregates = {};
+      
+      playerData.forEach(game => {
+        const keyParts = game.key.split(':');
+        const playerKey = keyParts[1]; // e.g., "HOU-Jose_Altuve-2025"
+        
+        if (!playerAggregates[playerKey]) {
+          playerAggregates[playerKey] = {
+            gameCount: 0,
+            batting: { gamesPlayed: 0, atBats: 0, hits: 0, runs: 0, rbi: 0, homeRuns: 0, baseOnBalls: 0, strikeOuts: 0, plateAppearances: 0, doubles: 0, triples: 0, totalBases: 0, stolenBases: 0, caughtStealing: 0, hitByPitch: 0, sacFlies: 0, groundIntoDoublePlay: 0 },
+            pitching: { gamesPlayed: 0, gamesStarted: 0, wins: 0, losses: 0, saves: 0, inningsPitched: "0.0", hits: 0, runs: 0, earnedRuns: 0, homeRuns: 0, baseOnBalls: 0, strikeOuts: 0, hitByPitch: 0, battersFaced: 0 },
+            fielding: { gamesStarted: 0, assists: 0, putOuts: 0, errors: 0, chances: 0 },
+            position: game.data.gameInfo?.position || 'Unknown',
+            status: 'active'
+          };
+        }
+        
+        const agg = playerAggregates[playerKey];
+        agg.gameCount += 1;
+        
+        // Aggregate batting stats
+        if (game.data.batting) {
+          const batting = game.data.batting;
+          if (batting.atBats > 0 || batting.plateAppearances > 0) {
+            agg.batting.gamesPlayed += 1;
+            Object.keys(agg.batting).forEach(stat => {
+              if (stat !== 'gamesPlayed' && typeof batting[stat] === 'number') {
+                agg.batting[stat] += batting[stat] || 0;
+              }
+            });
+          }
+        }
+        
+        // Aggregate pitching stats
+        if (game.data.pitching) {
+          const pitching = game.data.pitching;
+          const ip = parseFloat(pitching.inningsPitched) || 0;
+          if (ip > 0 || pitching.battersFaced > 0) {
+            agg.pitching.gamesPlayed += 1;
+            Object.keys(agg.pitching).forEach(stat => {
+              if (stat === 'inningsPitched') {
+                // Handle innings pitched aggregation
+                const currentIP = parseFloat(agg.pitching.inningsPitched) || 0;
+                const gameIP = parseFloat(pitching.inningsPitched) || 0;
+                agg.pitching.inningsPitched = (currentIP + gameIP).toFixed(1);
+              } else if (stat !== 'gamesPlayed' && typeof pitching[stat] === 'number') {
+                agg.pitching[stat] += pitching[stat] || 0;
+              }
+            });
+          }
+        }
+        
+        // Aggregate fielding stats
+        if (game.data.fielding) {
+          const fielding = game.data.fielding;
+          if (fielding.chances > 0 || fielding.assists > 0 || fielding.putOuts > 0) {
+            Object.keys(agg.fielding).forEach(stat => {
+              if (typeof fielding[stat] === 'number') {
+                agg.fielding[stat] += fielding[stat] || 0;
+              }
+            });
+          }
+        }
+        
+        // Update position if available
+        if (game.data.gameInfo?.position) {
+          agg.position = game.data.gameInfo.position;
+        }
+      });
+      
+      // Convert aggregates back to the expected format
+      playerData = Object.entries(playerAggregates).map(([playerKey, data]) => ({
+        key: `player:${playerKey}:season`,
+        data: {
+          ...data,
+          // Calculate rate stats
+          batting: calculateBattingRates(data.batting),
+          pitching: calculatePitchingRates(data.pitching),
+          fielding: calculateFieldingRates(data.fielding),
+          lastUpdated: new Date().toISOString()
+        }
+      }));
+    } else {
+      playerData = await getMultipleKeys(keys);
+    }
     
     // Process and filter players
     let players = playerData
@@ -97,7 +201,7 @@ router.get('/', async (req, res) => {
     res.json({
       players,
       count: players.length,
-      filters: { team, year, position, status, minGames, sortBy, playerType },
+      filters: { team, year, position, status, minGames, sortBy, playerType, startDate, endDate, dateRange },
       available: {
         teams: [...new Set(players.map(p => p.team))].sort(),
         positions: [...new Set(players.map(p => p.position))].filter(p => p !== 'Unknown').sort(),
@@ -882,6 +986,54 @@ function calculateSearchRelevance(name, query) {
   const includes = name.toLowerCase().includes(query.toLowerCase()) ? 25 : 0;
   
   return exact || startsWith || includes;
+}
+
+// Helper functions for date range aggregation
+function calculateBattingRates(batting) {
+  const { hits = 0, atBats = 0, baseOnBalls = 0, hitByPitch = 0, sacFlies = 0, totalBases = 0, homeRuns = 0, strikeOuts = 0, plateAppearances = 0 } = batting;
+  
+  const pa = plateAppearances || (atBats + baseOnBalls + hitByPitch + sacFlies);
+  const avg = atBats > 0 ? hits / atBats : 0;
+  const obp = (atBats + baseOnBalls + hitByPitch + sacFlies) > 0 ? (hits + baseOnBalls + hitByPitch) / (atBats + baseOnBalls + hitByPitch + sacFlies) : 0;
+  const slg = atBats > 0 ? totalBases / atBats : 0;
+  const ops = obp + slg;
+  
+  return {
+    ...batting,
+    plateAppearances: pa,
+    avg: Number(avg.toFixed(3)),
+    obp: Number(obp.toFixed(3)),
+    slg: Number(slg.toFixed(3)),
+    ops: Number(ops.toFixed(3))
+  };
+}
+
+function calculatePitchingRates(pitching) {
+  const { earnedRuns = 0, inningsPitched = "0.0", baseOnBalls = 0, hits = 0, strikeOuts = 0, wins = 0, losses = 0 } = pitching;
+  
+  const ip = parseFloat(inningsPitched) || 0;
+  const era = ip > 0 ? (earnedRuns * 9) / ip : 0;
+  const whip = ip > 0 ? (baseOnBalls + hits) / ip : 0;
+  const winPercentage = (wins + losses) > 0 ? wins / (wins + losses) : 0;
+  
+  return {
+    ...pitching,
+    inningsPitched: ip.toFixed(1),
+    era: Number(era.toFixed(2)),
+    whip: Number(whip.toFixed(2)),
+    winPercentage: Number(winPercentage.toFixed(3))
+  };
+}
+
+function calculateFieldingRates(fielding) {
+  const { assists = 0, putOuts = 0, errors = 0, chances = 0 } = fielding;
+  
+  const fieldingPercentage = chances > 0 ? (putOuts + assists) / chances : 0;
+  
+  return {
+    ...fielding,
+    fieldingPercentage: Number(fieldingPercentage.toFixed(3))
+  };
 }
 
 module.exports = router;
