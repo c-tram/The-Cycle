@@ -18,7 +18,7 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Factoring Simple WAR data into CVR. Fixed Some Sorting Issues!: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Backend Script Release: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."
