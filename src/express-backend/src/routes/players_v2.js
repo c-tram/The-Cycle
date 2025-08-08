@@ -7,6 +7,74 @@ const { getRedisClient, parseRedisData, getKeysByPattern, getMultipleKeys } = re
 // Professional-grade player statistics with comprehensive data coverage
 // ============================================================================
 
+/**
+ * Normalize player name for salary key matching
+ * Removes accents, handles special characters, and creates variations for matching
+ */
+function normalizePlayerName(name) {
+  if (!name) return [];
+  
+  // Original name
+  let normalized = name.trim();
+  
+  // Create variations for matching
+  const variations = [normalized];
+  
+  // Remove accents/diacritics (é → e, ñ → n, etc.)
+  const withoutAccents = normalized
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  
+  if (withoutAccents !== normalized) {
+    variations.push(withoutAccents);
+  }
+  
+  // Replace spaces with underscores for Redis key format
+  variations.forEach(variant => {
+    const withUnderscores = variant.replace(/\s+/g, '_');
+    if (!variations.includes(withUnderscores)) {
+      variations.push(withUnderscores);
+    }
+  });
+  
+  return variations;
+}
+
+/**
+ * Fetch salary data for a player using name normalization
+ */
+async function fetchPlayerSalary(team, playerName, year = '2025') {
+  try {
+    const nameVariations = normalizePlayerName(playerName);
+    const redisClient = await getRedisClient();
+    
+    // Try different name variations
+    for (const nameVariation of nameVariations) {
+      const salaryKey = `salary:${team}-${nameVariation}-${year}`;
+      const salaryData = await redisClient.get(salaryKey);
+      
+      if (salaryData) {
+        const parsed = parseRedisData(salaryData);
+        return {
+          salary: parsed.salary,
+          status: parsed.status || 'active',
+          source: parsed.source || 'spotrac'
+        };
+      }
+    }
+    
+    return null; // No salary data found
+  } catch (error) {
+    console.error('Error fetching salary data:', error);
+    return null;
+  }
+}
+
+// ============================================================================
+// ENHANCED PLAYERS API ROUTES
+// Professional-grade player statistics with comprehensive data coverage
+// ============================================================================
+
 // GET /api/players - Enhanced player listing with comprehensive filtering
 router.get('/', async (req, res) => {
   try {
@@ -235,6 +303,9 @@ router.get('/:playerId', async (req, res) => {
     const team = playerInfo[0];
     const name = playerInfo.slice(1, -1).join(' ').replace(/_/g, ' ');
     
+    // Fetch salary data with name normalization
+    const salaryData = await fetchPlayerSalary(team, name, year);
+    
     const response = {
       id: playerId,
       name,
@@ -243,6 +314,7 @@ router.get('/:playerId', async (req, res) => {
       gameCount: seasonStats.gameCount,
       position: seasonStats.position || 'Unknown',
       status: seasonStats.status || 'active',
+      salary: salaryData, // Include salary data
       seasonStats: {
         batting: seasonStats.batting || {},
         pitching: seasonStats.pitching || {},

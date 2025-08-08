@@ -26,7 +26,9 @@ import {
   TextField,
   InputAdornment,
   CircularProgress,
-  Paper
+  Paper,
+  Tooltip,
+  IconButton
 } from '@mui/material';
 import {
   ArrowBack,
@@ -34,10 +36,10 @@ import {
   Timeline,
   Compare,
   Assessment,
-  EmojiEvents,
   Person,
   Search,
-  TrendingUp
+  TrendingUp,
+  InfoOutlined
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -45,6 +47,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 // API and utils
 import { playersApi, statsApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
+import { calculatePlayerCVR, getCVRDisplay, formatSalary } from '../utils/cvrCalculations'; // v3.0 - FIXED EXPORTS
 
 // Helper function to format innings pitched for display (e.g., 5.33 → "5.1", 5.67 → "5.2")
 const formatInningsPitched = (ip) => {
@@ -63,6 +66,120 @@ const formatInningsPitched = (ip) => {
   } else {
     return `${wholeInnings + 1}.0`; // Round up to next inning
   }
+};
+
+// CVR Explanation Component
+const CVRExplanation = ({ player, cvrData, salaryData }) => {
+  const getSalaryTierName = (salary) => {
+    if (salary >= 35000000) return 'Ultra-Mega ($35M+)';
+    if (salary >= 25000000) return 'Superstar ($25M+)';
+    if (salary >= 15000000) return 'Star ($15M+)';  
+    if (salary >= 8000000) return 'Above Average ($8M+)';
+    if (salary >= 3000000) return 'Average ($3M+)';
+    if (salary >= 1000000) return 'Below Average ($1M+)';
+    return 'Rookie/Minimum (<$1M)';
+  };
+
+  const getValueScoreBreakdown = (stats) => {
+    if (!stats) return [];
+    
+    if (stats.batting) {
+      const batting = stats.batting;
+      const avg = parseFloat(batting.battingAverage) || 0;
+      const obp = parseFloat(batting.onBasePercentage) || 0;
+      const slg = parseFloat(batting.sluggingPercentage) || 0;
+      
+      return [
+        { category: 'Batting Average', value: avg.toFixed(3), max: '30pts', note: '.320+ is elite' },
+        { category: 'On-Base %', value: obp.toFixed(3), max: '30pts', note: 'Most important stat' },
+        { category: 'Slugging %', value: slg.toFixed(3), max: '25pts', note: 'Power component' },
+        { category: 'Production/Game', value: 'Various', max: '25pts', note: 'HRs + RBIs + Runs per game' }
+      ];
+    }
+    
+    if (stats.pitching) {
+      const pitching = stats.pitching;
+      const era = parseFloat(pitching.era) || 0;
+      const whip = parseFloat(pitching.whip) || 0;
+      const ip = parseFloat(pitching.inningsPitched) || 0;
+      const so = pitching.strikeouts || 0;
+      const k9 = ip > 0 ? (so * 9) / ip : 0;
+      
+      return [
+        { category: 'ERA', value: era.toFixed(2), max: '25pts', note: 'Under 2.00 is elite' },
+        { category: 'WHIP', value: whip.toFixed(2), max: '20pts', note: 'Under 0.90 is elite' },
+        { category: 'K/9', value: k9.toFixed(1), max: '20pts', note: '11+ strikeouts per 9 innings' },
+        { category: 'Wins & Innings', value: `${pitching.wins || 0}W, ${formatInningsPitched(ip)}IP`, max: '25pts', note: 'Durability and results' }
+      ];
+    }
+    
+    return [];
+  };
+
+  const breakdown = getValueScoreBreakdown(player?.seasonStats);
+  const salary = salaryData?.salary || 0;
+  const salaryTier = getSalaryTierName(salary);
+
+  return (
+    <Box sx={{ maxWidth: 400, p: 2 }}>
+      <Typography variant="h6" sx={{ mb: 2, fontWeight: 600, color: 'primary.main' }}>
+        🏆 Cycle Value Rating (CVR) v4.0 Explained
+      </Typography>
+      
+      <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+        CVR measures player value relative to salary on a 0.0-2.0+ scale where 1.0 = average value.
+      </Typography>
+
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+          📊 Performance Score: {cvrData?.valueScore || 0}/100
+        </Typography>
+        <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1, display: 'block' }}>
+          Base Score: {cvrData?.baseValueScore || 0} × WAR Multiplier: {cvrData?.warMultiplier || 1.0} (WAR: {cvrData?.estimatedWAR || 0})
+        </Typography>
+        {breakdown.map((item, index) => (
+          <Box key={index} sx={{ ml: 1, mb: 0.5 }}>
+            <Typography variant="caption" sx={{ display: 'block' }}>
+              • {item.category}: {item.value} ({item.max}) - {item.note}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+          💰 Salary Tier: {salaryTier}
+        </Typography>
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          Tier Multiplier: {cvrData?.salaryTier || 1.0}x (Elite players get reduced salary penalties)
+        </Typography>
+      </Box>
+
+      <Box sx={{ mb: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+        <Typography variant="caption" sx={{ fontWeight: 600 }}>
+          Formula: CVR = (Performance Score ÷ 50) ÷ (Salary Tier ÷ 1.0)
+        </Typography>
+      </Box>
+
+      <Box sx={{ mb: 2 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+          📈 CVR Scale (0.0-2.0+):
+        </Typography>
+        <Box sx={{ ml: 1 }}>
+          <Typography variant="caption" sx={{ display: 'block', color: '#00C851' }}>1.8+: Elite Value 💎 (Judge, Ohtani level)</Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: '#4CAF50' }}>1.5+: Excellent Value 🔥</Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: '#8BC34A' }}>1.2+: Good Value ✅</Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: '#FFC107' }}>0.8+: Fair Value ⚡</Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: '#FF9800' }}>0.5+: Below Average ⚠️</Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: '#F44336' }}>Under 0.5: Poor Value 💸</Typography>
+        </Box>
+      </Box>
+
+      <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+        Scale: 1.0 = average value, 2.0+ = exceptional value. Elite performers can achieve high CVR despite massive salaries.
+      </Typography>
+    </Box>
+  );
 };
 
 // Helper function to parse innings pitched from string format (e.g., "5.1" = 5.33, "5.0" = 5.0)
@@ -96,6 +213,9 @@ const PlayerDetail = () => {
   const [playerStats, setPlayerStats] = useState(null);
   const [gameStats, setGameStats] = useState([]);
   const [comparisons, setComparisons] = useState([]);
+  const [salaryData, setSalaryData] = useState(null);
+  const [cvr, setCvr] = useState(null);
+  const [cvrData, setCvrData] = useState(null); // Store full CVR calculation data
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
@@ -156,6 +276,35 @@ const PlayerDetail = () => {
         similarity: 85 + Math.floor(Math.random() * 15),
         reason: ['Similar batting style', 'Comparable power numbers', 'Defensive similarity'][index] || 'Statistical match'
       })) || []);
+
+      // Use salary data from player response (already includes name normalization)
+      console.log('Player response salary data:', playerResponse.salary);
+      
+      if (playerResponse.salary && playerResponse.salary.salary) {
+        setSalaryData(playerResponse.salary);
+        
+        // Calculate CVR using the salary data that's already normalized by backend
+        console.log('🚨 ABOUT TO CALL CVR FUNCTION - FRONTEND', {
+          salary: playerResponse.salary,
+          stats: playerResponse.seasonStats,
+          calculatePlayerCVR: typeof calculatePlayerCVR
+        });
+        
+        const calculatedCVR = await calculatePlayerCVR(
+          { stats: playerResponse.seasonStats },
+          playerResponse.salary
+        );
+        
+        console.log('🚨 CVR FUNCTION RETURNED:', calculatedCVR);
+        setCvr(calculatedCVR.cvr);
+        setCvrData(calculatedCVR); // Store full CVR data for explanation
+        console.log('Calculated CVR using backend salary data:', calculatedCVR);
+      } else {
+        console.log('No salary data in player response');
+        setSalaryData(null);
+        setCvr(null);
+        setCvrData(null);
+      }
       
     } catch (err) {
       console.error('Error loading player data:', err);
@@ -287,36 +436,135 @@ const PlayerDetail = () => {
                   </Typography>
                 </Box>
                 
-                {/* Quick Stats */}
+                {/* Quick Stats - CVR Focus */}
                 <Box sx={{ textAlign: 'center', minWidth: 200 }}>
                   <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <Typography variant="h4" fontWeight={800} color="primary">
-                        {playerType === 'pitcher' 
-                          ? (playerStats?.pitching?.gamesPlayed || 0)
-                          : (player?.gameCount || playerStats?.batting?.gamesPlayed || 0)
-                        }
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Games
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="h4" fontWeight={800} color="primary">
-                        {playerType === 'pitcher' 
-                          ? (() => {
-                              const ip = parseInningsPitched(playerStats?.pitching?.inningsPitched);
-                              const er = playerStats?.pitching?.earnedRuns || 0;
-                              return ip > 0 ? ((er * 9) / ip).toFixed(2) : '---';
-                            })()
-                          : (playerStats?.batting?.atBats > 0 
-                             ? (playerStats.batting.hits / playerStats.batting.atBats).toFixed(3)
-                             : '---')
-                        }
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {playerType === 'pitcher' ? 'ERA' : 'AVG'}
-                      </Typography>
+                    <Grid item xs={12}>
+                      {(() => {
+                        const cvrDisplay = getCVRDisplay(cvr);
+                        return (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: "spring", stiffness: 200, delay: 0.3 }}
+                          >
+                            <Tooltip
+                              title={
+                                <CVRExplanation 
+                                  player={player} 
+                                  cvrData={cvrData} 
+                                  salaryData={salaryData} 
+                                />
+                              }
+                              arrow
+                              placement="top"
+                              enterDelay={300}
+                              leaveDelay={200}
+                            >
+                              <Box 
+                                sx={{ 
+                                  background: `linear-gradient(135deg, ${cvrDisplay.color}15, ${cvrDisplay.color}05)`,
+                                  border: `2px solid ${cvrDisplay.color}`,
+                                  borderRadius: 3,
+                                  padding: 2,
+                                  position: 'relative',
+                                  overflow: 'hidden',
+                                  cursor: 'help',
+                                  '&::before': {
+                                    content: '""',
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    background: `linear-gradient(45deg, transparent 30%, ${cvrDisplay.color}10 50%, transparent 70%)`,
+                                    animation: cvr && cvr > 1.2 ? 'shimmer 2s infinite' : 'none',
+                                  },
+                                  '@keyframes shimmer': {
+                                    '0%': { transform: 'translateX(-100%)' },
+                                    '100%': { transform: 'translateX(100%)' }
+                                  }
+                                }}
+                              >
+                                <Box sx={{ position: 'relative', zIndex: 1 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                    <Typography 
+                                      variant="body2" 
+                                      sx={{ 
+                                        color: cvrDisplay.color, 
+                                        fontWeight: 600,
+                                        fontSize: '0.75rem',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: 1
+                                      }}
+                                    >
+                                      {cvrDisplay.emoji} Cycle Value Rating
+                                    </Typography>
+                                    <IconButton 
+                                      size="small" 
+                                      sx={{ 
+                                        color: cvrDisplay.color, 
+                                        opacity: 0.7,
+                                        '&:hover': { opacity: 1 }
+                                      }}
+                                    >
+                                      <InfoOutlined fontSize="small" />
+                                    </IconButton>
+                                  </Box>
+                                <Typography 
+                                  variant="h3" 
+                                  sx={{ 
+                                    color: cvrDisplay.color,
+                                    fontWeight: 900,
+                                    fontSize: '2.5rem',
+                                    lineHeight: 1,
+                                    textShadow: cvr && cvr > 1.5 ? `0 0 20px ${cvrDisplay.color}50` : 'none'
+                                  }}
+                                >
+                                  {cvrDisplay.value}
+                                </Typography>
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{ 
+                                    color: cvrDisplay.color,
+                                    fontWeight: 500,
+                                    fontSize: '0.7rem'
+                                  }}
+                                >
+                                  {cvrDisplay.description}
+                                </Typography>
+                                {cvrDisplay.grade && (
+                                  <Chip 
+                                    label={`Grade: ${cvrDisplay.grade}`}
+                                    size="small"
+                                    sx={{ 
+                                      mt: 0.5,
+                                      backgroundColor: cvrDisplay.color,
+                                      color: 'white',
+                                      fontWeight: 700,
+                                      fontSize: '0.6rem'
+                                    }}
+                                  />
+                                )}
+                                {salaryData && (
+                                  <Typography 
+                                    variant="caption" 
+                                    sx={{ 
+                                      display: 'block',
+                                      mt: 1,
+                                      color: 'text.secondary',
+                                      fontSize: '0.6rem'
+                                    }}
+                                  >
+                                    Salary: {formatSalary(salaryData.salary)}
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+                            </Tooltip>
+                          </motion.div>
+                        );
+                      })()}
                     </Grid>
                   </Grid>
                 </Box>
@@ -372,6 +620,8 @@ const PlayerDetail = () => {
             comparisons={comparisons} 
             playerType={playerType} 
             seasonStats={playerStats} 
+            playerCVR={cvr}
+            playerSalary={salaryData}
           />
         )}
       </Box>
@@ -996,13 +1246,14 @@ const PlayerGameLog = ({ games, playerType }) => {
 };
 
 // Player comparisons component - Modern redesign with detailed statistical comparisons
-const PlayerComparisons = ({ player, playerType, seasonStats }) => {
+const PlayerComparisons = ({ player, playerType, seasonStats, playerCVR, playerSalary }) => {
   const theme = useTheme();
   const [comparisonPlayers, setComparisonPlayers] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [availablePlayers, setAvailablePlayers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [playerCVRs, setPlayerCVRs] = useState({}); // Store CVR data for compared players
 
   // Get key statistics for comparison based on player type
   const getKeyStats = (stats, type) => {
@@ -1204,10 +1455,39 @@ const PlayerComparisons = ({ player, playerType, seasonStats }) => {
       const fullPlayerData = await playersApi.getPlayerById(playerKey);
       
       if (fullPlayerData?.seasonStats) {
-        setSelectedPlayer({
+        const updatedSelectedPlayer = {
           ...selectedPlayerData,
           stats: fullPlayerData.seasonStats
-        });
+        };
+        setSelectedPlayer(updatedSelectedPlayer);
+
+        // Fetch CVR data for the selected player
+        try {
+          const salaryResponse = await statsApi.getSalary(
+            selectedPlayerData.team, 
+            selectedPlayerData.name.replace(/\s+/g, '_'), 
+            player.year
+          );
+          
+          if (salaryResponse && salaryResponse.data && salaryResponse.data.salary) {
+            const cvrResult = await calculatePlayerCVR(
+              { stats: fullPlayerData.seasonStats },
+              salaryResponse.data
+            );
+            
+            setPlayerCVRs(prev => ({
+              ...prev,
+              [playerKey]: {
+                cvr: cvrResult.cvr,
+                salary: salaryResponse.data.salary,
+                salaryData: salaryResponse.data,
+                cvrDetails: cvrResult
+              }
+            }));
+          }
+        } catch (cvrErr) {
+          console.log('CVR data not available for selected player:', cvrErr.message);
+        }
       }
     } catch (err) {
       console.error('Error loading player for comparison:', err);
@@ -1486,6 +1766,107 @@ const PlayerComparisons = ({ player, playerType, seasonStats }) => {
                             </TableRow>
                           );
                         })}
+                        
+                        {/* CVR Comparison Row */}
+                        {(() => {
+                          const selectedPlayerKey = selectedPlayer ? `${selectedPlayer.team}-${selectedPlayer.name.replace(/\s+/g, '_')}-${player.year}` : null;
+                          const selectedPlayerCVR = selectedPlayerKey ? playerCVRs[selectedPlayerKey] : null;
+                          const playerCVRDisplay = getCVRDisplay(playerCVR);
+                          const selectedCVRDisplay = getCVRDisplay(selectedPlayerCVR?.cvr);
+                          
+                          const playerCVRVal = playerCVR || 0;
+                          const selectedCVRVal = selectedPlayerCVR?.cvr || 0;
+                          const cvrDiff = playerCVRVal - selectedCVRVal;
+                          const isPlayerBetter = cvrDiff > 0;
+
+                          return (
+                            <TableRow 
+                              sx={{ 
+                                backgroundColor: alpha(theme.palette.primary.main, 0.03),
+                                '& td': { borderTop: `2px solid ${theme.palette.primary.main}` }
+                              }}
+                            >
+                              <TableCell sx={{ fontWeight: 700 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  💎 CVR (Cycle Value Rating)
+                                </Box>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                  <Typography
+                                    variant="h6"
+                                    sx={{
+                                      fontWeight: 900,
+                                      color: playerCVRDisplay.color,
+                                      textShadow: playerCVR && playerCVR > 1.2 ? `0 0 10px ${playerCVRDisplay.color}50` : 'none'
+                                    }}
+                                  >
+                                    {playerCVRDisplay.value}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: playerCVRDisplay.color, fontSize: '0.6rem' }}>
+                                    {playerCVRDisplay.description}
+                                  </Typography>
+                                  {playerSalary && (
+                                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.6rem' }}>
+                                      {formatSalary(playerSalary.salary)}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </TableCell>
+                              <TableCell align="center">
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                  <Typography
+                                    variant="h6"
+                                    sx={{
+                                      fontWeight: 900,
+                                      color: selectedCVRDisplay.color,
+                                      textShadow: selectedPlayerCVR?.cvr && selectedPlayerCVR.cvr > 1.2 ? `0 0 10px ${selectedCVRDisplay.color}50` : 'none'
+                                    }}
+                                  >
+                                    {selectedCVRDisplay.value}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: selectedCVRDisplay.color, fontSize: '0.6rem' }}>
+                                    {selectedCVRDisplay.description}
+                                  </Typography>
+                                  {selectedPlayerCVR?.salary && (
+                                    <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.6rem' }}>
+                                      {formatSalary(selectedPlayerCVR.salary)}
+                                    </Typography>
+                                  )}
+                                </Box>
+                              </TableCell>
+                              <TableCell align="center">
+                                {playerCVR && selectedPlayerCVR?.cvr ? (
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        color: Math.abs(cvrDiff) < 0.01 ? 'text.secondary' :
+                                               isPlayerBetter ? 'success.main' : 'error.main',
+                                        fontWeight: 700,
+                                        fontSize: '0.9rem'
+                                      }}
+                                    >
+                                      {Math.abs(cvrDiff) < 0.01 ? 'Even' :
+                                       `${cvrDiff > 0 ? '+' : ''}${cvrDiff.toFixed(2)}`}
+                                    </Typography>
+                                    <Typography variant="caption" sx={{ 
+                                      color: isPlayerBetter ? 'success.main' : 'error.main',
+                                      fontSize: '0.6rem',
+                                      fontWeight: 600
+                                    }}>
+                                      {isPlayerBetter ? 'Better Value' : 'Worse Value'}
+                                    </Typography>
+                                  </Box>
+                                ) : (
+                                  <Typography variant="body2" color="text.secondary">
+                                    ---
+                                  </Typography>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })()}
                       </TableBody>
                     </Table>
                   </TableContainer>

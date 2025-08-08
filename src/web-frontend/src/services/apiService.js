@@ -105,6 +105,36 @@ export const statsApi = {
   getTeamAdvanced: async (teamId, year = '2025') => {
     const response = await apiClient.get(`/v2/stats/team/${teamId}/advanced?year=${year}`);
     return response.data;
+  },
+
+  // Enhanced CVR (Cycle Value Rating) API
+  getCVR: async (playerA, playerB, year = '2025') => {
+    const response = await apiClient.get(`/v2/stats/cvr/${encodeURIComponent(playerA)}/${encodeURIComponent(playerB)}?year=${year}`);
+    return response.data;
+  },
+
+  // Individual player CVR
+  getPlayerCVR: async (team, player, year = '2025') => {
+    const response = await apiClient.get(`/v2/stats/cvr/${team}/${encodeURIComponent(player)}/${year}`);
+    return response.data;
+  },
+
+  // Salary data API
+  getSalary: async (team, player, year = '2025') => {
+    const response = await apiClient.get(`/v2/stats/salary/${team}/${encodeURIComponent(player)}/${year}`);
+    return response.data;
+  },
+
+  // Get all salaries for a team
+  getTeamSalaries: async (team, year = '2025') => {
+    const response = await apiClient.get(`/v2/stats/salary/team/${team}/${year}`);
+    return response.data;
+  },
+
+  // Get all salaries for the year (league-wide)
+  getAllSalaries: async (year = '2025') => {
+    const response = await apiClient.get(`/v2/stats/salary/all/${year}`);
+    return response.data;
   }
 };
 

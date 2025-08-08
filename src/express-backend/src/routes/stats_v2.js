@@ -2,6 +2,21 @@ const express = require('express');
 const router = express.Router();
 const { getRedisClient, parseRedisData, getKeysByPattern, getMultipleKeys } = require('../utils/redis');
 
+/**
+ * Normalize player name to handle special characters (ñ, é, etc.)
+ * This ensures consistent key generation across scraping and API lookups
+ */
+function normalizePlayerName(name) {
+  if (!name) return name;
+  
+  return name
+    .normalize('NFD') // Decompose accented characters
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritical marks
+    .replace(/[^a-zA-Z0-9\s]/g, '') // Remove other special characters
+    .replace(/\s+/g, ' ') // Normalize spaces
+    .trim();
+}
+
 // ============================================================================
 // ENHANCED STATISTICS API ROUTES
 // Professional-grade baseball statistics with comprehensive data coverage
@@ -612,5 +627,549 @@ function calculateTeamBalance(playerData) {
     overallRating: 'A-' // Placeholder
   };
 }
+
+// ============================================================================
+// SALARY DATA API ROUTES
+// ============================================================================
+
+// GET /api/v2/stats/salary/:team/:player/:year - Get salary data for a specific player
+router.get('/salary/:team/:player/:year', async (req, res) => {
+  try {
+    const { team, player, year } = req.params;
+    
+    // Try both original player name and normalized version for better matching
+    const originalPlayerKey = player.replace(/\s+/g, '_');
+    const normalizedPlayerKey = normalizePlayerName(player).replace(/\s+/g, '_');
+    
+    const possibleKeys = [
+      `salary:${team}-${originalPlayerKey}-${year}`,
+      `salary:${team}-${normalizedPlayerKey}-${year}`
+    ];
+    
+    console.log(`🔍 Looking for salary data with keys:`, possibleKeys);
+    
+    const redisClient = getRedisClient();
+    let salaryData = null;
+    let usedKey = null;
+    
+    // Try each possible key until we find data
+    for (const key of possibleKeys) {
+      salaryData = await redisClient.get(key);
+      if (salaryData) {
+        usedKey = key;
+        console.log(`✅ Found salary data with key: ${key}`);
+        break;
+      }
+    }
+    
+    if (!salaryData) {
+      // Also try a pattern search as last resort
+      console.log(`🔍 Trying pattern search for player: ${player}`);
+      const searchPattern = `salary:${team}-*${normalizedPlayerKey.split('_')[0]}*-${year}`;
+      const matchingKeys = await getKeysByPattern(searchPattern);
+      
+      if (matchingKeys.length > 0) {
+        usedKey = matchingKeys[0];
+        salaryData = await redisClient.get(usedKey);
+        console.log(`✅ Found salary data via pattern search: ${usedKey}`);
+      }
+    }
+    
+    if (!salaryData) {
+      console.log(`❌ No salary data found for ${player} on ${team}`);
+      return res.status(404).json({
+        success: false,
+        error: 'Salary data not found',
+        searchedKeys: possibleKeys,
+        player: player,
+        normalizedPlayer: normalizePlayerName(player)
+      });
+    }
+    
+    const parsedData = parseRedisData(salaryData);
+    
+    res.json({
+      success: true,
+      data: parsedData,
+      metadata: {
+        key: usedKey,
+        lastUpdated: parsedData.scrapedAt,
+        source: parsedData.source,
+        originalPlayer: player,
+        normalizedPlayer: normalizePlayerName(player)
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching salary data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch salary data',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// GET /api/v2/stats/salary/team/:team/:year - Get all salary data for a team
+router.get('/salary/team/:team/:year', async (req, res) => {
+  try {
+    const { team, year } = req.params;
+    
+    // Get all salary keys for the team
+    const salaryKeys = await getKeysByPattern(`salary:${team}-*-${year}`);
+    
+    if (salaryKeys.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        count: 0,
+        message: `No salary data found for ${team} in ${year}`
+      });
+    }
+    
+    const salaryData = await getMultipleKeys(salaryKeys);
+    
+    // Transform data and add metadata
+    const processedData = salaryData
+      .filter(item => item.data)
+      .map(item => ({
+        ...item.data,
+        redisKey: item.key
+      }))
+      .sort((a, b) => (b.salary || 0) - (a.salary || 0)); // Sort by salary descending
+    
+    res.json({
+      success: true,
+      data: processedData,
+      count: processedData.length,
+      metadata: {
+        team,
+        year,
+        totalSalaries: processedData.length,
+        totalPayroll: processedData.reduce((sum, player) => sum + (player.salary || 0), 0),
+        averageSalary: processedData.length > 0 ? 
+          processedData.reduce((sum, player) => sum + (player.salary || 0), 0) / processedData.length : 0
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching team salary data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch team salary data',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// GET /api/v2/stats/salary/all/:year - Get all salary data for a year
+router.get('/salary/all/:year', async (req, res) => {
+  try {
+    const { year } = req.params;
+    const { limit = 50, minSalary, maxSalary, team } = req.query;
+    
+    // Build pattern based on filters
+    let pattern = `salary:*-${year}`;
+    if (team) {
+      pattern = `salary:${team}-*-${year}`;
+    }
+    
+    const salaryKeys = await getKeysByPattern(pattern);
+    
+    if (salaryKeys.length === 0) {
+      return res.json({
+        success: true,
+        data: [],
+        count: 0,
+        message: `No salary data found for ${year}`
+      });
+    }
+    
+    const salaryData = await getMultipleKeys(salaryKeys);
+    
+    // Filter and process data
+    let processedData = salaryData
+      .filter(item => item.data)
+      .map(item => ({
+        ...item.data,
+        redisKey: item.key
+      }));
+    
+    // Apply salary filters
+    if (minSalary) {
+      processedData = processedData.filter(player => player.salary >= parseInt(minSalary));
+    }
+    if (maxSalary) {
+      processedData = processedData.filter(player => player.salary <= parseInt(maxSalary));
+    }
+    
+    // Sort by salary descending
+    processedData.sort((a, b) => (b.salary || 0) - (a.salary || 0));
+    
+    // Apply limit
+    const limitedData = processedData.slice(0, parseInt(limit));
+    
+    res.json({
+      success: true,
+      data: limitedData,
+      count: limitedData.length,
+      totalCount: processedData.length,
+      metadata: {
+        year,
+        totalPlayers: processedData.length,
+        totalPayroll: processedData.reduce((sum, player) => sum + (player.salary || 0), 0),
+        averageSalary: processedData.length > 0 ? 
+          processedData.reduce((sum, player) => sum + (player.salary || 0), 0) / processedData.length : 0,
+        filters: { minSalary, maxSalary, team, limit }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching all salary data:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch salary data',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// GET /api/v2/stats/cvr/:team/:player/:year - Calculate individual Cycle Value Rating
+router.get('/cvr/:team/:player/:year', async (req, res) => {
+  try {
+    const { team, player, year } = req.params;
+    
+    // Normalize player name
+    const normalizedPlayer = normalizePlayerName(player.replace(/_/g, ' '));
+    const playerKey = `player:${team}-${normalizedPlayer.replace(/\s+/g, '_')}-${year}:season`;
+    const salaryKey = `salary:${team}-${normalizedPlayer.replace(/\s+/g, '_')}-${year}`;
+    
+    console.log(`Fetching CVR data for: ${playerKey} and ${salaryKey}`);
+    
+    // Get player stats and salary data
+    const [playerData, salaryData] = await Promise.all([
+      getRedisClient().hgetall(playerKey),
+      getRedisClient().hgetall(salaryKey)
+    ]);
+    
+    if (!playerData || Object.keys(playerData).length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Player not found',
+        playerKey,
+        salaryKey
+      });
+    }
+    
+    if (!salaryData || Object.keys(salaryData).length === 0 || !salaryData.salary) {
+      return res.status(404).json({
+        success: false,
+        error: 'Salary data not found',
+        playerKey,
+        salaryKey,
+        debug: { playerData: Object.keys(playerData), salaryData }
+      });
+    }
+    
+    const salary = parseInt(salaryData.salary);
+    if (!salary || salary <= 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Invalid salary data',
+        salary: salaryData.salary
+      });
+    }
+    
+    // Parse player stats
+    const stats = parseRedisData(playerData);
+    
+    // Determine player type and calculate performance score
+    const isPitcher = stats.pitching && stats.pitching.gamesPlayed > 0;
+    let performanceScore = 0;
+    
+    if (isPitcher) {
+      // Pitching performance (ERA, WHIP, K/9, etc.)
+      const era = parseFloat(stats.pitching.era) || 5.00;
+      const whip = parseFloat(stats.pitching.whip) || 1.50;
+      const strikeoutsPer9 = parseFloat(stats.pitching.strikeoutsPer9) || 6.0;
+      const wins = parseInt(stats.pitching.wins) || 0;
+      
+      // ERA performance (lower is better, league average ~4.00)
+      const eraScore = Math.max(0, 100 - ((era - 2.00) * 25));
+      
+      // WHIP performance (lower is better, league average ~1.30)
+      const whipScore = Math.max(0, 100 - ((whip - 0.90) * 125));
+      
+      // Strikeout rate (higher is better)
+      const strikeoutScore = Math.min(100, (strikeoutsPer9 / 12.0) * 100);
+      
+      // Wins bonus
+      const winScore = Math.min(25, wins * 2);
+      
+      performanceScore = (eraScore * 0.3 + whipScore * 0.3 + strikeoutScore * 0.3 + winScore * 0.1);
+    } else {
+      // Batting performance (BA, OBP, SLG, HR, RBI, etc.)
+      const battingAverage = parseFloat(stats.batting.battingAverage) || 0.200;
+      const onBasePercentage = parseFloat(stats.batting.onBasePercentage) || 0.250;
+      const sluggingPercentage = parseFloat(stats.batting.sluggingPercentage) || 0.300;
+      const homeRuns = parseInt(stats.batting.homeRuns) || 0;
+      const rbi = parseInt(stats.batting.rbi) || 0;
+      
+      // Batting average (league average ~.260)
+      const baScore = Math.min(100, ((battingAverage - 0.150) / 0.250) * 100);
+      
+      // OBP (league average ~.320)
+      const obpScore = Math.min(100, ((onBasePercentage - 0.200) / 0.300) * 100);
+      
+      // SLG (league average ~.420)
+      const slgScore = Math.min(100, ((sluggingPercentage - 0.200) / 0.400) * 100);
+      
+      // Power numbers
+      const hrScore = Math.min(50, homeRuns * 1.5);
+      const rbiScore = Math.min(50, rbi * 0.5);
+      
+      performanceScore = (baScore * 0.2 + obpScore * 0.25 + slgScore * 0.25 + hrScore * 0.15 + rbiScore * 0.15);
+    }
+    
+    // Determine salary type and calculate CVR
+    let salaryType = 'contract';
+    let salaryMultiplier = 1.0;
+    let adjustedLeagueAverage = 4500000; // MLB average salary
+    
+    if (salary <= 750000) {
+      salaryType = 'minimum';
+      adjustedLeagueAverage = 740000;
+      salaryMultiplier = 1.5;
+    } else if (salary <= 1000000) {
+      salaryType = 'rookie';
+      adjustedLeagueAverage = 900000;
+      salaryMultiplier = 1.3;
+    } else if (salary <= 3000000) {
+      salaryType = 'arbitration';
+      adjustedLeagueAverage = 2000000;
+      salaryMultiplier = 1.2;
+    } else if (salary <= 10000000) {
+      salaryType = 'contract';
+      adjustedLeagueAverage = 4500000;
+      salaryMultiplier = 1.0;
+    } else if (salary <= 25000000) {
+      salaryType = 'premium';
+      adjustedLeagueAverage = 15000000;
+      salaryMultiplier = 0.95;
+    } else {
+      salaryType = 'superstar';
+      adjustedLeagueAverage = 30000000;
+      salaryMultiplier = 0.9;
+    }
+    
+    // Calculate CVR: (Performance / 50) * salaryMultiplier / (salary / adjustedLeagueAverage)
+    const performanceRatio = Math.max(0.1, performanceScore / 50);
+    const salaryRatio = salary / adjustedLeagueAverage;
+    const cvr = (performanceRatio * salaryMultiplier / salaryRatio) * 100;
+    
+    // Get CVR tier
+    let tier, color, emoji;
+    if (cvr >= 150) {
+      tier = 'Elite Value';
+      color = '#00C851';
+      emoji = '💎';
+    } else if (cvr >= 125) {
+      tier = 'Great Value';
+      color = '#4CAF50';
+      emoji = '🔥';
+    } else if (cvr >= 100) {
+      tier = 'Good Value';
+      color = '#8BC34A';
+      emoji = '👍';
+    } else if (cvr >= 75) {
+      tier = 'Fair Value';
+      color = '#FFC107';
+      emoji = '👌';
+    } else if (cvr >= 50) {
+      tier = 'Below Average';
+      color = '#FF9800';
+      emoji = '👎';
+    } else {
+      tier = 'Poor Value';
+      color = '#F44336';
+      emoji = '💸';
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        player: {
+          name: normalizedPlayer,
+          team,
+          year
+        },
+        cvr: {
+          value: Math.round(cvr * 10) / 10,
+          tier,
+          color,
+          emoji
+        },
+        breakdown: {
+          performanceScore: Math.round(performanceScore * 10) / 10,
+          salaryType,
+          salaryMultiplier,
+          salary: salary,
+          salaryFormatted: salary >= 1000000 ? `$${(salary/1000000).toFixed(1)}M` : `$${(salary/1000).toFixed(0)}K`,
+          isPitcher
+        },
+        stats
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error calculating individual CVR:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error calculating CVR',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// GET /api/v2/stats/cvr/:playerA/:playerB - Calculate Cycle Value Rating between two players
+router.get('/cvr/:playerA/:playerB', async (req, res) => {
+  try {
+    const { playerA, playerB } = req.params;
+    const { year = '2025' } = req.query;
+    
+    // Parse player keys (format: "TEAM-Player_Name")
+    const parsePlayerKey = (key) => {
+      const parts = key.split('-');
+      return {
+        team: parts[0],
+        name: parts.slice(1).join('-').replace(/_/g, ' ')
+      };
+    };
+    
+    const player1 = parsePlayerKey(playerA);
+    const player2 = parsePlayerKey(playerB);
+    
+    // Get salary and stats data for both players
+    const [salary1, salary2, stats1, stats2] = await Promise.all([
+      getRedisClient().get(`salary:${player1.team}-${player1.name.replace(/\s+/g, '_')}-${year}`),
+      getRedisClient().get(`salary:${player2.team}-${player2.name.replace(/\s+/g, '_')}-${year}`),
+      getRedisClient().get(`player:${player1.team}-${player1.name.replace(/\s+/g, '_')}-${year}:season`),
+      getRedisClient().get(`player:${player2.team}-${player2.name.replace(/\s+/g, '_')}-${year}:season`)
+    ]);
+    
+    if (!salary1 || !salary2) {
+      return res.status(404).json({
+        success: false,
+        error: 'Salary data not found for one or both players',
+        missing: {
+          player1: !salary1,
+          player2: !salary2
+        }
+      });
+    }
+    
+    if (!stats1 || !stats2) {
+      return res.status(404).json({
+        success: false,
+        error: 'Stats data not found for one or both players',
+        missing: {
+          player1: !stats1,
+          player2: !stats2
+        }
+      });
+    }
+    
+    const salaryData1 = parseRedisData(salary1);
+    const salaryData2 = parseRedisData(salary2);
+    const statsData1 = parseRedisData(stats1);
+    const statsData2 = parseRedisData(stats2);
+    
+    // Calculate statistical similarity (simplified version)
+    let similarity = 0;
+    const comparisons = [];
+    
+    // Determine player type and calculate similarity
+    if (statsData1.pitching && statsData2.pitching) {
+      // Pitcher comparison
+      const era1 = statsData1.pitching.era || 0;
+      const era2 = statsData2.pitching.era || 0;
+      const whip1 = statsData1.pitching.whip || 0;
+      const whip2 = statsData2.pitching.whip || 0;
+      
+      const eraSim = Math.max(0, 100 - Math.abs(era1 - era2) * 20);
+      const whipSim = Math.max(0, 100 - Math.abs(whip1 - whip2) * 80);
+      
+      similarity = (eraSim + whipSim) / 2;
+      
+      comparisons.push(
+        { stat: 'ERA', player1: era1, player2: era2, similarity: eraSim },
+        { stat: 'WHIP', player1: whip1, player2: whip2, similarity: whipSim }
+      );
+      
+    } else if (statsData1.batting && statsData2.batting) {
+      // Batter comparison
+      const avg1 = statsData1.batting.hits && statsData1.batting.atBats ? 
+        statsData1.batting.hits / statsData1.batting.atBats : 0;
+      const avg2 = statsData2.batting.hits && statsData2.batting.atBats ? 
+        statsData2.batting.hits / statsData2.batting.atBats : 0;
+      const hr1 = statsData1.batting.homeRuns || 0;
+      const hr2 = statsData2.batting.homeRuns || 0;
+      
+      const avgSim = Math.max(0, 100 - Math.abs(avg1 - avg2) * 300);
+      const hrSim = Math.max(0, 100 - Math.abs(hr1 - hr2) * 2);
+      
+      similarity = (avgSim + hrSim) / 2;
+      
+      comparisons.push(
+        { stat: 'AVG', player1: avg1.toFixed(3), player2: avg2.toFixed(3), similarity: avgSim },
+        { stat: 'HR', player1: hr1, player2: hr2, similarity: hrSim }
+      );
+    }
+    
+    // Calculate CVR
+    const higherSalary = Math.max(salaryData1.salary, salaryData2.salary);
+    const lowerSalary = Math.min(salaryData1.salary, salaryData2.salary);
+    const salaryRatio = lowerSalary > 0 ? higherSalary / lowerSalary : 1;
+    
+    // Player with lower salary gets better CVR if similar performance
+    const player1IsBetter = salaryData1.salary < salaryData2.salary;
+    const cvr = similarity > 50 ? (similarity / salaryRatio) * 100 : similarity;
+    
+    const result = {
+      success: true,
+      data: {
+        players: {
+          player1: { ...player1, salary: salaryData1.salary },
+          player2: { ...player2, salary: salaryData2.salary }
+        },
+        similarity: Math.round(similarity),
+        salaryRatio: salaryRatio.toFixed(2),
+        cvr: Math.round(cvr),
+        betterValue: player1IsBetter ? player1.name : player2.name,
+        comparisons,
+        analysis: {
+          similarPerformance: similarity > 70,
+          significantSalaryDifference: salaryRatio > 1.5,
+          valueOpportunity: similarity > 70 && salaryRatio > 1.5
+        }
+      },
+      metadata: {
+        year,
+        calculatedAt: new Date().toISOString(),
+        algorithm: 'Cycle Value Rating v1.0'
+      }
+    };
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error('Error calculating CVR:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to calculate Cycle Value Rating',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
 
 module.exports = router;

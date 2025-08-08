@@ -194,15 +194,50 @@ const Dashboard = () => {
       animate="visible"
     >
       <Box sx={{ p: { xs: 2, sm: 3 } }}>
-        {/* Header */}
+        {/* Quick Actions */}
         <motion.div variants={itemVariants}>
           <Box sx={{ mb: 4 }}>
-            <Typography variant="h4" fontWeight={800} gutterBottom>
-              Baseball Analytics Dashboard
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Professional-grade statistics and insights for the {new Date().getFullYear()} season
-            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <ActionCard
+                  title="View Players"
+                  description="Browse player statistics and performance"
+                  icon={<People />}
+                  onClick={() => navigate('/players')}
+                  color={theme.palette.primary.main}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={3}>
+                <ActionCard
+                  title="Team Standings"
+                  description="Check current league standings"
+                  icon={<Groups />}
+                  onClick={() => navigate('/standings')}
+                  color={theme.palette.success.main}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={3}>
+                <ActionCard
+                  title="Statistical Leaders"
+                  description="Top performers by category"
+                  icon={<Star />}
+                  onClick={() => navigate('/leaders')}
+                  color={theme.palette.warning.main}
+                />
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={3}>
+                <ActionCard
+                  title="Advanced Analytics"
+                  description="Deep statistical analysis"
+                  icon={<Assessment />}
+                  onClick={() => navigate('/analytics')}
+                  color={theme.palette.secondary.main}
+                />
+              </Grid>
+            </Grid>
           </Box>
         </motion.div>
 
@@ -454,60 +489,6 @@ const Dashboard = () => {
             </motion.div>
           </Grid>
 
-          {/* Quick Actions */}
-          <Grid item xs={12}>
-            <motion.div variants={itemVariants}>
-              <Card elevation={0}>
-                <CardContent sx={{ p: 3 }}>
-                  <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>
-                    Quick Actions
-                  </Typography>
-                  
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <ActionCard
-                        title="View Players"
-                        description="Browse player statistics and performance"
-                        icon={<People />}
-                        onClick={() => navigate('/players')}
-                        color={theme.palette.primary.main}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} sm={6} md={3}>
-                      <ActionCard
-                        title="Team Standings"
-                        description="Check current league standings"
-                        icon={<Groups />}
-                        onClick={() => navigate('/standings')}
-                        color={theme.palette.success.main}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} sm={6} md={3}>
-                      <ActionCard
-                        title="Statistical Leaders"
-                        description="Top performers by category"
-                        icon={<Star />}
-                        onClick={() => navigate('/leaders')}
-                        color={theme.palette.warning.main}
-                      />
-                    </Grid>
-                    
-                    <Grid item xs={12} sm={6} md={3}>
-                      <ActionCard
-                        title="Advanced Analytics"
-                        description="Deep statistical analysis"
-                        icon={<Assessment />}
-                        onClick={() => navigate('/analytics')}
-                        color={theme.palette.secondary.main}
-                      />
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </Grid>
         </Grid>
       </Box>
     </motion.div>
