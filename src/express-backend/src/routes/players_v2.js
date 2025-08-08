@@ -222,10 +222,14 @@ router.get('/', async (req, res) => {
           position: player.data.position || 'Unknown',
           status: player.data.status || 'active',
           playerType: player.data.playerType || 'Unknown', // Add player type
+          war: typeof player.data.war === 'number' ? player.data.war : (player.data.war ? parseFloat(player.data.war) : 0), // Ensure numeric
+          cvr: typeof player.data.cvr === 'number' ? player.data.cvr : (player.data.cvr ? parseFloat(player.data.cvr) : 0), // Ensure numeric
           stats: {
             batting: player.data.batting || {},
             pitching: player.data.pitching || {},
-            fielding: player.data.fielding || {}
+            fielding: player.data.fielding || {},
+            war: typeof player.data.war === 'number' ? player.data.war : (player.data.war ? parseFloat(player.data.war) : 0), // Ensure numeric
+            cvr: typeof player.data.cvr === 'number' ? player.data.cvr : (player.data.cvr ? parseFloat(player.data.cvr) : 0)  // Ensure numeric
           },
           summary: generatePlayerSummary(player.data),
           lastUpdated: player.data.lastUpdated
@@ -248,33 +252,124 @@ router.get('/', async (req, res) => {
     // Apply status filter
     if (status !== 'all') {
       players = players.filter(p => p.status === status);
-    }    // Sort players
+    }
+    
+    // Enhanced sorting with ascending/descending support
+    const sortOrder = req.query.sortOrder || 'desc'; // 'asc' or 'desc'
+    
     players.sort((a, b) => {
+      let result = 0;
+      
       switch (sortBy) {
         case 'name':
-          return a.name.localeCompare(b.name);
+          result = a.name.localeCompare(b.name);
+          break;
         case 'team':
-          return a.team.localeCompare(b.team);
+          result = a.team.localeCompare(b.team);
+          break;
         case 'games':
-          return b.gameCount - a.gameCount;
+        case 'gameCount':
+          result = (b.gameCount || 0) - (a.gameCount || 0);
+          break;
+        case 'war':
+          result = (parseFloat(b.war) || 0) - (parseFloat(a.war) || 0);
+          break;
+        case 'cvr':
+          result = (parseFloat(b.cvr) || 0) - (parseFloat(a.cvr) || 0);
+          break;
+        // Batting stats
         case 'avg':
-          return (b.stats.batting.avg || 0) - (a.stats.batting.avg || 0);
+          result = (b.stats.batting.avg || 0) - (a.stats.batting.avg || 0);
+          break;
+        case 'abs':
+        case 'atBats':
+          result = (b.stats.batting.atBats || 0) - (a.stats.batting.atBats || 0);
+          break;
+        case 'hits':
+          result = (b.stats.batting.hits || 0) - (a.stats.batting.hits || 0);
+          break;
+        case 'runs':
+          result = (b.stats.batting.runs || 0) - (a.stats.batting.runs || 0);
+          break;
+        case 'rbi':
+          result = (b.stats.batting.rbi || 0) - (a.stats.batting.rbi || 0);
+          break;
+        case 'homeRuns':
+        case 'hr':
+          result = (b.stats.batting.homeRuns || 0) - (a.stats.batting.homeRuns || 0);
+          break;
+        case 'obp':
+          result = (b.stats.batting.obp || 0) - (a.stats.batting.obp || 0);
+          break;
+        case 'slg':
+          result = (b.stats.batting.slg || 0) - (a.stats.batting.slg || 0);
+          break;
+        case 'ops':
+          result = (b.stats.batting.ops || 0) - (a.stats.batting.ops || 0);
+          break;
+        case 'stolenBases':
+        case 'sb':
+          result = (b.stats.batting.stolenBases || 0) - (a.stats.batting.stolenBases || 0);
+          break;
+        case 'strikeOuts':
+        case 'so':
+          result = (b.stats.batting.strikeOuts || 0) - (a.stats.batting.strikeOuts || 0);
+          break;
+        case 'baseOnBalls':
+        case 'bb':
+          result = (b.stats.batting.baseOnBalls || 0) - (a.stats.batting.baseOnBalls || 0);
+          break;
+        // Pitching stats
         case 'era':
-          return (a.stats.pitching.era || 999) - (b.stats.pitching.era || 999);
+          result = (a.stats.pitching.era || 999) - (b.stats.pitching.era || 999); // Lower ERA is better
+          break;
+        case 'wins':
+          result = (b.stats.pitching.wins || 0) - (a.stats.pitching.wins || 0);
+          break;
+        case 'losses':
+          result = (a.stats.pitching.losses || 0) - (b.stats.pitching.losses || 0); // Fewer losses is better
+          break;
+        case 'saves':
+          result = (b.stats.pitching.saves || 0) - (a.stats.pitching.saves || 0);
+          break;
+        case 'inningsPitched':
+        case 'ip':
+          result = (parseFloat(b.stats.pitching.inningsPitched) || 0) - (parseFloat(a.stats.pitching.inningsPitched) || 0);
+          break;
+        case 'strikeOutsPitching':
+        case 'ksPitching':
+          result = (b.stats.pitching.strikeOuts || 0) - (a.stats.pitching.strikeOuts || 0);
+          break;
+        case 'whip':
+          result = (a.stats.pitching.whip || 999) - (b.stats.pitching.whip || 999); // Lower WHIP is better
+          break;
+        case 'gamesStarted':
+        case 'gs':
+          result = (b.stats.pitching.gamesStarted || 0) - (a.stats.pitching.gamesStarted || 0);
+          break;
         default:
-          return a.name.localeCompare(b.name);
+          result = a.name.localeCompare(b.name);
+          break;
       }
+      
+      // Apply sort order (ascending vs descending)
+      return sortOrder === 'asc' ? -result : result;
     });
     
     res.json({
       players,
       count: players.length,
-      filters: { team, year, position, status, minGames, sortBy, playerType, startDate, endDate, dateRange },
+      filters: { team, year, position, status, minGames, sortBy, sortOrder, playerType, startDate, endDate, dateRange },
       available: {
         teams: [...new Set(players.map(p => p.team))].sort(),
         positions: [...new Set(players.map(p => p.position))].filter(p => p !== 'Unknown').sort(),
         playerTypes: [...new Set(players.map(p => p.playerType))].filter(p => p !== 'Unknown').sort(),
-        years: [year]
+        years: [year],
+        sortOptions: [
+          'name', 'team', 'games', 'gameCount', 'war', 'cvr',
+          'avg', 'abs', 'hits', 'runs', 'rbi', 'hr', 'obp', 'slg', 'ops', 'sb', 'so', 'bb',
+          'era', 'wins', 'losses', 'saves', 'ip', 'ksPitching', 'whip', 'gs'
+        ]
       }
     });
   } catch (err) {
@@ -293,6 +388,15 @@ router.get('/:playerId', async (req, res) => {
     const seasonKey = `player:${playerId}:season`;
     const seasonData = await getRedisClient().get(seasonKey);
     const seasonStats = parseRedisData(seasonData);
+    
+    // Debug logging
+    console.log('🔍 DEBUG - Season Key:', seasonKey);
+    console.log('🔍 DEBUG - Raw Redis Data:', seasonData ? 'FOUND' : 'NOT FOUND');
+    console.log('🔍 DEBUG - Parsed Stats:', seasonStats ? Object.keys(seasonStats) : 'NULL');
+    if (seasonStats) {
+      console.log('🔍 DEBUG - WAR Value:', seasonStats.war, '(type:', typeof seasonStats.war, ')');
+      console.log('🔍 DEBUG - CVR Value:', seasonStats.cvr, '(type:', typeof seasonStats.cvr, ')');
+    }
     
     if (!seasonStats) {
       return res.status(404).json({ error: 'Player not found' });
@@ -314,11 +418,16 @@ router.get('/:playerId', async (req, res) => {
       gameCount: seasonStats.gameCount,
       position: seasonStats.position || 'Unknown',
       status: seasonStats.status || 'active',
+      war: typeof seasonStats.war === 'number' ? seasonStats.war : (seasonStats.war ? parseFloat(seasonStats.war) : 0), // Ensure numeric
+      cvr: typeof seasonStats.cvr === 'number' ? seasonStats.cvr : (seasonStats.cvr ? parseFloat(seasonStats.cvr) : 0), // Ensure numeric
+      playerType: seasonStats.playerType || 'Unknown', // Add player type
       salary: salaryData, // Include salary data
       seasonStats: {
         batting: seasonStats.batting || {},
         pitching: seasonStats.pitching || {},
-        fielding: seasonStats.fielding || {}
+        fielding: seasonStats.fielding || {},
+        war: typeof seasonStats.war === 'number' ? seasonStats.war : (seasonStats.war ? parseFloat(seasonStats.war) : 0), // Ensure numeric
+        cvr: typeof seasonStats.cvr === 'number' ? seasonStats.cvr : (seasonStats.cvr ? parseFloat(seasonStats.cvr) : 0)  // Ensure numeric
       },
       careerHighlights: generateCareerHighlights(seasonStats),
       analytics: {

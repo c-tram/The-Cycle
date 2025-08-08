@@ -151,18 +151,21 @@ export const playersApi = {
       position,
       status = 'active',
       sortBy = 'name',
+      sortOrder = 'desc', // Add sortOrder parameter
       minGames = 0,
       category = 'batting',
       playerType = 'all', // Add playerType filtering
       startDate, // Add date range support
       endDate,   // Add date range support
-      dateRange  // Add date range support
+      dateRange,  // Add date range support
+      limit // Add limit parameter
     } = params;
 
     const queryParams = new URLSearchParams({
       year,
       status,
       sortBy,
+      sortOrder, // Add sortOrder to query
       minGames: minGames.toString(),
       category,
       playerType,
@@ -170,7 +173,8 @@ export const playersApi = {
       ...(position && { position }),
       ...(startDate && { startDate }),
       ...(endDate && { endDate }),
-      ...(dateRange && { dateRange })
+      ...(dateRange && { dateRange }),
+      ...(limit && { limit: limit.toString() }) // Add limit to query
     });
 
     const response = await apiClient.get(`/v2/players?${queryParams}`);

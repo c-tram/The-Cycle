@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Grid,
@@ -19,9 +19,7 @@ import {
   TableRow,
   Switch,
   FormControlLabel,
-  Divider,
   Paper,
-  LinearProgress,
   useTheme,
   alpha
 } from '@mui/material';
@@ -29,16 +27,9 @@ import {
   Person,
   Timeline,
   BarChart,
-  Sports,
   TrendingUp,
   CompareArrows,
-  CalendarToday,
-  Home,
-  FlightTakeoff,
-  Whatshot,
-  AcUnit,
-  WbSunny,
-  Settings
+  InfoOutlined
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -46,12 +37,68 @@ import { useParams, useNavigate } from 'react-router-dom';
 // API and utils
 import { playersApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
+import { getCVRDisplay } from '../utils/cvrCalculations';
 
 // Import player components
 import GameLog from '../components/player/GameLog';
 import PlayerSplits from '../components/player/PlayerSplits';
 import AdvancedStats from '../components/player/AdvancedStats';
 import CareerStats from '../components/player/CareerStats';
+
+// WAR Display Helper
+const getWARDisplay = (war) => {
+  const warValue = war || 0;
+  
+  if (warValue >= 6.0) {
+    return {
+      value: warValue.toFixed(1),
+      description: 'MVP Level',
+      color: '#ff6b35',
+      emoji: '🔥',
+      grade: 'A+'
+    };
+  } else if (warValue >= 4.0) {
+    return {
+      value: warValue.toFixed(1),
+      description: 'All-Star Level',
+      color: '#ff8c42',
+      emoji: '⭐',
+      grade: 'A'
+    };
+  } else if (warValue >= 2.0) {
+    return {
+      value: warValue.toFixed(1),
+      description: 'Above Average',
+      color: '#ffd23f',
+      emoji: '👍',
+      grade: 'B+'
+    };
+  } else if (warValue >= 1.0) {
+    return {
+      value: warValue.toFixed(1),
+      description: 'Average',
+      color: '#06ffa5',
+      emoji: '✅',
+      grade: 'B'
+    };
+  } else if (warValue >= 0.0) {
+    return {
+      value: warValue.toFixed(1),
+      description: 'Below Average',
+      color: '#4fb3d9',
+      emoji: '📉',
+      grade: 'C'
+    };
+  } else {
+    return {
+      value: warValue.toFixed(1),
+      description: 'Replacement Level',
+      color: '#c0392b',
+      emoji: '🔻',
+      grade: 'D'
+    };
+  }
+};
 
 const PlayerProfile = () => {
   const { team, playerName, year = '2025' } = useParams();
@@ -321,8 +368,8 @@ const PlayerHeader = ({ player, year }) => {
             <Typography variant="subtitle2" sx={{ opacity: 0.8, mb: 1 }}>
               Season Summary
             </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
+            <Grid container spacing={1}>
+              <Grid item xs={4}>
                 <Typography variant="caption" sx={{ opacity: 0.7 }}>
                   Games
                 </Typography>
@@ -330,16 +377,34 @@ const PlayerHeader = ({ player, year }) => {
                   {player.gameCount || 0}
                 </Typography>
               </Grid>
-              <Grid item xs={6}>
+              <Grid item xs={4}>
                 <Typography variant="caption" sx={{ opacity: 0.7 }}>
-                  {player.batting?.atBats > 0 ? 'AVG' : 'ERA'}
+                  WAR
                 </Typography>
                 <Typography variant="h6" fontWeight={700}>
-                  {player.batting?.atBats > 0 
-                    ? (player.batting.avg?.toFixed(3) || '.000')
-                    : (player.pitching?.era?.toFixed(2) || '0.00')
-                  }
+                  {player.war ? player.war.toFixed(1) : '0.0'}
                 </Typography>
+              </Grid>
+              <Grid item xs={4}>
+                <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                  CVR
+                </Typography>
+                <Typography variant="h6" fontWeight={700}>
+                  {player.cvr ? player.cvr.toFixed(2) : '0.00'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12}>
+                <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+                  <Typography variant="caption" sx={{ opacity: 0.7 }}>
+                    {player.batting?.atBats > 0 ? 'AVG' : 'ERA'}
+                  </Typography>
+                  <Typography variant="h6" fontWeight={700}>
+                    {player.batting?.atBats > 0 
+                      ? (player.batting.avg?.toFixed(3) || '.000')
+                      : (player.pitching?.era?.toFixed(2) || '0.00')
+                    }
+                  </Typography>
+                </Box>
               </Grid>
             </Grid>
           </Paper>
@@ -356,6 +421,18 @@ const PlayerOverview = ({ player, showAdvanced, onAdvancedToggle }) => {
   // Determine if player is primarily a batter or pitcher
   const isPrimaryBatter = (player.batting?.atBats || 0) > (player.pitching?.battersFaced || 0) / 4;
   const isPrimaryPitcher = (player.pitching?.inningsPitched || 0) > (player.batting?.atBats || 0) / 4;
+
+  // Debug logging
+  console.log('PlayerOverview Debug:', {
+    playerName: player.name,
+    isPrimaryBatter,
+    isPrimaryPitcher,
+    battingAtBats: player.batting?.atBats,
+    pitchingInnings: player.pitching?.inningsPitched,
+    pitchingBattersFaced: player.pitching?.battersFaced,
+    war: player.war,
+    cvr: player.cvr
+  });
 
   return (
     <Box>
@@ -385,7 +462,7 @@ const PlayerOverview = ({ player, showAdvanced, onAdvancedToggle }) => {
                 <Typography variant="h6" fontWeight={700} gutterBottom>
                   Batting Statistics
                 </Typography>
-                <BattingStatsTable stats={player.batting} showAdvanced={showAdvanced} />
+                <BattingStatsTable stats={player.batting} player={player} showAdvanced={showAdvanced} />
               </CardContent>
             </Card>
           </Grid>
@@ -398,14 +475,30 @@ const PlayerOverview = ({ player, showAdvanced, onAdvancedToggle }) => {
                 <Typography variant="h6" fontWeight={700} gutterBottom>
                   Pitching Statistics
                 </Typography>
-                <PitchingStatsTable stats={player.pitching} showAdvanced={showAdvanced} />
+                <PitchingStatsTable stats={player.pitching} player={player} showAdvanced={showAdvanced} />
               </CardContent>
             </Card>
           </Grid>
         )}
 
-        {/* Secondary Stats & Info */}
-        <Grid item xs={12} lg={4}>
+        {/* If neither primary batter nor pitcher, show general stats */}
+        {!isPrimaryBatter && !isPrimaryPitcher && (
+          <Grid item xs={12} lg={8}>
+            <Card elevation={0}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} gutterBottom>
+                  Player Statistics
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  This player has limited statistical data available.
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
+        {/* Secondary Stats & Info - Always show */}
+        <Grid item xs={12} lg={(isPrimaryBatter || isPrimaryPitcher) ? 4 : 12}>
           <Grid container spacing={2}>
             {/* Quick Info Card */}
             <Grid item xs={12}>
@@ -435,6 +528,18 @@ const PlayerOverview = ({ player, showAdvanced, onAdvancedToggle }) => {
                       <Typography fontWeight={600}>{player.gameCount || 0}</Typography>
                     </Box>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography color="text.secondary">WAR</Typography>
+                      <Typography fontWeight={600} color="primary.main">
+                        {player.war ? player.war.toFixed(1) : '0.0'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography color="text.secondary">CVR</Typography>
+                      <Typography fontWeight={600} color="secondary.main">
+                        {player.cvr ? player.cvr.toFixed(2) : '0.00'}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                       <Typography color="text.secondary">Status</Typography>
                       <Chip 
                         label={player.status || 'Active'} 
@@ -448,6 +553,100 @@ const PlayerOverview = ({ player, showAdvanced, onAdvancedToggle }) => {
               </Card>
             </Grid>
 
+            {/* WAR Display Box */}
+            <Grid item xs={12}>
+              {console.log('Rendering WAR Display Box for:', player.name, 'WAR:', player.war)}
+              <Card 
+                elevation={2}
+                sx={{
+                  background: `linear-gradient(135deg, ${getWARDisplay(player.war).color}15 0%, ${getWARDisplay(player.war).color}05 100%)`,
+                  border: `2px solid ${getWARDisplay(player.war).color}50`,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  cursor: 'help',
+                  minHeight: '140px',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: `linear-gradient(45deg, transparent 30%, ${getWARDisplay(player.war).color}10 50%, transparent 70%)`,
+                    animation: player.war && player.war > 2.0 ? 'shimmer 2s infinite' : 'none',
+                  },
+                  '@keyframes shimmer': {
+                    '0%': { transform: 'translateX(-100%)' },
+                    '100%': { transform: 'translateX(100%)' }
+                  }
+                }}
+              >
+                <CardContent sx={{ textAlign: 'center', p: 3 }}>
+                  <Box sx={{ position: 'relative', zIndex: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          color: getWARDisplay(player.war).color, 
+                          fontWeight: 600,
+                          fontSize: '0.75rem',
+                          textTransform: 'uppercase',
+                          letterSpacing: 1
+                        }}
+                      >
+                        {getWARDisplay(player.war).emoji} Wins Above Replacement
+                      </Typography>
+                      <IconButton 
+                        size="small" 
+                        sx={{ 
+                          color: getWARDisplay(player.war).color, 
+                          opacity: 0.7,
+                          '&:hover': { opacity: 1 }
+                        }}
+                      >
+                        <InfoOutlined fontSize="small" />
+                      </IconButton>
+                    </Box>
+                    <Typography 
+                      variant="h3" 
+                      sx={{ 
+                        color: getWARDisplay(player.war).color,
+                        fontWeight: 900,
+                        fontSize: '2.5rem',
+                        lineHeight: 1,
+                        textShadow: player.war && player.war > 2.0 ? `0 0 20px ${getWARDisplay(player.war).color}50` : 'none'
+                      }}
+                    >
+                      {getWARDisplay(player.war).value}
+                    </Typography>
+                    <Typography 
+                      variant="body2" 
+                      sx={{ 
+                        color: getWARDisplay(player.war).color,
+                        fontWeight: 500,
+                        fontSize: '0.7rem'
+                      }}
+                    >
+                      {getWARDisplay(player.war).description}
+                    </Typography>
+                    {getWARDisplay(player.war).grade && (
+                      <Chip 
+                        label={`Grade: ${getWARDisplay(player.war).grade}`}
+                        size="small"
+                        sx={{ 
+                          mt: 1,
+                          backgroundColor: `${getWARDisplay(player.war).color}20`,
+                          color: getWARDisplay(player.war).color,
+                          border: `1px solid ${getWARDisplay(player.war).color}40`,
+                          fontWeight: 600
+                        }}
+                      />
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+
             {/* Secondary Stats */}
             {isPrimaryBatter && player.pitching?.inningsPitched > 0 && (
               <Grid item xs={12}>
@@ -456,7 +655,7 @@ const PlayerOverview = ({ player, showAdvanced, onAdvancedToggle }) => {
                     <Typography variant="h6" fontWeight={700} gutterBottom>
                       Pitching
                     </Typography>
-                    <PitchingStatsTable stats={player.pitching} showAdvanced={showAdvanced} compact />
+                    <PitchingStatsTable stats={player.pitching} player={player} showAdvanced={showAdvanced} compact />
                   </CardContent>
                 </Card>
               </Grid>
@@ -469,7 +668,7 @@ const PlayerOverview = ({ player, showAdvanced, onAdvancedToggle }) => {
                     <Typography variant="h6" fontWeight={700} gutterBottom>
                       Batting
                     </Typography>
-                    <BattingStatsTable stats={player.batting} showAdvanced={showAdvanced} compact />
+                    <BattingStatsTable stats={player.batting} player={player} showAdvanced={showAdvanced} compact />
                   </CardContent>
                 </Card>
               </Grid>
@@ -496,7 +695,7 @@ const PlayerOverview = ({ player, showAdvanced, onAdvancedToggle }) => {
 };
 
 // Batting Stats Table Component
-const BattingStatsTable = ({ stats, showAdvanced, compact = false }) => {
+const BattingStatsTable = ({ stats, player, showAdvanced, compact = false }) => {
   const basicStats = [
     { key: 'gamesPlayed', label: 'G', format: (val) => val || 0 },
     { key: 'atBats', label: 'AB', format: (val) => val || 0 },
@@ -516,6 +715,13 @@ const BattingStatsTable = ({ stats, showAdvanced, compact = false }) => {
   ];
 
   const advancedStats = [
+    // Add WAR and CVR to advanced stats
+    { key: 'war', label: 'WAR', format: (val) => val ? val.toFixed(1) : '0.0', source: 'player' },
+    { key: 'cvr', label: 'CVR', format: (val) => {
+      if (!val) return '0.00';
+      const display = getCVRDisplay(val);
+      return `${display.value} ${display.emoji}`;
+    }, source: 'player' },
     { key: 'iso', label: 'ISO', format: (val) => val?.toFixed(3) || '.000' },
     { key: 'babip', label: 'BABIP', format: (val) => val?.toFixed(3) || '.000' },
     { key: 'kRate', label: 'K%', format: (val) => `${(val * 100)?.toFixed(1) || '0.0'}%` },
@@ -541,11 +747,15 @@ const BattingStatsTable = ({ stats, showAdvanced, compact = false }) => {
         </TableHead>
         <TableBody>
           <TableRow>
-            {displayStats.map((stat) => (
-              <TableCell key={stat.key} align="center" sx={{ fontWeight: 600 }}>
-                {stat.format(stats?.[stat.key])}
-              </TableCell>
-            ))}
+            {displayStats.map((stat) => {
+              // Get value from player object or stats object based on source
+              const value = stat.source === 'player' ? player?.[stat.key] : stats?.[stat.key];
+              return (
+                <TableCell key={stat.key} align="center" sx={{ fontWeight: 600 }}>
+                  {stat.format(value)}
+                </TableCell>
+              );
+            })}
           </TableRow>
         </TableBody>
       </Table>
@@ -554,7 +764,7 @@ const BattingStatsTable = ({ stats, showAdvanced, compact = false }) => {
 };
 
 // Pitching Stats Table Component
-const PitchingStatsTable = ({ stats, showAdvanced, compact = false }) => {
+const PitchingStatsTable = ({ stats, player, showAdvanced, compact = false }) => {
   const basicStats = [
     { key: 'gamesPlayed', label: 'G', format: (val) => val || 0 },
     { key: 'gamesStarted', label: 'GS', format: (val) => val || 0 },
@@ -573,6 +783,13 @@ const PitchingStatsTable = ({ stats, showAdvanced, compact = false }) => {
   ];
 
   const advancedStats = [
+    // Add WAR and CVR to advanced stats
+    { key: 'war', label: 'WAR', format: (val) => val ? val.toFixed(1) : '0.0', source: 'player' },
+    { key: 'cvr', label: 'CVR', format: (val) => {
+      if (!val) return '0.00';
+      const display = getCVRDisplay(val);
+      return `${display.value} ${display.emoji}`;
+    }, source: 'player' },
     { key: 'fip', label: 'FIP', format: (val) => val?.toFixed(2) || '0.00' },
     { key: 'strikeoutsPer9Inn', label: 'K/9', format: (val) => val?.toFixed(1) || '0.0' },
     { key: 'walksPer9Inn', label: 'BB/9', format: (val) => val?.toFixed(1) || '0.0' },
@@ -598,11 +815,15 @@ const PitchingStatsTable = ({ stats, showAdvanced, compact = false }) => {
         </TableHead>
         <TableBody>
           <TableRow>
-            {displayStats.map((stat) => (
-              <TableCell key={stat.key} align="center" sx={{ fontWeight: 600 }}>
-                {stat.format(stats?.[stat.key])}
-              </TableCell>
-            ))}
+            {displayStats.map((stat) => {
+              // Get value from player object or stats object based on source
+              const value = stat.source === 'player' ? player?.[stat.key] : stats?.[stat.key];
+              return (
+                <TableCell key={stat.key} align="center" sx={{ fontWeight: 600 }}>
+                  {stat.format(value)}
+                </TableCell>
+              );
+            })}
           </TableRow>
         </TableBody>
       </Table>

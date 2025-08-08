@@ -49,6 +49,61 @@ import { playersApi, statsApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
 import { calculatePlayerCVR, getCVRDisplay, formatSalary } from '../utils/cvrCalculations'; // v3.0 - FIXED EXPORTS
 
+// WAR Display Helper
+const getWARDisplay = (war) => {
+  const warValue = war || 0;
+  
+  if (warValue >= 6.0) {
+    return {
+      value: warValue.toFixed(1),
+      description: 'MVP Level',
+      color: '#ff6b35',
+      emoji: '🔥',
+      grade: 'A+'
+    };
+  } else if (warValue >= 4.0) {
+    return {
+      value: warValue.toFixed(1),
+      description: 'All-Star Level',
+      color: '#ff8c42',
+      emoji: '⭐',
+      grade: 'A'
+    };
+  } else if (warValue >= 2.0) {
+    return {
+      value: warValue.toFixed(1),
+      description: 'Above Average',
+      color: '#ffd23f',
+      emoji: '👍',
+      grade: 'B+'
+    };
+  } else if (warValue >= 1.0) {
+    return {
+      value: warValue.toFixed(1),
+      description: 'Average',
+      color: '#06ffa5',
+      emoji: '✅',
+      grade: 'B'
+    };
+  } else if (warValue >= 0.0) {
+    return {
+      value: warValue.toFixed(1),
+      description: 'Below Average',
+      color: '#4fb3d9',
+      emoji: '📉',
+      grade: 'C'
+    };
+  } else {
+    return {
+      value: warValue.toFixed(1),
+      description: 'Replacement Level',
+      color: '#c0392b',
+      emoji: '🔻',
+      grade: 'D'
+    };
+  }
+};
+
 // Helper function to format innings pitched for display (e.g., 5.33 → "5.1", 5.67 → "5.2")
 const formatInningsPitched = (ip) => {
   if (!ip || ip === 0) return '0.0';
@@ -439,7 +494,7 @@ const PlayerDetail = () => {
                 {/* Quick Stats - CVR Focus */}
                 <Box sx={{ textAlign: 'center', minWidth: 200 }}>
                   <Grid container spacing={2}>
-                    <Grid item xs={12}>
+                    <Grid item xs={6}>
                       {(() => {
                         const cvrDisplay = getCVRDisplay(cvr);
                         return (
@@ -562,6 +617,107 @@ const PlayerDetail = () => {
                               </Box>
                             </Box>
                             </Tooltip>
+                          </motion.div>
+                        );
+                      })()}
+                    </Grid>
+                    
+                    <Grid item xs={6}>
+                      {(() => {
+                        const warDisplay = getWARDisplay(player.war);
+                        return (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            transition={{ type: "spring", stiffness: 200, delay: 0.4 }}
+                          >
+                            <Box 
+                              sx={{ 
+                                background: `linear-gradient(135deg, ${warDisplay.color}15, ${warDisplay.color}05)`,
+                                border: `2px solid ${warDisplay.color}`,
+                                borderRadius: 3,
+                                padding: 2,
+                                position: 'relative',
+                                overflow: 'hidden',
+                                cursor: 'help',
+                                '&::before': {
+                                  content: '""',
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  background: `linear-gradient(45deg, transparent 30%, ${warDisplay.color}10 50%, transparent 70%)`,
+                                  animation: player.war && player.war > 2.0 ? 'shimmer 2s infinite' : 'none',
+                                },
+                                '@keyframes shimmer': {
+                                  '0%': { transform: 'translateX(-100%)' },
+                                  '100%': { transform: 'translateX(100%)' }
+                                }
+                              }}
+                            >
+                              <Box sx={{ position: 'relative', zIndex: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                  <Typography 
+                                    variant="body2" 
+                                    sx={{ 
+                                      color: warDisplay.color, 
+                                      fontWeight: 600,
+                                      fontSize: '0.75rem',
+                                      textTransform: 'uppercase',
+                                      letterSpacing: 1
+                                    }}
+                                  >
+                                    {warDisplay.emoji} Wins Above Replacement
+                                  </Typography>
+                                  <IconButton 
+                                    size="small" 
+                                    sx={{ 
+                                      color: warDisplay.color, 
+                                      opacity: 0.7,
+                                      '&:hover': { opacity: 1 }
+                                    }}
+                                  >
+                                    <InfoOutlined fontSize="small" />
+                                  </IconButton>
+                                </Box>
+                              <Typography 
+                                variant="h3" 
+                                sx={{ 
+                                  color: warDisplay.color,
+                                  fontWeight: 900,
+                                  fontSize: '2.5rem',
+                                  lineHeight: 1,
+                                  textShadow: player.war && player.war > 2.0 ? `0 0 20px ${warDisplay.color}50` : 'none'
+                                }}
+                              >
+                                {warDisplay.value}
+                              </Typography>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  color: warDisplay.color,
+                                  fontWeight: 500,
+                                  fontSize: '0.7rem'
+                                }}
+                              >
+                                {warDisplay.description}
+                              </Typography>
+                              {warDisplay.grade && (
+                                <Chip 
+                                  label={`Grade: ${warDisplay.grade}`}
+                                  size="small"
+                                  sx={{ 
+                                    mt: 0.5,
+                                    backgroundColor: warDisplay.color,
+                                    color: 'white',
+                                    fontWeight: 700,
+                                    fontSize: '0.6rem'
+                                  }}
+                                />
+                              )}
+                            </Box>
+                          </Box>
                           </motion.div>
                         );
                       })()}

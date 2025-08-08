@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   Box,
   Grid,
@@ -11,6 +11,13 @@ import {
   Avatar,
   Chip,
   Button,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
   Skeleton,
   useTheme,
   alpha,
@@ -20,126 +27,472 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Divider,
-  LinearProgress,
-  List,
-  ListItem,
+  OutlinedInput,
+  Checkbox,
   ListItemText,
-  ListItemAvatar
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Stack
 } from '@mui/material';
 import {
   Search,
-  Groups,
   Sports,
-  TrendingUp,
-  TrendingDown,
   Refresh,
-  Star,
-  Assessment,
-  EmojiEvents,
-  Timeline
+  ViewList,
+  ViewModule,
+  ArrowUpward,
+  ArrowDownward,
+  DateRange,
+  Analytics,
+  Groups,
+  Stadium
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
 // API and utils
-import { teamsApi, statsApi } from '../services/apiService';
+import { teamsApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
+import { getCVRDisplay } from '../utils/cvrCalculations';
+
+// Helper function to safely get nested object values
+const getNestedValue = (obj, path) => {
+  return path.split('.').reduce((current, key) => current?.[key], obj);
+};
 
 const Teams = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const searchInputRef = useRef(null);
   
   const [teams, setTeams] = useState([]);
-  const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [error, setError] = useState(null);
   
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeView, setActiveView] = useState('overview'); // 'overview', 'standings', 'stats'
-  const [selectedDivision, setSelectedDivision] = useState('all');
-  const [selectedLeague, setSelectedLeague] = useState('all');
+  const [selectedLeagues, setSelectedLeagues] = useState([]);
+  const [selectedDivisions, setSelectedDivisions] = useState([]);
+  const [activeCategory, setActiveCategory] = useState('batting');
+  const [sortBy, setSortBy] = useState('record.wins');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [dateRange, setDateRange] = useState('all');
+  
+  // Enhanced date range functionality
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
+  
+  // View options
+  const [viewMode, setViewMode] = useState('table');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
-  // Available divisions and leagues
-  const divisions = ['AL East', 'AL Central', 'AL West', 'NL East', 'NL Central', 'NL West'];
+  // Static data
   const leagues = ['AL', 'NL'];
+  const divisions = ['East', 'Central', 'West'];
+
+  // Helper function to get date range for API calls
+  const getDateRangeParams = useCallback(() => {
+    const currentDate = new Date();
+    
+    switch (dateRange) {
+      case 'today':
+        return {
+          startDate: format(currentDate, 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'last1':
+        return {
+          startDate: format(subDays(currentDate, 1), 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'last3':
+        return {
+          startDate: format(subDays(currentDate, 3), 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'last7':
+        return {
+          startDate: format(subDays(currentDate, 7), 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'last14':
+        return {
+          startDate: format(subDays(currentDate, 14), 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'last30':
+        return {
+          startDate: format(subDays(currentDate, 30), 'yyyy-MM-dd'),
+          endDate: format(currentDate, 'yyyy-MM-dd')
+        };
+      case 'thisWeek':
+        return {
+          startDate: format(startOfWeek(currentDate), 'yyyy-MM-dd'),
+          endDate: format(endOfWeek(currentDate), 'yyyy-MM-dd')
+        };
+      case 'thisMonth':
+        return {
+          startDate: format(startOfMonth(currentDate), 'yyyy-MM-dd'),
+          endDate: format(endOfMonth(currentDate), 'yyyy-MM-dd')
+        };
+      case 'august':
+        return {
+          startDate: '2025-08-01',
+          endDate: '2025-08-31'
+        };
+      case 'custom':
+        if (customStartDate && customEndDate) {
+          return {
+            startDate: customStartDate,
+            endDate: customEndDate
+          };
+        }
+        return null;
+      default:
+        return null;
+    }
+  }, [dateRange, customStartDate, customEndDate]);
 
   useEffect(() => {
-    loadTeamsData();
-  }, []);
+    loadTeams();
+  }, [activeCategory, sortBy, sortOrder]);
 
-  const loadTeamsData = async () => {
+  // Real-time search and filter effect
+  useEffect(() => {
+    setPage(0); // Reset to first page when filters change
+    
+    // Debounce the search to avoid too many API calls
+    const searchTimeout = setTimeout(() => {
+      if (searchTerm || selectedLeagues.length > 0 || selectedDivisions.length > 0 || dateRange !== 'all') {
+        setSearchLoading(true);
+        loadTeams().finally(() => setSearchLoading(false));
+      } else {
+        loadTeams();
+      }
+    }, 300); // 300ms delay
+
+    return () => clearTimeout(searchTimeout);
+  }, [searchTerm, selectedLeagues, selectedDivisions, dateRange]);
+
+  // Debounced API call for real-time search
+  const loadTeams = useCallback(async () => {
     try {
-      setLoading(true);
+      if (!searchTerm && selectedLeagues.length === 0 && selectedDivisions.length === 0 && dateRange === 'all') {
+        setLoading(true);
+      }
       setError(null);
 
-      const [teamsResponse, standingsResponse] = await Promise.all([
-        teamsApi.getTeams(),
-        teamsApi.getStandings()
-      ]);
+      // Build API parameters based on current filters
+      const apiParams = {
+        category: activeCategory,
+        sortBy,
+        sortOrder,
+        limit: 100 // Get all teams
+      };
 
-      setTeams(teamsResponse.teams || []);
-      setStandings(standingsResponse.standings || []);
+      // Add league filter if selected
+      if (selectedLeagues.length === 1) {
+        apiParams.league = selectedLeagues[0];
+      }
+
+      // Add division filter if selected
+      if (selectedDivisions.length === 1) {
+        apiParams.division = selectedDivisions[0];
+      }
+
+      // Add date range filter if not 'all'
+      const dateParams = getDateRangeParams();
+      if (dateParams) {
+        apiParams.startDate = dateParams.startDate;
+        apiParams.endDate = dateParams.endDate;
+        apiParams.dateRange = dateRange;
+      }
+
+      const response = await teamsApi.getTeams(apiParams);
+      const newTeams = response.teams || [];
+      setTeams(newTeams);
+      
     } catch (err) {
-      console.error('Error loading teams data:', err);
+      console.error('Error loading teams:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeCategory, sortBy, sortOrder, selectedLeagues, selectedDivisions, searchTerm, dateRange, customStartDate, customEndDate, getDateRangeParams]);
 
-  // Filter teams
+  // Filter and sort teams with real-time search
   const filteredTeams = useMemo(() => {
     let filtered = [...teams];
 
-    // Search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
+    // Real-time search filter
+    if (searchTerm && searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(team =>
-        team.name.toLowerCase().includes(term) ||
-        team.abbreviation.toLowerCase().includes(term) ||
-        team.city.toLowerCase().includes(term)
+        team.name?.toLowerCase().includes(term) ||
+        team.id?.toLowerCase().includes(term) ||
+        team.league?.toLowerCase().includes(term) ||
+        team.division?.toLowerCase().includes(term)
       );
     }
 
-    // Division filter
-    if (selectedDivision !== 'all') {
-      filtered = filtered.filter(team => team.division === selectedDivision);
+    // League filter (handled by API for single league, client-side for multiple)
+    if (selectedLeagues.length > 1) {
+      filtered = filtered.filter(team =>
+        selectedLeagues.includes(team.league)
+      );
     }
 
-    // League filter
-    if (selectedLeague !== 'all') {
-      filtered = filtered.filter(team => team.league === selectedLeague);
+    // Division filter (handled by API for single division, client-side for multiple)
+    if (selectedDivisions.length > 1) {
+      filtered = filtered.filter(team =>
+        selectedDivisions.includes(team.division)
+      );
+    }
+
+    // Client-side sorting
+    if (sortBy) {
+      filtered.sort((a, b) => {
+        const aValue = getNestedValue(a, sortBy);
+        const bValue = getNestedValue(b, sortBy);
+        
+        // Handle null/undefined values
+        if (aValue == null && bValue == null) return 0;
+        if (aValue == null) return 1;
+        if (bValue == null) return -1;
+        
+        // Convert to numbers if they're numeric strings
+        const aNum = Number(aValue);
+        const bNum = Number(bValue);
+        
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return sortOrder === 'desc' ? bNum - aNum : aNum - bNum;
+        }
+        
+        // String comparison
+        const aStr = String(aValue).toLowerCase();
+        const bStr = String(bValue).toLowerCase();
+        
+        if (sortOrder === 'desc') {
+          return bStr.localeCompare(aStr);
+        } else {
+          return aStr.localeCompare(bStr);
+        }
+      });
     }
 
     return filtered;
-  }, [teams, searchTerm, selectedDivision, selectedLeague]);
+  }, [teams, searchTerm, selectedLeagues, selectedDivisions, sortBy, sortOrder]);
 
-  // Group standings by division
-  const standingsByDivision = useMemo(() => {
-    const grouped = {};
-    standings.forEach(team => {
-      if (!grouped[team.division]) {
-        grouped[team.division] = [];
+  // Calculate category-specific filtered teams (for stats display)
+  const categoryFilteredTeams = useMemo(() => {
+    return filteredTeams.filter(team => {
+      const stats = team.stats?.[activeCategory];
+      if (!stats) return false;
+      
+      // Category-specific filtering logic
+      switch (activeCategory) {
+        case 'batting':
+          return stats.atBats > 0 || stats.hits > 0;
+        case 'pitching':
+          return stats.inningsPitched && parseFloat(stats.inningsPitched) > 0;
+        case 'fielding':
+          return stats.chances > 0 || stats.assists > 0 || stats.putOuts > 0;
+        default:
+          return true;
       }
-      grouped[team.division].push(team);
     });
-    
-    // Sort each division by wins
-    Object.keys(grouped).forEach(division => {
-      grouped[division].sort((a, b) => (b.wins || 0) - (a.wins || 0));
-    });
-    
-    return grouped;
-  }, [standings]);
+  }, [filteredTeams, activeCategory]);
 
-  // Tab configuration
-  const tabs = [
-    { value: 'overview', label: 'Team Overview', icon: <Groups /> },
-    { value: 'standings', label: 'Standings', icon: <EmojiEvents /> },
-    { value: 'stats', label: 'Team Stats', icon: <Assessment /> }
-  ];
+  // Pagination
+  const paginatedTeams = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    return categoryFilteredTeams.slice(startIndex, startIndex + rowsPerPage);
+  }, [categoryFilteredTeams, page, rowsPerPage]);
+
+  // Stat configurations for different categories
+  const statConfigs = {
+    batting: [
+      // Team Identity
+      { key: 'id', label: 'Team', format: (val) => val || '---', sticky: true },
+      { key: 'record.wins', label: 'W', format: (val) => val || 0 },
+      { key: 'record.losses', label: 'L', format: (val) => val || 0 },
+      { key: 'standings.winPercentage', label: 'PCT', format: (val) => val?.toFixed(3) || '---' },
+      
+      // Advanced Team Metrics
+      { key: 'war.total', label: 'WAR', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'cvr', label: 'CVR', format: (val) => {
+        if (!val) return '---';
+        const display = getCVRDisplay(val);
+        return `${display.value} ${display.emoji}`;
+      }},
+      
+      // Traditional Triple Slash (Team)
+      { key: 'stats.batting.avg', label: 'AVG', format: (val) => val?.toFixed(3) || '---' },
+      { key: 'stats.batting.obp', label: 'OBP', format: (val) => val?.toFixed(3) || '---' },
+      { key: 'stats.batting.slg', label: 'SLG', format: (val) => val?.toFixed(3) || '---' },
+      { key: 'stats.batting.ops', label: 'OPS', format: (val) => val?.toFixed(3) || '---' },
+      
+      // Power Metrics
+      { key: 'stats.batting.homeRuns', label: 'HR', format: (val) => val || 0 },
+      { key: 'stats.batting.iso', label: 'ISO', format: (val) => val?.toFixed(3) || '---' },
+      { key: 'stats.batting.extraBaseHits', label: 'XBH', format: (val) => val || 0 },
+      { key: 'stats.batting.extraBaseHitRate', label: 'XBH%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
+      
+      // Plate Discipline
+      { key: 'stats.batting.kRate', label: 'K%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
+      { key: 'stats.batting.bbRate', label: 'BB%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
+      { key: 'stats.batting.contactRate', label: 'Contact%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
+      { key: 'stats.batting.walkToStrikeoutRatio', label: 'BB/K', format: (val) => val && val < 999 ? val.toFixed(2) : val > 0 ? '∞' : '---' },
+      
+      // Advanced Sabermetrics
+      { key: 'stats.batting.wOBA', label: 'wOBA', format: (val) => val?.toFixed(3) || '---' },
+      { key: 'stats.batting.babip', label: 'BABIP', format: (val) => val?.toFixed(3) || '---' },
+      
+      // Run Production
+      { key: 'standings.runsScored', label: 'R', format: (val) => val || 0 },
+      { key: 'stats.batting.rbi', label: 'RBI', format: (val) => val || 0 },
+      { key: 'stats.batting.hits', label: 'H', format: (val) => val || 0 },
+      { key: 'stats.batting.doubles', label: '2B', format: (val) => val || 0 },
+      { key: 'stats.batting.triples', label: '3B', format: (val) => val || 0 },
+      { key: 'stats.batting.stolenBases', label: 'SB', format: (val) => val || 0 },
+      { key: 'stats.batting.plateAppearances', label: 'PA', format: (val) => val || 0 },
+      { key: 'stats.batting.baseOnBalls', label: 'BB', format: (val) => val || 0 },
+      { key: 'stats.batting.strikeOuts', label: 'K', format: (val) => val || 0 }
+    ],
+    pitching: [
+      // Team Identity
+      { key: 'id', label: 'Team', format: (val) => val || '---', sticky: true },
+      { key: 'record.wins', label: 'W', format: (val) => val || 0 },
+      { key: 'record.losses', label: 'L', format: (val) => val || 0 },
+      { key: 'standings.winPercentage', label: 'PCT', format: (val) => val?.toFixed(3) || '---' },
+      
+      // Advanced Team Metrics
+      { key: 'war.total', label: 'WAR', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'war.pitching', label: 'pWAR', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'cvr', label: 'CVR', format: (val) => {
+        if (!val) return '---';
+        const display = getCVRDisplay(val);
+        return `${display.value} ${display.emoji}`;
+      }},
+      
+      // Innings (Primary Volume)
+      { key: 'stats.pitching.inningsPitched', label: 'IP', format: (val) => val || '---' },
+      
+      // Traditional Rate Stats
+      { key: 'stats.pitching.era', label: 'ERA', format: (val) => val?.toFixed(2) || '---' },
+      { key: 'stats.pitching.whip', label: 'WHIP', format: (val) => val?.toFixed(2) || '---' },
+      { key: 'stats.pitching.winPercentage', label: 'WIN%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
+      
+      // Advanced Sabermetrics
+      { key: 'stats.pitching.fip', label: 'FIP', format: (val) => val?.toFixed(2) || '---' },
+      { key: 'stats.pitching.xFip', label: 'xFIP', format: (val) => val?.toFixed(2) || '---' },
+      { key: 'stats.pitching.babip', label: 'BABIP', format: (val) => val?.toFixed(3) || '---' },
+      { key: 'stats.pitching.strandRate', label: 'LOB%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
+      
+      // Strikeout Metrics
+      { key: 'stats.pitching.strikeoutWalkRatio', label: 'K/BB', format: (val) => val && val < 999 ? val.toFixed(2) : val > 0 ? '∞' : '---' },
+      { key: 'stats.pitching.strikeoutsPer9Inn', label: 'K/9', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'stats.pitching.walksPer9Inn', label: 'BB/9', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'stats.pitching.hitsPer9Inn', label: 'H/9', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'stats.pitching.homeRunsPer9', label: 'HR/9', format: (val) => val?.toFixed(1) || '---' },
+      
+      // Efficiency Metrics
+      { key: 'stats.pitching.pitchesPerInning', label: 'P/IP', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'stats.pitching.strikePercentage', label: 'Strike%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
+      
+      // Run Prevention
+      { key: 'standings.runsAllowed', label: 'RA', format: (val) => val || 0 },
+      { key: 'standings.runDifferential', label: 'DIFF', format: (val) => val >= 0 ? `+${val}` : val || 0 },
+      { key: 'stats.pitching.earnedRuns', label: 'ER', format: (val) => val || 0 },
+      { key: 'stats.pitching.homeRuns', label: 'HR', format: (val) => val || 0 },
+      { key: 'stats.pitching.strikeOuts', label: 'K', format: (val) => val || 0 },
+      { key: 'stats.pitching.baseOnBalls', label: 'BB', format: (val) => val || 0 },
+      { key: 'stats.pitching.hits', label: 'H', format: (val) => val || 0 },
+      { key: 'stats.pitching.saves', label: 'SV', format: (val) => val || 0 }
+    ],
+    fielding: [
+      // Team Identity
+      { key: 'id', label: 'Team', format: (val) => val || '---', sticky: true },
+      { key: 'record.wins', label: 'W', format: (val) => val || 0 },
+      { key: 'record.losses', label: 'L', format: (val) => val || 0 },
+      { key: 'standings.winPercentage', label: 'PCT', format: (val) => val?.toFixed(3) || '---' },
+      
+      // Advanced Team Metrics
+      { key: 'war.total', label: 'WAR', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'cvr', label: 'CVR', format: (val) => {
+        if (!val) return '---';
+        const display = getCVRDisplay(val);
+        return `${display.value} ${display.emoji}`;
+      }},
+      
+      // Primary Fielding Stats
+      { key: 'stats.fielding.fieldingPercentage', label: 'FLD%', format: (val) => val?.toFixed(3) || '---' },
+      { key: 'stats.fielding.errors', label: 'E', format: (val) => val || 0 },
+      { key: 'stats.fielding.assists', label: 'A', format: (val) => val || 0 },
+      { key: 'stats.fielding.putOuts', label: 'PO', format: (val) => val || 0 },
+      { key: 'stats.fielding.chances', label: 'TC', format: (val) => val || 0 },
+      
+      // Advanced Fielding
+      { key: 'stats.fielding.caughtStealingPercentage', label: 'CS%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
+      
+      // Related Stats
+      { key: 'stats.pitching.groundOutsToAirouts', label: 'GO/AO', format: (val) => val?.toFixed(2) || '---' },
+      { key: 'standings.runDifferential', label: 'DIFF', format: (val) => val >= 0 ? `+${val}` : val || 0 }
+    ]
+  };
+
+  const currentStats = statConfigs[activeCategory] || [];
+
+  // Handle custom date range application
+  const handleCustomDateRange = () => {
+    if (customStartDate && customEndDate) {
+      setDateRange('custom');
+      setShowCustomDateDialog(false);
+    }
+  };
+
+  // Handle sorting
+  const handleSort = useCallback((statKey) => {
+    if (sortBy === statKey) {
+      setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortBy(statKey);
+      setSortOrder('desc');
+    }
+  }, [sortBy]);
+
+  // Loading skeleton component
+  const TeamsSkeleton = () => (
+    <Box>
+      {[...Array(10)].map((_, index) => (
+        <Card key={index} sx={{ mb: 2 }}>
+          <CardContent>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={3}>
+                <Skeleton variant="text" height={40} />
+              </Grid>
+              <Grid item xs={9}>
+                <Grid container spacing={1}>
+                  {[...Array(8)].map((_, statIndex) => (
+                    <Grid item xs={1.5} key={statIndex}>
+                      <Skeleton variant="text" height={24} />
+                    </Grid>
+                  ))}
+                </Grid>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      ))}
+    </Box>
+  );
 
   if (loading) {
     return <TeamsSkeleton />;
@@ -151,11 +504,7 @@ const Teams = () => {
         <Typography color="error" variant="h6">
           Error loading teams: {error}
         </Typography>
-        <Button 
-          startIcon={<Refresh />} 
-          onClick={loadTeamsData}
-          sx={{ mt: 2 }}
-        >
+        <Button onClick={loadTeams} variant="contained" sx={{ mt: 2 }}>
           Retry
         </Button>
       </Box>
@@ -163,478 +512,399 @@ const Teams = () => {
   }
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 } }}>
+    <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: '100%', overflow: 'hidden' }}>
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" fontWeight={800} gutterBottom>
-          Team Center
+          Team Statistics
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Complete team information, standings, and performance analytics
+          Comprehensive team performance analytics for the 2025 season
         </Typography>
       </Box>
 
       {/* Controls */}
-      <Card elevation={0} sx={{ mb: 3 }}>
-        <CardContent sx={{ p: 3 }}>
-          {/* View Tabs */}
-          <Box sx={{ mb: 3 }}>
-            <Tabs
-              value={activeView}
-              onChange={(_, newValue) => setActiveView(newValue)}
-              sx={{
-                '& .MuiTab-root': {
-                  minHeight: 48,
-                  textTransform: 'none',
-                  fontWeight: 600
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        {/* Search */}
+        <Grid item xs={12} md={4}>
+          <TextField
+            ref={searchInputRef}
+            fullWidth
+            placeholder="Search teams..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search color="action" />
+                </InputAdornment>
+              ),
+              endAdornment: searchLoading && (
+                <InputAdornment position="end">
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  >
+                    <Refresh color="action" />
+                  </motion.div>
+                </InputAdornment>
+              )
+            }}
+          />
+        </Grid>
+
+        {/* League Filter */}
+        <Grid item xs={12} md={2}>
+          <FormControl fullWidth size="small">
+            <InputLabel>League</InputLabel>
+            <Select
+              multiple
+              value={selectedLeagues}
+              onChange={(e) => setSelectedLeagues(e.target.value)}
+              input={<OutlinedInput label="League" />}
+              renderValue={(selected) => selected.length === 0 ? 'All Leagues' : selected.join(', ')}
+            >
+              {leagues.map((league) => (
+                <MenuItem key={league} value={league}>
+                  <Checkbox checked={selectedLeagues.indexOf(league) > -1} />
+                  <ListItemText primary={league} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        {/* Division Filter */}
+        <Grid item xs={12} md={2}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Division</InputLabel>
+            <Select
+              multiple
+              value={selectedDivisions}
+              onChange={(e) => setSelectedDivisions(e.target.value)}
+              input={<OutlinedInput label="Division" />}
+              renderValue={(selected) => selected.length === 0 ? 'All Divisions' : selected.join(', ')}
+            >
+              {divisions.map((division) => (
+                <MenuItem key={division} value={division}>
+                  <Checkbox checked={selectedDivisions.indexOf(division) > -1} />
+                  <ListItemText primary={division} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+
+        {/* Date Range */}
+        <Grid item xs={12} md={2}>
+          <FormControl fullWidth size="small">
+            <InputLabel>Date Range</InputLabel>
+            <Select
+              value={dateRange}
+              onChange={(e) => {
+                if (e.target.value === 'custom') {
+                  setShowCustomDateDialog(true);
+                } else {
+                  setDateRange(e.target.value);
                 }
               }}
+              label="Date Range"
             >
-              {tabs.map((tab) => (
-                <Tab
-                  key={tab.value}
-                  value={tab.value}
-                  label={tab.label}
-                  icon={tab.icon}
-                  iconPosition="start"
-                />
-              ))}
-            </Tabs>
+              <MenuItem value="all">Full Season</MenuItem>
+              <MenuItem value="august">August 2025</MenuItem>
+              <MenuItem value="last30">Last 30 Days</MenuItem>
+              <MenuItem value="last14">Last 14 Days</MenuItem>
+              <MenuItem value="last7">Last 7 Days</MenuItem>
+              <MenuItem value="thisWeek">This Week</MenuItem>
+              <MenuItem value="custom">Custom Range...</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+
+        {/* View Controls */}
+        <Grid item xs={12} md={2}>
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <IconButton 
+              onClick={() => setViewMode('table')}
+              color={viewMode === 'table' ? 'primary' : 'default'}
+            >
+              <ViewList />
+            </IconButton>
+            <IconButton 
+              onClick={() => setViewMode('cards')}
+              color={viewMode === 'cards' ? 'primary' : 'default'}
+            >
+              <ViewModule />
+            </IconButton>
+            <IconButton onClick={loadTeams} color="primary">
+              <Refresh />
+            </IconButton>
           </Box>
+        </Grid>
+      </Grid>
 
-          {/* Search and Filters */}
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                placeholder="Search teams..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search />
-                    </InputAdornment>
-                  )
-                }}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>League</InputLabel>
-                <Select
-                  value={selectedLeague}
-                  onChange={(e) => setSelectedLeague(e.target.value)}
-                  label="League"
-                >
-                  <MenuItem value="all">All Leagues</MenuItem>
-                  {leagues.map((league) => (
-                    <MenuItem key={league} value={league}>
-                      {league}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Division</InputLabel>
-                <Select
-                  value={selectedDivision}
-                  onChange={(e) => setSelectedDivision(e.target.value)}
-                  label="Division"
-                >
-                  <MenuItem value="all">All Divisions</MenuItem>
-                  {divisions.map((division) => (
-                    <MenuItem key={division} value={division}>
-                      {division}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={12} md={2}>
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <IconButton onClick={loadTeamsData}>
-                  <Refresh />
-                </IconButton>
+      {/* Category Tabs */}
+      <Card elevation={0} sx={{ mb: 3 }}>
+        <Tabs
+          value={activeCategory}
+          onChange={(_, newValue) => {
+            setActiveCategory(newValue);
+            setPage(0);
+          }}
+          variant="fullWidth"
+          sx={{
+            '& .MuiTab-root': {
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.95rem'
+            }
+          }}
+        >
+          <Tab 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Sports />
+                Batting
               </Box>
-            </Grid>
-          </Grid>
-
-          {/* Results Summary */}
-          <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${theme.palette.divider}` }}>
-            <Typography variant="body2" color="text.secondary">
-              {activeView === 'overview' && `Showing ${filteredTeams.length} teams`}
-              {activeView === 'standings' && `${standings.length} teams in standings`}
-              {searchTerm && ` matching "${searchTerm}"`}
-            </Typography>
-          </Box>
-        </CardContent>
+            } 
+            value="batting" 
+          />
+          <Tab 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Stadium />
+                Pitching
+              </Box>
+            } 
+            value="pitching" 
+          />
+          <Tab 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Groups />
+                Fielding
+              </Box>
+            } 
+            value="fielding" 
+          />
+        </Tabs>
       </Card>
 
-      {/* Main Content */}
+      {/* Results Summary */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="body2" color="text.secondary">
+          Showing {categoryFilteredTeams.length} teams
+          {dateRange !== 'all' && ` (${dateRange} data)`}
+        </Typography>
+        
+        {dateRange === 'custom' && customStartDate && customEndDate && (
+          <Chip 
+            label={`${format(new Date(customStartDate), 'MMM dd')} - ${format(new Date(customEndDate), 'MMM dd')}`}
+            size="small"
+            onDelete={() => setDateRange('all')}
+            color="primary"
+            variant="outlined"
+          />
+        )}
+      </Box>
+
+      {/* Teams Table */}
       <AnimatePresence mode="wait">
-        {activeView === 'overview' && (
+        {viewMode === 'table' ? (
           <motion.div
-            key="overview"
+            key="table"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
           >
-            <TeamsOverview teams={filteredTeams} onTeamClick={(team) => navigate(`/teams/${team.id}`)} />
+            <Card elevation={0}>
+              <TableContainer sx={{ maxHeight: '70vh' }}>
+                <Table stickyHeader size="small">
+                  <TableHead>
+                    <TableRow>
+                      {currentStats.map((stat) => (
+                        <TableCell
+                          key={stat.key}
+                          sx={{
+                            fontWeight: 700,
+                            bgcolor: 'background.paper',
+                            cursor: stat.key !== 'id' ? 'pointer' : 'default',
+                            position: stat.sticky ? 'sticky' : 'static',
+                            left: stat.sticky ? 0 : 'auto',
+                            zIndex: stat.sticky ? 1000 : 'auto',
+                            minWidth: stat.key === 'id' ? 120 : 80,
+                            '&:hover': {
+                              bgcolor: stat.key !== 'id' ? alpha(theme.palette.primary.main, 0.04) : 'inherit'
+                            }
+                          }}
+                          onClick={() => stat.key !== 'id' && handleSort(stat.key)}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            {stat.label}
+                            {sortBy === stat.key && (
+                              <Box component="span" sx={{ ml: 0.5 }}>
+                                {sortOrder === 'desc' ? <ArrowDownward sx={{ fontSize: 16 }} /> : <ArrowUpward sx={{ fontSize: 16 }} />}
+                              </Box>
+                            )}
+                          </Box>
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {paginatedTeams.map((team, index) => (
+                      <TableRow
+                        key={`${team.id}-${index}`}
+                        hover
+                        sx={{
+                          cursor: 'pointer',
+                          '&:hover': {
+                            bgcolor: alpha(theme.palette.primary.main, 0.04)
+                          }
+                        }}
+                        onClick={() => navigate(`/teams/${team.id}/2025`)}
+                      >
+                        {currentStats.map((stat) => (
+                          <TableCell
+                            key={stat.key}
+                            sx={{
+                              position: stat.sticky ? 'sticky' : 'static',
+                              left: stat.sticky ? 0 : 'auto',
+                              bgcolor: stat.sticky ? 'background.paper' : 'inherit',
+                              zIndex: stat.sticky ? 999 : 'auto',
+                              borderRight: stat.sticky ? '1px solid' : 'none',
+                              borderColor: stat.sticky ? 'divider' : 'transparent'
+                            }}
+                          >
+                            {stat.key === 'id' ? (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Avatar
+                                  sx={{
+                                    width: 32,
+                                    height: 32,
+                                    bgcolor: themeUtils.getTeamColor(team.id),
+                                    fontSize: '0.75rem',
+                                    fontWeight: 'bold'
+                                  }}
+                                >
+                                  {team.id}
+                                </Avatar>
+                                <Box>
+                                  <Typography variant="body2" fontWeight={600}>
+                                    {team.name || team.id}
+                                  </Typography>
+                                  <Typography variant="caption" color="text.secondary">
+                                    {team.league} {team.division}
+                                  </Typography>
+                                </Box>
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                                {stat.format(getNestedValue(team, stat.key))}
+                              </Typography>
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Card>
           </motion.div>
-        )}
-
-        {activeView === 'standings' && (
+        ) : (
           <motion.div
-            key="standings"
+            key="cards"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
           >
-            <StandingsView standings={standingsByDivision} onTeamClick={(team) => navigate(`/teams/${team.id}`)} />
-          </motion.div>
-        )}
-
-        {activeView === 'stats' && (
-          <motion.div
-            key="stats"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            <TeamStatsView teams={filteredTeams} onTeamClick={(team) => navigate(`/teams/${team.id}`)} />
+            <Typography>Cards view coming soon...</Typography>
           </motion.div>
         )}
       </AnimatePresence>
-    </Box>
-  );
-};
 
-// Teams overview component
-const TeamsOverview = ({ teams, onTeamClick }) => {
-  const theme = useTheme();
+      {/* Pagination */}
+      <Card elevation={0} sx={{ mt: 3 }}>
+        <TablePagination
+          component="div"
+          count={categoryFilteredTeams.length}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[10, 25, 50, 100]}
+        />
+      </Card>
 
-  return (
-    <Grid container spacing={3}>
-      {teams.map((team) => (
-        <Grid item xs={12} sm={6} md={4} lg={3} key={team.id}>
-          <motion.div
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <Card
-              elevation={0}
-              sx={{
-                height: '100%',
-                cursor: 'pointer',
-                border: `1px solid ${theme.palette.divider}`,
-                '&:hover': {
-                  borderColor: themeUtils.getTeamColor(team.abbreviation),
-                  boxShadow: `0 4px 12px ${alpha(themeUtils.getTeamColor(team.abbreviation), 0.15)}`
-                }
+      {/* Custom Date Range Dialog */}
+      <Dialog 
+        open={showCustomDateDialog} 
+        onClose={() => setShowCustomDateDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DateRange color="primary" />
+            Custom Date Range
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={3} sx={{ mt: 2 }}>
+            <TextField
+              label="Start Date"
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              inputProps={{
+                max: format(new Date(), 'yyyy-MM-dd'),
+                min: '2025-03-01'
               }}
-              onClick={() => onTeamClick(team)}
-            >
-              <CardContent sx={{ p: 3 }}>
-                {/* Team Header */}
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                  <Avatar
-                    sx={{
-                      width: 56,
-                      height: 56,
-                      backgroundColor: themeUtils.getTeamColor(team.abbreviation),
-                      mr: 2,
-                      fontSize: '1.1rem',
-                      fontWeight: 700
-                    }}
-                  >
-                    {team.abbreviation}
-                  </Avatar>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="h6" fontWeight={700} noWrap>
-                      {team.name}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {team.city}
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Divider sx={{ mb: 2 }} />
-
-                {/* Team Info */}
-                <Box sx={{ mb: 2 }}>
-                  <Chip
-                    label={team.division}
-                    size="small"
-                    sx={{
-                      backgroundColor: alpha(themeUtils.getTeamColor(team.abbreviation), 0.1),
-                      color: themeUtils.getTeamColor(team.abbreviation),
-                      fontWeight: 600,
-                      mb: 1
-                    }}
-                  />
-                </Box>
-
-                {/* Quick Stats */}
-                <Grid container spacing={1}>
-                  <Grid item xs={4}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Players
-                      </Typography>
-                      <Typography variant="h6" fontWeight={700}>
-                        {team.playerCount || 0}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Record
-                      </Typography>
-                      <Typography variant="h6" fontWeight={700}>
-                        {team.wins || 0}-{team.losses || 0}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                  <Grid item xs={4}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Typography variant="caption" color="text.secondary">
-                        Pct
-                      </Typography>
-                      <Typography variant="h6" fontWeight={700}>
-                        {team.winPercentage ? team.winPercentage.toFixed(3) : '---'}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </Grid>
-      ))}
-    </Grid>
-  );
-};
-
-// Standings view component
-const StandingsView = ({ standings, onTeamClick }) => {
-  const theme = useTheme();
-
-  return (
-    <Grid container spacing={3}>
-      {Object.entries(standings).map(([division, teams]) => (
-        <Grid item xs={12} lg={6} key={division}>
-          <Card elevation={0}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>
-                {division}
-              </Typography>
-
-              <List>
-                {teams.map((team, index) => (
-                  <React.Fragment key={team.id}>
-                    <ListItem
-                      onClick={() => onTeamClick(team)}
-                      sx={{
-                        cursor: 'pointer',
-                        borderRadius: 1,
-                        '&:hover': {
-                          backgroundColor: alpha(themeUtils.getTeamColor(team.abbreviation), 0.05)
-                        }
-                      }}
-                    >
-                      <ListItemAvatar>
-                        <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 40 }}>
-                          <Typography
-                            variant="h6"
-                            fontWeight={700}
-                            sx={{
-                              color: index === 0 ? theme.palette.warning.main : 'text.secondary',
-                              mr: 2
-                            }}
-                          >
-                            {index + 1}
-                          </Typography>
-                          <Avatar
-                            sx={{
-                              width: 36,
-                              height: 36,
-                              backgroundColor: themeUtils.getTeamColor(team.abbreviation),
-                              fontSize: '0.75rem',
-                              fontWeight: 700
-                            }}
-                          >
-                            {team.abbreviation}
-                          </Avatar>
-                        </Box>
-                      </ListItemAvatar>
-
-                      <ListItemText
-                        primary={
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Typography variant="body1" fontWeight={600}>
-                              {team.name}
-                            </Typography>
-                            {index === 0 && <Star sx={{ color: theme.palette.warning.main, fontSize: 16 }} />}
-                          </Box>
-                        }
-                        secondary={`${team.wins || 0}-${team.losses || 0} • ${team.gamesBack > 0 ? `${team.gamesBack} GB` : 'Leader'}`}
-                      />
-
-                      <Box sx={{ textAlign: 'right' }}>
-                        <Typography variant="h6" fontWeight={700}>
-                          {team.winPercentage ? team.winPercentage.toFixed(3) : '---'}
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-                          {team.streak > 0 ? (
-                            <TrendingUp sx={{ color: theme.palette.success.main, fontSize: 16, mr: 0.5 }} />
-                          ) : (
-                            <TrendingDown sx={{ color: theme.palette.error.main, fontSize: 16, mr: 0.5 }} />
-                          )}
-                          <Typography variant="caption" color="text.secondary">
-                            {Math.abs(team.streak || 0)}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    </ListItem>
-                    {index < teams.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-      ))}
-    </Grid>
-  );
-};
-
-// Team stats view component
-const TeamStatsView = ({ teams, onTeamClick }) => {
-  const theme = useTheme();
-
-  // Calculate team averages and leaders
-  const teamStats = teams.map(team => {
-    const battingAvg = team.stats?.batting?.avg || 0;
-    const homeRuns = team.stats?.batting?.homeRuns || 0;
-    const era = team.stats?.pitching?.era || 0;
-    const wins = team.wins || 0;
-
-    return {
-      ...team,
-      battingAvg,
-      homeRuns,
-      era,
-      wins
-    };
-  });
-
-  // Sort by different stats
-  const topBattingAvg = [...teamStats].sort((a, b) => b.battingAvg - a.battingAvg).slice(0, 5);
-  const topHomeRuns = [...teamStats].sort((a, b) => b.homeRuns - a.homeRuns).slice(0, 5);
-  const topERA = [...teamStats].sort((a, b) => a.era - b.era).slice(0, 5);
-  const topWins = [...teamStats].sort((a, b) => b.wins - a.wins).slice(0, 5);
-
-  const statCategories = [
-    { title: 'Team Batting Average', teams: topBattingAvg, stat: 'battingAvg', format: (val) => val.toFixed(3) },
-    { title: 'Team Home Runs', teams: topHomeRuns, stat: 'homeRuns', format: (val) => val.toString() },
-    { title: 'Team ERA (Best)', teams: topERA, stat: 'era', format: (val) => val.toFixed(2) },
-    { title: 'Most Wins', teams: topWins, stat: 'wins', format: (val) => val.toString() }
-  ];
-
-  return (
-    <Grid container spacing={3}>
-      {statCategories.map((category, index) => (
-        <Grid item xs={12} md={6} key={index}>
-          <Card elevation={0}>
-            <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>
-                {category.title}
-              </Typography>
-
-              <List>
-                {category.teams.map((team, rank) => (
-                  <React.Fragment key={team.id}>
-                    <ListItem
-                      onClick={() => onTeamClick(team)}
-                      sx={{
-                        cursor: 'pointer',
-                        borderRadius: 1,
-                        '&:hover': {
-                          backgroundColor: alpha(themeUtils.getTeamColor(team.abbreviation), 0.05)
-                        }
-                      }}
-                    >
-                      <ListItemAvatar>
-                        <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 40 }}>
-                          <Typography
-                            variant="h6"
-                            fontWeight={700}
-                            sx={{
-                              color: rank === 0 ? theme.palette.warning.main : 'text.secondary',
-                              mr: 2
-                            }}
-                          >
-                            {rank + 1}
-                          </Typography>
-                          <Avatar
-                            sx={{
-                              width: 32,
-                              height: 32,
-                              backgroundColor: themeUtils.getTeamColor(team.abbreviation),
-                              fontSize: '0.75rem',
-                              fontWeight: 700
-                            }}
-                          >
-                            {team.abbreviation}
-                          </Avatar>
-                        </Box>
-                      </ListItemAvatar>
-
-                      <ListItemText
-                        primary={team.name}
-                        secondary={`${team.wins || 0}-${team.losses || 0}`}
-                      />
-
-                      <Typography variant="h6" fontWeight={700} color="primary">
-                        {category.format(team[category.stat])}
-                      </Typography>
-                    </ListItem>
-                    {rank < category.teams.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-        </Grid>
-      ))}
-    </Grid>
-  );
-};
-
-// Loading skeleton
-const TeamsSkeleton = () => {
-  return (
-    <Box sx={{ p: 3 }}>
-      <Skeleton variant="text" width={200} height={50} sx={{ mb: 1 }} />
-      <Skeleton variant="text" width={400} height={30} sx={{ mb: 4 }} />
-      
-      <Skeleton variant="rectangular" height={150} sx={{ mb: 3, borderRadius: 2 }} />
-      
-      <Grid container spacing={3}>
-        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-          <Grid item xs={12} sm={6} md={4} lg={3} key={i}>
-            <Skeleton variant="rectangular" height={200} sx={{ borderRadius: 2 }} />
-          </Grid>
-        ))}
-      </Grid>
+            />
+            <TextField
+              label="End Date"
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              inputProps={{
+                max: format(new Date(), 'yyyy-MM-dd'),
+                min: customStartDate || '2025-03-01'
+              }}
+            />
+            {customStartDate && customEndDate && (
+              <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+                <Typography variant="body2" color="text.secondary">
+                  Selected Range: {format(new Date(customStartDate), 'MMM dd, yyyy')} - {format(new Date(customEndDate), 'MMM dd, yyyy')}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Duration: {Math.ceil((new Date(customEndDate) - new Date(customStartDate)) / (1000 * 60 * 60 * 24)) + 1} days
+                </Typography>
+              </Box>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowCustomDateDialog(false)}>
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCustomDateRange} 
+            variant="contained"
+            disabled={!customStartDate || !customEndDate}
+            startIcon={<Analytics />}
+          >
+            Apply Range
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

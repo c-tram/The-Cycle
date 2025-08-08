@@ -57,6 +57,7 @@ import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isVa
 // API and utils
 import { playersApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
+import { getCVRDisplay } from '../utils/cvrCalculations';
 
 // Helper function to safely get nested object values
 const getNestedValue = (obj, path) => {
@@ -289,18 +290,27 @@ const Players = () => {
     // Client-side sorting
     if (sortBy) {
       filtered.sort((a, b) => {
-        const aValue = getNestedValue(a, sortBy);
-        const bValue = getNestedValue(b, sortBy);
-        
+        let aValue = getNestedValue(a, sortBy);
+        let bValue = getNestedValue(b, sortBy);
+
         // Handle null/undefined values
         if (aValue == null && bValue == null) return 0;
         if (aValue == null) return 1;
         if (bValue == null) return -1;
-        
+
+        // Always try to parse as float for numeric columns (G, WAR, CVR)
+        const numericSortKeys = ['gameCount', 'war', 'cvr'];
+        if (numericSortKeys.includes(sortBy)) {
+          aValue = parseFloat(aValue);
+          bValue = parseFloat(bValue);
+          if (isNaN(aValue)) aValue = 0;
+          if (isNaN(bValue)) bValue = 0;
+        }
+
         // Convert to numbers if they're numeric strings
         const aNum = typeof aValue === 'string' ? parseFloat(aValue) : aValue;
         const bNum = typeof bValue === 'string' ? parseFloat(bValue) : bValue;
-        
+
         let comparison = 0;
         if (typeof aNum === 'number' && typeof bNum === 'number' && !isNaN(aNum) && !isNaN(bNum)) {
           comparison = aNum - bNum;
@@ -308,7 +318,7 @@ const Players = () => {
           // String comparison for non-numeric values
           comparison = String(aValue).localeCompare(String(bValue));
         }
-        
+
         // Apply sort order (desc = high to low, asc = low to high)
         return sortOrder === 'desc' ? -comparison : comparison;
       });
@@ -358,8 +368,11 @@ const Players = () => {
     }
   }, [availableTabs, activeCategory]);
 
-  // Update sort field when category changes
+  // Update sort field when category changes, but do NOT override top-level sort keys (gameCount, war, cvr)
   useEffect(() => {
+    const topLevelKeys = ['gameCount', 'war', 'cvr'];
+    // Only reset sortBy if it's not a top-level key
+    if (topLevelKeys.includes(sortBy)) return;
     if (activeCategory === 'batting' && !sortBy.includes('batting')) {
       setSortBy('stats.batting.avg');
     } else if (activeCategory === 'pitching' && !sortBy.includes('pitching')) {
@@ -436,7 +449,16 @@ const Players = () => {
       { key: 'stats.batting.baseOnBalls', label: 'BB', format: (val) => val || 0 },
       { key: 'stats.batting.strikeOuts', label: 'K', format: (val) => val || 0 },
       { key: 'stats.batting.hitByPitch', label: 'HBP', format: (val) => val || 0 },
-      { key: 'stats.batting.groundOutsToAirouts', label: 'GO/AO', format: (val) => val?.toFixed(2) || '---' }
+      { key: 'stats.batting.groundOutsToAirouts', label: 'GO/AO', format: (val) => val?.toFixed(2) || '---' },
+      
+      // Advanced Metrics Last
+      { key: 'gameCount', label: 'Games', format: (val) => val || 0 },
+      { key: 'war', label: 'WAR', format: (val) => val ? val.toFixed(1) : '0.0' },
+      { key: 'cvr', label: 'CVR', format: (val) => {
+        if (!val) return '0.00';
+        const display = getCVRDisplay(val);
+        return `${display.value} ${display.emoji}`;
+      }}
     ],
     pitching: [
       // Innings (Primary Volume)
@@ -486,7 +508,16 @@ const Players = () => {
       { key: 'stats.pitching.earnedRuns', label: 'ER', format: (val) => val || 0 },
       { key: 'stats.pitching.homeRuns', label: 'HR', format: (val) => val || 0 },
       { key: 'stats.pitching.battersFaced', label: 'BF', format: (val) => val || 0 },
-      { key: 'stats.pitching.groundOutsToAirouts', label: 'GO/AO', format: (val) => val?.toFixed(2) || '---' }
+      { key: 'stats.pitching.groundOutsToAirouts', label: 'GO/AO', format: (val) => val?.toFixed(2) || '---' },
+      
+      // Advanced Metrics Last
+      { key: 'gameCount', label: 'Games', format: (val) => val || 0 },
+      { key: 'war', label: 'WAR', format: (val) => val ? val.toFixed(1) : '0.0' },
+      { key: 'cvr', label: 'CVR', format: (val) => {
+        if (!val) return '0.00';
+        const display = getCVRDisplay(val);
+        return `${display.value} ${display.emoji}`;
+      }}
     ]
   };
 
