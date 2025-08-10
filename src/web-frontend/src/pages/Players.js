@@ -65,6 +65,11 @@ const getNestedValue = (obj, path) => {
 };
 
 const Players = () => {
+  // Games/IP filter state
+  const [minGames, setMinGames] = useState(0);
+  const [minInnings, setMinInnings] = useState(10);
+  const [gamesIpFilterEnabled, setGamesIpFilterEnabled] = useState(true);
+
   const theme = useTheme();
   const navigate = useNavigate();
   const searchInputRef = useRef(null);
@@ -201,6 +206,17 @@ const Players = () => {
   useEffect(() => {
     loadPlayers();
   }, [activeCategory, sortBy, sortOrder]);
+
+  // Set default minGames/minInnings on category or players change
+  useEffect(() => {
+    if (activeCategory === 'batting') {
+      // Default: 25% of max team games (rounded down)
+      const maxGames = Math.max(...players.map(p => p.gameCount || 0), 0);
+      setMinGames(Math.floor(maxGames * 0.25));
+    } else if (activeCategory === 'pitching') {
+      setMinInnings(10);
+    }
+  }, [activeCategory, players]);
 
   // Real-time search and filter effect
   useEffect(() => {
@@ -390,14 +406,17 @@ const Players = () => {
     return filteredPlayers.filter(player => {
       if (activeCategory === 'batting') {
         const batting = player.stats?.batting;
-        return batting && (batting.atBats > 0 || batting.plateAppearances > 0);
+        const meetsGames = !gamesIpFilterEnabled || (player.gameCount >= minGames);
+        return batting && (batting.atBats > 0 || batting.plateAppearances > 0) && meetsGames;
       } else if (activeCategory === 'pitching') {
         const pitching = player.stats?.pitching;
-        return pitching && (parseFloat(pitching.inningsPitched) > 0 || pitching.gamesPlayed > 0);
+        const ip = parseFloat(pitching?.inningsPitched) || 0;
+        const meetsIp = !gamesIpFilterEnabled || (ip >= minInnings);
+        return pitching && (ip > 0 || pitching.gamesPlayed > 0) && meetsIp;
       }
       return true;
     });
-  }, [filteredPlayers, activeCategory]);
+  }, [filteredPlayers, activeCategory, gamesIpFilterEnabled, minGames, minInnings]);
 
   // Paginated players (use category-filtered players)
   const paginatedPlayers = useMemo(() => {
@@ -590,7 +609,7 @@ const Players = () => {
           {/* Search and Filters */}
           <Grid container spacing={2} alignItems="center">
             {/* Search */}
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
               <TextField
                 fullWidth
                 placeholder="Search players or teams... (real-time)"
@@ -653,6 +672,77 @@ const Players = () => {
               </FormControl>
             </Grid>
 
+            {/* Date Range Filter */}
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth>
+                <InputLabel>Date Range</InputLabel>
+                <Select
+                  value={dateRange}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'custom') {
+                      setShowCustomDateDialog(true);
+                    } else {
+                      setDateRange(value);
+                    }
+                  }}
+                  label="Date Range"
+                >
+                  <MenuItem value="all">Full Season</MenuItem>
+                  <Divider />
+                  <MenuItem value="today">Today</MenuItem>
+                  <MenuItem value="last1">Last 1 Day</MenuItem>
+                  <MenuItem value="last3">Last 3 Days</MenuItem>
+                  <MenuItem value="last7">Last 7 Days</MenuItem>
+                  <MenuItem value="last14">Last 14 Days</MenuItem>
+                  <MenuItem value="last30">Last 30 Days</MenuItem>
+                  <Divider />
+                  <MenuItem value="thisWeek">This Week</MenuItem>
+                  <MenuItem value="thisMonth">This Month</MenuItem>
+                  <MenuItem value="august">August 2025</MenuItem>
+                  <Divider />
+                  <MenuItem value="custom">Custom Range...</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* Games/IP Filter */}
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth>
+                <InputLabel shrink>
+                  {activeCategory === 'batting' ? 'Min Games' : 'Min IP'}
+                </InputLabel>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                  <Checkbox
+                    checked={gamesIpFilterEnabled}
+                    onChange={e => setGamesIpFilterEnabled(e.target.checked)}
+                    size="small"
+                    sx={{ p: 0.5 }}
+                  />
+                  <TextField
+                    type="number"
+                    size="small"
+                    variant="outlined"
+                    value={activeCategory === 'batting' ? minGames : minInnings}
+                    onChange={e => {
+                      const val = Math.max(0, Number(e.target.value));
+                      if (activeCategory === 'batting') setMinGames(val);
+                      else setMinInnings(val);
+                    }}
+                    inputProps={{ min: 0, step: 1 }}
+                    disabled={!gamesIpFilterEnabled}
+                    sx={{ 
+                      width: 80,
+                      '& .MuiInputBase-input': { 
+                        textAlign: 'center',
+                        fontSize: '0.875rem'
+                      }
+                    }}
+                  />
+                </Box>
+              </FormControl>
+            </Grid>
+
             {/* Sort By */}
             <Grid item xs={12} md={2}>
               <FormControl fullWidth>
@@ -671,67 +761,14 @@ const Players = () => {
               </FormControl>
             </Grid>
 
-            {/* Enhanced Date Range Filter */}
-            <Grid item xs={12} md={3}>
-              <Stack direction="row" spacing={1}>
-                <FormControl fullWidth>
-                  <InputLabel>Date Range</InputLabel>
-                  <Select
-                    value={dateRange}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === 'custom') {
-                        setShowCustomDateDialog(true);
-                      } else {
-                        setDateRange(value);
-                      }
-                    }}
-                    label="Date Range"
-                    startAdornment={
-                      <InputAdornment position="start">
-                        <DateRange fontSize="small" />
-                      </InputAdornment>
-                    }
-                  >
-                    <MenuItem value="all">Full Season</MenuItem>
-                    <Divider />
-                    <MenuItem value="today">Today</MenuItem>
-                    <MenuItem value="last1">Last 1 Day</MenuItem>
-                    <MenuItem value="last3">Last 3 Days</MenuItem>
-                    <MenuItem value="last7">Last 7 Days</MenuItem>
-                    <MenuItem value="last14">Last 14 Days</MenuItem>
-                    <MenuItem value="last30">Last 30 Days</MenuItem>
-                    <Divider />
-                    <MenuItem value="thisWeek">This Week</MenuItem>
-                    <MenuItem value="thisMonth">This Month</MenuItem>
-                    <MenuItem value="august">August 2025</MenuItem>
-                    <Divider />
-                    <MenuItem value="custom">Custom Range...</MenuItem>
-                  </Select>
-                </FormControl>
-                {dateRange !== 'all' && (
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      // TODO: Implement analytics view for selected date range
-                      console.log('Analytics for:', getDateRangeDescription());
-                    }}
-                    title="View Analytics for Date Range"
-                    color="primary"
-                  >
-                    <TrendingUp />
-                  </IconButton>
-                )}
-              </Stack>
-            </Grid>
-
-            {/* View Mode */}
+            {/* View Mode and Controls */}
             <Grid item xs={12} md={1}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                 <IconButton
                   onClick={() => setViewMode('table')}
                   color={viewMode === 'table' ? 'primary' : 'default'}
                   title="Table View"
+                  size="small"
                 >
                   <ViewList />
                 </IconButton>
@@ -739,16 +776,26 @@ const Players = () => {
                   onClick={() => setViewMode('cards')}
                   color={viewMode === 'cards' ? 'primary' : 'default'}
                   title="Card View"
+                  size="small"
                 >
                   <ViewModule />
                 </IconButton>
                 <IconButton 
                   onClick={loadPlayers}
                   title="Refresh Data"
+                  size="small"
                 >
                   <Refresh />
                 </IconButton>
-                {(searchTerm || selectedTeams.length > 0 || dateRange !== 'all') && (
+              </Box>
+            </Grid>
+          </Grid>
+
+          {/* Secondary Row - Clear Filters Only */}
+          <Grid container spacing={2} alignItems="center" sx={{ mt: 1 }}>
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                {(searchTerm || selectedTeams.length > 0 || dateRange !== 'all' || gamesIpFilterEnabled) && (
                   <Button
                     size="small"
                     variant="outlined"
@@ -758,10 +805,10 @@ const Players = () => {
                       setDateRange('all');
                       setCustomStartDate('');
                       setCustomEndDate('');
+                      setGamesIpFilterEnabled(false);
                     }}
-                    sx={{ ml: 1, minWidth: 'auto' }}
                   >
-                    Clear
+                    Clear All Filters
                   </Button>
                 )}
               </Box>
@@ -776,6 +823,8 @@ const Players = () => {
                 {searchTerm && ` for "${searchTerm}"`}
                 {selectedTeams.length > 0 && ` • ${selectedTeams.length} team(s) selected`}
                 {dateRange !== 'all' && ` • ${getDateRangeDescription()}`}
+                {gamesIpFilterEnabled && activeCategory === 'batting' && ` • Min ${minGames} games`}
+                {gamesIpFilterEnabled && activeCategory === 'pitching' && ` • Min ${minInnings} IP`}
               </Typography>
               {searchLoading && (
                 <Chip 
@@ -786,9 +835,9 @@ const Players = () => {
                   sx={{ ml: 'auto' }}
                 />
               )}
-              {!searchLoading && !loading && (searchTerm || selectedTeams.length > 0 || dateRange !== 'all') && (
+              {!searchLoading && !loading && (searchTerm || selectedTeams.length > 0 || dateRange !== 'all' || gamesIpFilterEnabled) && (
                 <Chip 
-                  label="Live Search Active" 
+                  label="Filters Active" 
                   size="small" 
                   color="success" 
                   variant="outlined"
