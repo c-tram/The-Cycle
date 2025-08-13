@@ -337,27 +337,25 @@ const PlayerDetail = () => {
       
       if (playerResponse.salary && playerResponse.salary.salary) {
         setSalaryData(playerResponse.salary);
-        
-        // Calculate CVR using the salary data that's already normalized by backend
-        console.log('🚨 ABOUT TO CALL CVR FUNCTION - FRONTEND', {
-          salary: playerResponse.salary,
-          stats: playerResponse.seasonStats,
-          calculatePlayerCVR: typeof calculatePlayerCVR
-        });
-        
-        const calculatedCVR = await calculatePlayerCVR(
-          { stats: playerResponse.seasonStats },
-          playerResponse.salary
-        );
-        
-        console.log('🚨 CVR FUNCTION RETURNED:', calculatedCVR);
-        setCvr(calculatedCVR.cvr);
-        setCvrData(calculatedCVR); // Store full CVR data for explanation
-        console.log('Calculated CVR using backend salary data:', calculatedCVR);
       } else {
         console.log('No salary data in player response');
         setSalaryData(null);
-        setCvr(null);
+      }
+      
+      // Use pre-computed CVR from backend instead of calculating dynamically
+      // This ensures consistency with the players list page
+      const backendCVR = playerResponse.cvr || playerResponse.seasonStats?.cvr || 0;
+      console.log('🚨 USING BACKEND CVR:', backendCVR, 'from player response');
+      setCvr(backendCVR);
+      
+      // Create minimal CVR data for explanation (we'll use the backend value)
+      if (backendCVR > 0) {
+        setCvrData({
+          cvr: backendCVR,
+          explanation: 'Pre-computed CVR from backend (consistent with players list)',
+          source: 'backend'
+        });
+      } else {
         setCvrData(null);
       }
       
