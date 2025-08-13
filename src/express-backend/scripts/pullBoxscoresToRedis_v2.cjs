@@ -1379,6 +1379,10 @@ async function updatePlayerSeasonStats(playerSeasonKey, gameStats, team, playerN
  */
 async function updateTeamSeasonStats(teamSeasonKey, gameStats, team) {
   try {
+    // Extract year from teamSeasonKey (format: team:TEAM:YEAR:season)
+    const teamSeasonParts = teamSeasonKey.split(':');
+    const year = teamSeasonParts[2]; // Extract year from key
+    
     // Get existing season stats or create new ones
     const existingData = await redisClient.get(teamSeasonKey);
     let seasonStats;
@@ -1483,37 +1487,39 @@ async function updateTeamSeasonStats(teamSeasonKey, gameStats, team) {
     seasonStats.pitching = calculatePitchingStats(seasonStats.pitching);
     seasonStats.fielding = calculateFieldingStats(seasonStats.fielding);
     
-    // Calculate team-level WAR and CVR - NEW ADDITIONS
-    const teamBattingWAR = calculateHitterWAR({ batting: seasonStats.batting });
-    const teamPitchingWAR = calculatePitcherWAR({ pitching: seasonStats.pitching });
-    const teamTotalWAR = teamBattingWAR + teamPitchingWAR;
+    // Calculate team-level WAR and CVR by summing individual player values (CORRECT APPROACH)
+    let teamTotalWAR = 0;
+    let teamBattingWAR = 0;
+    let teamPitchingWAR = 0;
     
-    // Get all players for this team to sum their individual CVRs
+    // Get all players for this team to sum their individual WARs and CVRs
     const teamPlayerKeys = await redisClient.keys(`player:${team}-*-${year}:season`);
     let totalTeamCVR = 0;
     let totalBattingCVR = 0;
     let totalPitchingCVR = 0;
     let playerCount = 0;
     
-    // Sum individual player CVRs
+    // Sum individual player CVRs and WARs
     for (const playerKey of teamPlayerKeys) {
       try {
         const playerData = await redisClient.get(playerKey);
         if (playerData) {
           const playerStats = JSON.parse(playerData);
           const playerCVR = playerStats.cvr || 0;
+          const playerWAR = playerStats.war || 0;
           
-          if (playerCVR !== 0) {
+          if (playerCVR !== 0 || playerWAR !== 0) {
             totalTeamCVR += playerCVR;
+            teamTotalWAR += playerWAR;
             playerCount++;
             
             // Determine if this is primarily a batter or pitcher based on their stats
             const hasBattingStats = playerStats.batting && (playerStats.batting.atBats > 0 || playerStats.batting.hits > 0);
             const hasPitchingStats = playerStats.pitching && playerStats.pitching.inningsPitched && parseFloat(playerStats.pitching.inningsPitched) > 0;
             
-            // Assign CVR to batting or pitching based on primary role
+            // Assign CVR and WAR to batting or pitching based on primary role
             if (hasBattingStats && hasPitchingStats) {
-              // Two-way player: split CVR proportionally based on games/usage
+              // Two-way player: split CVR and WAR proportionally based on games/usage
               const battingGames = playerStats.batting?.gamesPlayed || 0;
               const pitchingAppearances = playerStats.pitching?.appearances || 0;
               const totalAppearances = battingGames + pitchingAppearances;
@@ -1523,20 +1529,28 @@ async function updateTeamSeasonStats(teamSeasonKey, gameStats, team) {
                 const pitchingPortion = pitchingAppearances / totalAppearances;
                 totalBattingCVR += playerCVR * battingPortion;
                 totalPitchingCVR += playerCVR * pitchingPortion;
+                teamBattingWAR += playerWAR * battingPortion;
+                teamBattingWAR += playerWAR * battingPortion;
+                teamPitchingWAR += playerWAR * pitchingPortion;
               } else {
                 // Default split for two-way players
                 totalBattingCVR += playerCVR * 0.6;
                 totalPitchingCVR += playerCVR * 0.4;
+                teamBattingWAR += playerWAR * 0.6;
+                teamPitchingWAR += playerWAR * 0.4;
               }
             } else if (hasBattingStats) {
               // Primarily a batter
               totalBattingCVR += playerCVR;
+              teamBattingWAR += playerWAR;
             } else if (hasPitchingStats) {
               // Primarily a pitcher
               totalPitchingCVR += playerCVR;
+              teamPitchingWAR += playerWAR;
             } else {
               // Default to batting if unclear
               totalBattingCVR += playerCVR;
+              teamBattingWAR += playerWAR;
             }
           }
         }
@@ -1734,16 +1748,21 @@ async function aggregateSeasonStats(season) {
         // Use total sum of CVRs for the team (not average)
         const totalTeamCVR = teamTotalCVR; // This is already the sum
         
-        // Add aggregated team metrics
-        teamSeasonStats.war = {
-          total: Math.round(teamTotalWAR * 10) / 10,
-          batting: Math.round(battingWAR * 10) / 10,
-          pitching: Math.round(pitchingWAR * 10) / 10
-        };
-        teamSeasonStats.cvr = Math.round(totalTeamCVR * 100) / 100;
+        // Add aggregated team metrics (only if they don't already exist from updateTeamSeasonStats)
+        if (!teamSeasonStats.war) {
+          teamSeasonStats.war = {
+            total: Math.round(teamTotalWAR * 10) / 10,
+            batting: Math.round(battingWAR * 10) / 10,
+            pitching: Math.round(pitchingWAR * 10) / 10
+          };
+          console.log(`📊 Team ${teamCode}: WAR=${teamTotalWAR.toFixed(1)} (${playerCount} players), CVR=${totalTeamCVR.toFixed(2)} (sum of individual player CVRs)`);
+        } else {
+          console.log(`📊 Team ${teamCode}: Using existing WAR=${teamSeasonStats.war.total} (from incremental updates), CVR=${totalTeamCVR.toFixed(2)} (${playerCount} players)`);
+        }
         
-        console.log(`📊 Team ${teamCode}: WAR=${teamTotalWAR.toFixed(1)} (${playerCount} players), CVR=${totalTeamCVR.toFixed(2)} (sum of individual player CVRs)`);
-        
+        if (!teamSeasonStats.cvr) {
+          teamSeasonStats.cvr = Math.round(totalTeamCVR * 100) / 100;
+        }
       } catch (aggregationError) {
         console.log(`⚠️ Error aggregating team stats for ${teamCode}:`, aggregationError.message);
         // Fallback to old calculation method
@@ -1873,8 +1892,8 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 if (require.main === module) {
   const season = process.argv[2] || '2025';
   // Full MLB season: Opening Day (late March) through current date (or full season)
-  const startDate = process.argv[3] || '2025-08-09';  // Opening Day 2025
-  const endDate = process.argv[4] || '2025-08-12';    // Current date (adjust to completed games)
+  const startDate = process.argv[3] || '2025-08-11';  // Opening Day 2025
+  const endDate = process.argv[4] || '2025-08-11';    // Current date (adjust to completed games)
   
   console.log(`🏁 Starting MLB data pull for ${season} season`);
   console.log(`📅 Date range: ${startDate} to ${endDate}`);

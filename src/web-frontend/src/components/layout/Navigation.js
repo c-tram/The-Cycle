@@ -11,7 +11,8 @@ import {
   Chip,
   useTheme,
   alpha,
-  Tooltip
+  Tooltip,
+  Avatar
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -200,6 +201,37 @@ const Navigation = ({
 
         {/* Right side controls */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, ml: 'auto' }}>
+          {/* GitHub Repository Link */}
+          <Tooltip title="View GitHub Repository">
+            <IconButton
+              color="inherit"
+              onClick={() => window.open('https://github.com/c-tram/The-Cycle', '_blank')}
+              sx={{
+                p: 0.5,
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.1)
+                }
+              }}
+            >
+              <Avatar
+                src="https://github.com/c-tram.png"
+                alt="GitHub Repository"
+                sx={{
+                  width: 32,
+                  height: 32,
+                  border: `2px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                  '&:hover': {
+                    border: `2px solid ${theme.palette.primary.main}`,
+                    transform: 'scale(1.05)',
+                    transition: 'all 0.2s ease-in-out'
+                  }
+                }}
+              >
+                CT
+              </Avatar>
+            </IconButton>
+          </Tooltip>
+
           {/* API Status Indicator */}
           <Tooltip title={`API Status: ${apiStatus}`}>
             <Chip
