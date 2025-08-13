@@ -238,7 +238,7 @@ const CVRExplanation = ({ player, cvrData, salaryData }) => {
           📈 CVR Scale (0.0-2.0+):
         </Typography>
         <Box sx={{ ml: 1 }}>
-          <Typography variant="caption" sx={{ display: 'block', color: '#00C851' }}>1.8+: Elite Value 💎 (Judge, Ohtani level)</Typography>
+          <Typography variant="caption" sx={{ display: 'block', color: '#00C851' }}>1.8+: Elite Value 💎 </Typography>
           <Typography variant="caption" sx={{ display: 'block', color: '#4CAF50' }}>1.5+: Excellent Value 🔥</Typography>
           <Typography variant="caption" sx={{ display: 'block', color: '#8BC34A' }}>1.2+: Good Value ✅</Typography>
           <Typography variant="caption" sx={{ display: 'block', color: '#FFC107' }}>0.8+: Fair Value ⚡</Typography>
@@ -394,13 +394,19 @@ const PlayerDetail = () => {
   const playerType = React.useMemo(() => {
     const battingGames = playerStats?.batting?.gamesPlayed || 0;
     const pitchingGames = playerStats?.pitching?.gamesPlayed || 0;
+    const atBats = playerStats?.batting?.atBats || 0;
+    const inningsPitched = parseFloat(playerStats?.pitching?.inningsPitched) || 0;
     
-    if (battingGames > 0 && pitchingGames > 10) {
-      return 'two-way'; // Two-way player (significant games in both)
-    } else if (pitchingGames > 0) {
-      return 'pitcher'; // Primarily pitcher
+    // Check for two-way player - meaningful stats in both categories
+    const hasBattingStats = battingGames > 0 || atBats > 0;
+    const hasPitchingStats = pitchingGames > 0 || inningsPitched > 0;
+    
+    if (hasBattingStats && hasPitchingStats) {
+      return 'two-way'; // Two-way player (any meaningful stats in both)
+    } else if (hasPitchingStats && !hasBattingStats) {
+      return 'pitcher'; // Pure pitcher
     } else {
-      return 'batter'; // Primarily batter
+      return 'batter'; // Pure batter (default)
     }
   }, [playerStats]);
 
@@ -480,17 +486,12 @@ const PlayerDetail = () => {
                   
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                     <Chip
-                      label={`#${player.jerseyNumber || '---'}`}
+                      label={player.position || 'Unknown Position'}
                       sx={{
                         backgroundColor: themeUtils.getTeamColor(player?.team || team) || '#1976d2',
                         color: '#ffffff',
                         fontWeight: 700
                       }}
-                    />
-                    <Chip
-                      label={player.position || 'Unknown Position'}
-                      variant="outlined"
-                      sx={{ fontWeight: 600 }}
                     />
                     <Chip
                       label={player.team}

@@ -109,6 +109,7 @@ function parseSalaryString(salaryText) {
 function getTeamCity(teamAbbr) {
   const cityMap = {
     'ARI': 'arizona-diamondbacks',
+    'AZ': 'arizona-diamondbacks',      // Alternative for Arizona
     'ATL': 'atlanta-braves', 
     'BAL': 'baltimore-orioles',
     'BOS': 'boston-red-sox',
@@ -127,7 +128,8 @@ function getTeamCity(teamAbbr) {
     'MIN': 'minnesota-twins',
     'NYM': 'new-york-mets',
     'NYY': 'new-york-yankees',
-    'OAK': 'oakland-athletics',
+    'OAK': 'athletics',               // Fixed: should be 'athletics' not 'oakland-athletics'
+    'ATH': 'athletics',               // Alternative for Oakland Athletics
     'PHI': 'philadelphia-phillies',
     'PIT': 'pittsburgh-pirates',
     'SD': 'san-diego-padres',
@@ -137,7 +139,8 @@ function getTeamCity(teamAbbr) {
     'TB': 'tampa-bay-rays',
     'TEX': 'texas-rangers',
     'TOR': 'toronto-blue-jays',
-    'WAS': 'washington-nationals'
+    'WAS': 'washington-nationals',
+    'WSH': 'washington-nationals'     // Alternative for Washington
   };
   
   return cityMap[teamAbbr] || 'mlb';

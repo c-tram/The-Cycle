@@ -485,6 +485,111 @@ function calculateTeamCVR(teamStats, teamWAR, estimatedPayroll) {
 }
 
 /**
+ * Calculate team batting CVR (focused on offensive production vs. investment)
+ */
+function calculateTeamBattingCVR(battingStats, battingWAR, estimatedOffensivePayroll) {
+  if (!battingStats || !battingStats.runs) return null;
+  
+  // Calculate offensive performance score
+  let offensiveScore = 50; // Base score
+  
+  // Key offensive metrics
+  const ops = battingStats.ops || 0;
+  const runs = battingStats.runs || 0;
+  const homeRuns = battingStats.homeRuns || 0;
+  const gamesPlayed = battingStats.gamesPlayed || 162;
+  const runsPerGame = runs / gamesPlayed;
+  
+  // OPS component (primary offensive metric)
+  if (ops >= 0.850) offensiveScore += 25;      // Elite offense
+  else if (ops >= 0.800) offensiveScore += 20; // Excellent
+  else if (ops >= 0.750) offensiveScore += 15; // Very good
+  else if (ops >= 0.720) offensiveScore += 10; // Above average
+  else if (ops >= 0.700) offensiveScore += 5;  // Average
+  else if (ops >= 0.680) offensiveScore += 0;  // Below average
+  else offensiveScore -= 10;                   // Poor
+  
+  // Runs per game component
+  if (runsPerGame >= 5.5) offensiveScore += 15;
+  else if (runsPerGame >= 5.0) offensiveScore += 10;
+  else if (runsPerGame >= 4.5) offensiveScore += 5;
+  else if (runsPerGame >= 4.0) offensiveScore += 0;
+  else offensiveScore -= 10;
+  
+  // WAR adjustment for batting
+  const warMultiplier = battingWAR >= 20 ? 1.3 : battingWAR >= 15 ? 1.2 : battingWAR >= 10 ? 1.1 : battingWAR >= 5 ? 1.0 : 0.9;
+  const adjustedOffensiveScore = offensiveScore * warMultiplier;
+  
+  // Calculate payroll tier for offensive spending (typically 60% of team payroll)
+  const offensivePayroll = estimatedOffensivePayroll * 0.6;
+  let payrollTier = 1.0;
+  if (offensivePayroll >= 150000000) payrollTier = 1.4;
+  else if (offensivePayroll >= 120000000) payrollTier = 1.3;
+  else if (offensivePayroll >= 90000000) payrollTier = 1.2;
+  else if (offensivePayroll >= 60000000) payrollTier = 1.0;
+  else if (offensivePayroll >= 45000000) payrollTier = 0.9;
+  else payrollTier = 0.8;
+  
+  const normalizedOffensiveScore = adjustedOffensiveScore / 50;
+  const normalizedPayrollTier = payrollTier / 1.0;
+  const battingCVR = normalizedOffensiveScore / normalizedPayrollTier;
+  
+  return Math.round(battingCVR * 100) / 100;
+}
+
+/**
+ * Calculate team pitching CVR (focused on run prevention vs. investment)
+ */
+function calculateTeamPitchingCVR(pitchingStats, pitchingWAR, estimatedPitchingPayroll) {
+  if (!pitchingStats) return null;
+  
+  // Calculate pitching performance score
+  let pitchingScore = 50; // Base score
+  
+  // Key pitching metrics
+  const era = pitchingStats.era || 5.00;
+  const whip = pitchingStats.whip || 1.50;
+  const fip = pitchingStats.fip || era; // Use ERA if FIP not available
+  const saves = pitchingStats.saves || 0;
+  
+  // ERA component (primary pitching metric)
+  if (era <= 3.20) pitchingScore += 25;      // Elite pitching
+  else if (era <= 3.50) pitchingScore += 20; // Excellent
+  else if (era <= 3.80) pitchingScore += 15; // Very good
+  else if (era <= 4.00) pitchingScore += 10; // Above average
+  else if (era <= 4.20) pitchingScore += 5;  // Average
+  else if (era <= 4.50) pitchingScore += 0;  // Below average
+  else pitchingScore -= 10;                  // Poor
+  
+  // WHIP component
+  if (whip <= 1.10) pitchingScore += 15;
+  else if (whip <= 1.20) pitchingScore += 10;
+  else if (whip <= 1.30) pitchingScore += 5;
+  else if (whip <= 1.40) pitchingScore += 0;
+  else pitchingScore -= 10;
+  
+  // WAR adjustment for pitching
+  const warMultiplier = pitchingWAR >= 20 ? 1.3 : pitchingWAR >= 15 ? 1.2 : pitchingWAR >= 10 ? 1.1 : pitchingWAR >= 5 ? 1.0 : 0.9;
+  const adjustedPitchingScore = pitchingScore * warMultiplier;
+  
+  // Calculate payroll tier for pitching spending (typically 40% of team payroll)
+  const pitchingPayroll = estimatedPitchingPayroll * 0.4;
+  let payrollTier = 1.0;
+  if (pitchingPayroll >= 100000000) payrollTier = 1.4;
+  else if (pitchingPayroll >= 80000000) payrollTier = 1.3;
+  else if (pitchingPayroll >= 60000000) payrollTier = 1.2;
+  else if (pitchingPayroll >= 40000000) payrollTier = 1.0;
+  else if (pitchingPayroll >= 30000000) payrollTier = 0.9;
+  else payrollTier = 0.8;
+  
+  const normalizedPitchingScore = adjustedPitchingScore / 50;
+  const normalizedPayrollTier = payrollTier / 1.0;
+  const pitchingCVR = normalizedPitchingScore / normalizedPayrollTier;
+  
+  return Math.round(pitchingCVR * 100) / 100;
+}
+
+/**
  * Classify player type based on their actual usage patterns
  * This is the core function that determines if a player is a batter, pitcher, or two-way player
  */
@@ -1383,9 +1488,67 @@ async function updateTeamSeasonStats(teamSeasonKey, gameStats, team) {
     const teamPitchingWAR = calculatePitcherWAR({ pitching: seasonStats.pitching });
     const teamTotalWAR = teamBattingWAR + teamPitchingWAR;
     
-    // Estimate team payroll (simplified - in production use real payroll data)
-    const estimatedPayroll = 150000000; // MLB average team payroll
-    const teamCVR = calculateTeamCVR(seasonStats, teamTotalWAR, estimatedPayroll);
+    // Get all players for this team to sum their individual CVRs
+    const teamPlayerKeys = await redisClient.keys(`player:${team}-*-${year}:season`);
+    let totalTeamCVR = 0;
+    let totalBattingCVR = 0;
+    let totalPitchingCVR = 0;
+    let playerCount = 0;
+    
+    // Sum individual player CVRs
+    for (const playerKey of teamPlayerKeys) {
+      try {
+        const playerData = await redisClient.get(playerKey);
+        if (playerData) {
+          const playerStats = JSON.parse(playerData);
+          const playerCVR = playerStats.cvr || 0;
+          
+          if (playerCVR !== 0) {
+            totalTeamCVR += playerCVR;
+            playerCount++;
+            
+            // Determine if this is primarily a batter or pitcher based on their stats
+            const hasBattingStats = playerStats.batting && (playerStats.batting.atBats > 0 || playerStats.batting.hits > 0);
+            const hasPitchingStats = playerStats.pitching && playerStats.pitching.inningsPitched && parseFloat(playerStats.pitching.inningsPitched) > 0;
+            
+            // Assign CVR to batting or pitching based on primary role
+            if (hasBattingStats && hasPitchingStats) {
+              // Two-way player: split CVR proportionally based on games/usage
+              const battingGames = playerStats.batting?.gamesPlayed || 0;
+              const pitchingAppearances = playerStats.pitching?.appearances || 0;
+              const totalAppearances = battingGames + pitchingAppearances;
+              
+              if (totalAppearances > 0) {
+                const battingPortion = battingGames / totalAppearances;
+                const pitchingPortion = pitchingAppearances / totalAppearances;
+                totalBattingCVR += playerCVR * battingPortion;
+                totalPitchingCVR += playerCVR * pitchingPortion;
+              } else {
+                // Default split for two-way players
+                totalBattingCVR += playerCVR * 0.6;
+                totalPitchingCVR += playerCVR * 0.4;
+              }
+            } else if (hasBattingStats) {
+              // Primarily a batter
+              totalBattingCVR += playerCVR;
+            } else if (hasPitchingStats) {
+              // Primarily a pitcher
+              totalPitchingCVR += playerCVR;
+            } else {
+              // Default to batting if unclear
+              totalBattingCVR += playerCVR;
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error reading player CVR from ${playerKey}:`, error.message);
+      }
+    }
+    
+    // Round the totals
+    totalTeamCVR = Math.round(totalTeamCVR * 100) / 100;
+    totalBattingCVR = Math.round(totalBattingCVR * 100) / 100;
+    totalPitchingCVR = Math.round(totalPitchingCVR * 100) / 100;
     
     // Add advanced team metrics
     seasonStats.war = {
@@ -1394,17 +1557,23 @@ async function updateTeamSeasonStats(teamSeasonKey, gameStats, team) {
       pitching: Math.round(teamPitchingWAR * 10) / 10
     };
     
-    seasonStats.cvr = teamCVR;
+    // Store CVR as sum of individual player CVRs
+    seasonStats.cvr = totalTeamCVR; // Total sum of all player CVRs
+    seasonStats.cvrDetails = {
+      total: totalTeamCVR,
+      batting: totalBattingCVR,
+      pitching: totalPitchingCVR
+    };
     
     // Add team performance grades
     seasonStats.performance = {
       warGrade: teamTotalWAR >= 30 ? 'Elite' : teamTotalWAR >= 20 ? 'Very Good' : teamTotalWAR >= 10 ? 'Above Average' : teamTotalWAR >= 0 ? 'Average' : 'Poor',
-      cvrGrade: teamCVR >= 1.5 ? 'Excellent Value' : teamCVR >= 1.2 ? 'Good Value' : teamCVR >= 0.8 ? 'Fair Value' : 'Poor Value',
+      cvrGrade: totalTeamCVR >= 15 ? 'Elite Value' : totalTeamCVR >= 10 ? 'Excellent Value' : totalTeamCVR >= 5 ? 'Good Value' : totalTeamCVR >= 0 ? 'Fair Value' : 'Poor Value',
       projectedWins: Math.round(81 + (teamTotalWAR - 18) * 2), // Rough WAR-to-wins conversion
-      estimatedPayroll
+      playerCount // Number of players contributing to CVR
     };
     
-    console.log(`🏟️  ${team} - Team WAR: ${teamTotalWAR.toFixed(1)} (Batting: ${teamBattingWAR.toFixed(1)}, Pitching: ${teamPitchingWAR.toFixed(1)}), CVR: ${teamCVR ? teamCVR.toFixed(2) : 'N/A'}`);
+    console.log(`🏟️  ${team} - Team WAR: ${teamTotalWAR.toFixed(1)} (Batting: ${teamBattingWAR.toFixed(1)}, Pitching: ${teamPitchingWAR.toFixed(1)}), CVR: ${totalTeamCVR.toFixed(2)} (${playerCount} players, Batting: ${totalBattingCVR.toFixed(2)}, Pitching: ${totalPitchingCVR.toFixed(2)})`);
     
     // Update timestamp
     seasonStats.lastUpdated = new Date().toISOString();
@@ -1503,6 +1672,9 @@ async function aggregateSeasonStats(season) {
       // Calculate wins/losses from game results
       const wins = games.filter(game => game.gameInfo.result === 'W').length;
       const losses = games.filter(game => game.gameInfo.result === 'L').length;
+      
+      // Extract team code from teamKey (format: "TEAMCODE:YEAR")
+      const [teamCode, year] = teamKey.split(':');
 
       const teamSeasonStats = {
         ...calculateBattingStats(battingTotals),
@@ -1524,6 +1696,70 @@ async function aggregateSeasonStats(season) {
         gameCount: games.length,
         lastUpdated: new Date().toISOString()
       };
+      
+      // Calculate team WAR and CVR by summing individual player values
+      try {
+        const playerKeys = await redisClient.keys(`player:${teamCode}-*-${year}:season`);
+        let teamTotalWAR = 0;
+        let teamTotalCVR = 0;
+        let playerCount = 0;
+        let battingWAR = 0;
+        let pitchingWAR = 0;
+        
+        for (const playerKey of playerKeys) {
+          try {
+            const playerData = await redisClient.get(playerKey);
+            if (playerData) {
+              const player = JSON.parse(playerData);
+              if (player.war && typeof player.war === 'number') {
+                teamTotalWAR += player.war;
+                playerCount++;
+                
+                // Classify player contribution by position/role
+                if (player.batting && player.batting.atBats > 0) {
+                  battingWAR += player.war;
+                } else if (player.pitching && player.pitching.inningsPitched > 0) {
+                  pitchingWAR += player.war;
+                }
+              }
+              if (player.cvr && typeof player.cvr === 'number') {
+                teamTotalCVR += player.cvr;
+              }
+            }
+          } catch (playerError) {
+            console.log(`⚠️ Error reading player data ${playerKey}:`, playerError.message);
+          }
+        }
+        
+        // Use total sum of CVRs for the team (not average)
+        const totalTeamCVR = teamTotalCVR; // This is already the sum
+        
+        // Add aggregated team metrics
+        teamSeasonStats.war = {
+          total: Math.round(teamTotalWAR * 10) / 10,
+          batting: Math.round(battingWAR * 10) / 10,
+          pitching: Math.round(pitchingWAR * 10) / 10
+        };
+        teamSeasonStats.cvr = Math.round(totalTeamCVR * 100) / 100;
+        
+        console.log(`📊 Team ${teamCode}: WAR=${teamTotalWAR.toFixed(1)} (${playerCount} players), CVR=${totalTeamCVR.toFixed(2)} (sum of individual player CVRs)`);
+        
+      } catch (aggregationError) {
+        console.log(`⚠️ Error aggregating team stats for ${teamCode}:`, aggregationError.message);
+        // Fallback to old calculation method
+        const teamBattingWAR = calculateHitterWAR({ batting: teamSeasonStats.batting });
+        const teamPitchingWAR = calculatePitcherWAR({ pitching: teamSeasonStats.pitching });
+        const teamTotalWAR = teamBattingWAR + teamPitchingWAR;
+        
+        teamSeasonStats.war = {
+          total: Math.round(teamTotalWAR * 10) / 10,
+          batting: Math.round(teamBattingWAR * 10) / 10,
+          pitching: Math.round(teamPitchingWAR * 10) / 10
+        };
+        
+        const estimatedPayroll = 150000000;
+        teamSeasonStats.cvr = calculateTeamCVR(teamSeasonStats, teamTotalWAR, estimatedPayroll);
+      }
 
       // Store with correct key format expected by API routes
       const teamSeasonKey = `team:${teamKey}:season`;  // Format: team:TEAMCODE:YEAR:season
@@ -1637,8 +1873,8 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 if (require.main === module) {
   const season = process.argv[2] || '2025';
   // Full MLB season: Opening Day (late March) through current date (or full season)
-  const startDate = process.argv[3] || '2025-08-08';  // Opening Day 2025
-  const endDate = process.argv[4] || '2025-08-08';    // Current date (adjust to completed games)
+  const startDate = process.argv[3] || '2025-08-09';  // Opening Day 2025
+  const endDate = process.argv[4] || '2025-08-12';    // Current date (adjust to completed games)
   
   console.log(`🏁 Starting MLB data pull for ${season} season`);
   console.log(`📅 Date range: ${startDate} to ${endDate}`);

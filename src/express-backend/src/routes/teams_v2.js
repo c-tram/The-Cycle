@@ -3,7 +3,7 @@ const router = express.Router();
 const { getRedisClient, parseRedisData, getKeysByPattern, getMultipleKeys } = require('../utils/redis');
 
 // ============================================================================
-// ENHANCED TEAMS API ROUTES
+// ENHANCED TEAMS API ROUTES - v2
 // Professional-grade team statistics with comprehensive data coverage
 // ============================================================================
 
@@ -47,11 +47,24 @@ router.get('/', async (req, res) => {
         },
         cvr: team.data.cvr || 0,      // Also at top level for easy access
         war: team.data.war || { total: 0, batting: 0, pitching: 0 },
+        // Add separate CVR values for batting and pitching
+        cvrDetails: team.data.cvrDetails || {
+          total: team.data.cvr || 0,
+          batting: 0,
+          pitching: 0
+        },
         standings: {
           winPercentage: calculateWinPercentage(team.data.record),
           runsScored: team.data.batting?.runs || 0,
           runsAllowed: team.data.pitching?.earnedRuns || 0,
-          runDifferential: (team.data.batting?.runs || 0) - (team.data.pitching?.earnedRuns || 0)
+          runDifferential: (team.data.batting?.runs || 0) - (team.data.pitching?.earnedRuns || 0),
+          pythagoreanWinPct: calculatePythagoreanWinPct(
+            team.data.batting?.runs || 0, 
+            team.data.pitching?.earnedRuns || 0
+          ),
+          lastTen: team.data.lastTenGames || { wins: 5, losses: 5 },
+          homeRecord: team.data.homeRecord || { wins: 0, losses: 0 },
+          awayRecord: team.data.awayRecord || { wins: 0, losses: 0 }
         },
         lastUpdated: team.data.lastUpdated
       };
@@ -221,6 +234,11 @@ router.get('/:teamId', async (req, res) => {
         runsScored: teamStats.batting?.runs || 0,
         runsAllowed: teamStats.pitching?.earnedRuns || 0,
         runDifferential: (teamStats.batting?.runs || 0) - (teamStats.pitching?.earnedRuns || 0),
+        pythagoreanWinPct: calculatePythagoreanWinPct(
+          teamStats.batting?.runs || 0, 
+          teamStats.pitching?.earnedRuns || 0
+        ),
+        lastTen: teamStats.lastTenGames || { wins: 5, losses: 5 },
         homeRecord: teamStats.homeRecord || { wins: 0, losses: 0 },
         awayRecord: teamStats.awayRecord || { wins: 0, losses: 0 }
       },
@@ -228,8 +246,19 @@ router.get('/:teamId', async (req, res) => {
         offensive: calculateOffensiveAnalytics(teamStats.batting),
         pitching: calculatePitchingAnalytics(teamStats.pitching),
         fielding: calculateFieldingAnalytics(teamStats.fielding),
-        overall: calculateOverallTeamRating(teamStats)
+        overall: {
+          rating: calculateOverallTeamRating(teamStats),
+          cvr: teamStats.cvr || 0,
+          war: teamStats.war || { total: 0, batting: 0, pitching: 0 },
+          pythagoreanWinPct: calculatePythagoreanWinPct(
+            teamStats.batting?.runs || 0, 
+            teamStats.pitching?.earnedRuns || 0
+          )
+        }
       },
+      // Also include CVR and WAR at root level for easy access
+      cvr: teamStats.cvr || 0,
+      war: teamStats.war || { total: 0, batting: 0, pitching: 0 },
       lastUpdated: teamStats.lastUpdated
     };
     
@@ -279,7 +308,7 @@ router.get('/:teamId/schedule', async (req, res) => {
     // If month specified, filter by month
     if (month) {
       const monthPad = month.padStart(2, '0');
-      pattern = `team:${teamId.toUpperCase()}:${year}:????-${monthPad}-??`;
+      pattern = `team:${teamId.toUpperCase()}:${year}:${year}-${monthPad}-??`;
     }
     
     const gameKeys = await getKeysByPattern(pattern);
@@ -292,18 +321,26 @@ router.get('/:teamId/schedule', async (req, res) => {
     const games = gameData
       .map(game => {
         const date = game.key.split(':').pop();
+        const gameInfo = game.data.gameInfo || {};
+        const batting = game.data.batting || {};
+        const pitching = game.data.pitching || {};
+        
         return {
           date,
-          opponent: game.data.opponent || 'Unknown',
-          homeAway: game.data.homeAway || 'Unknown',
-          result: game.data.result || 'Unknown',
-          score: game.data.score || { team: 0, opponent: 0 },
+          gameId: gameInfo.gameId || 'Unknown',
+          opponent: gameInfo.opponent || 'Unknown',
+          homeAway: gameInfo.homeAway || 'Unknown', 
+          result: gameInfo.result || 'Unknown',
+          score: {
+            team: gameInfo.runsScored || 0,
+            opponent: gameInfo.runsAllowed || 0
+          },
           stats: {
-            batting: game.data.batting || {},
-            pitching: game.data.pitching || {},
+            batting: batting,
+            pitching: pitching,
             fielding: game.data.fielding || {}
           },
-          gameInfo: game.data.gameInfo || {},
+          gameInfo: gameInfo,
           performance: evaluateTeamGamePerformance(game.data)
         };
       })
@@ -423,6 +460,18 @@ function calculateWinPercentage(record) {
   
   if (totalGames === 0) return 0;
   return Number((wins / totalGames).toFixed(3));
+}
+
+function calculatePythagoreanWinPct(runsScored, runsAllowed) {
+  if (!runsScored || !runsAllowed || runsScored <= 0 || runsAllowed <= 0) {
+    return 0;
+  }
+  
+  // Pythagorean expectation formula: RS^2 / (RS^2 + RA^2)
+  const rsSquared = Math.pow(runsScored, 2);
+  const raSquared = Math.pow(runsAllowed, 2);
+  
+  return Number((rsSquared / (rsSquared + raSquared)).toFixed(3));
 }
 
 function calculateOffensiveAnalytics(batting) {

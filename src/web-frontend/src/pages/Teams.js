@@ -35,20 +35,22 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Stack
+  Stack,
+  ToggleButton
 } from '@mui/material';
 import {
   Search,
-  Sports,
   Refresh,
   ViewList,
   ViewModule,
+  Analytics,
+  Sports,
+  Stadium,
   ArrowUpward,
   ArrowDownward,
   DateRange,
-  Analytics,
-  Groups,
-  Stadium
+  TableView,
+  ViewStream
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -58,6 +60,23 @@ import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } fro
 import { teamsApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
 import { getCVRDisplay } from '../utils/cvrCalculations';
+
+// Team logo utility
+const getTeamLogoUrl = (teamCode) => {
+  if (!teamCode) return null;
+  const code = teamCode.toUpperCase();
+  const codeMap = {
+    AZ: 'ARI',
+    CWS: 'CHW',
+    KC: 'KCR',
+    SD: 'SDP',
+    SF: 'SFG',
+    TB: 'TBR',
+    WSH: 'WSN',
+  };
+  const logoCode = codeMap[code] || code;
+  return `https://a.espncdn.com/i/teamlogos/mlb/500/${logoCode}.png`;
+};
 
 // Helper function to safely get nested object values
 const getNestedValue = (obj, path) => {
@@ -76,9 +95,8 @@ const Teams = () => {
   
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedLeagues, setSelectedLeagues] = useState([]);
   const [selectedDivisions, setSelectedDivisions] = useState([]);
-  const [activeCategory, setActiveCategory] = useState('batting');
+  const [activeCategory, setActiveCategory] = useState('primary'); // Changed to 'primary'
   const [sortBy, setSortBy] = useState('record.wins');
   const [sortOrder, setSortOrder] = useState('desc');
   const [dateRange, setDateRange] = useState('all');
@@ -89,13 +107,15 @@ const Teams = () => {
   const [showCustomDateDialog, setShowCustomDateDialog] = useState(false);
   
   // View options
-  const [viewMode, setViewMode] = useState('table');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [viewMode, setViewMode] = useState('unified'); // 'divisions' or 'unified' - default to unified (list view)
 
   // Static data
-  const leagues = ['AL', 'NL'];
-  const divisions = ['East', 'Central', 'West'];
+  const divisionOptions = [
+    'AL East', 'AL Central', 'AL West',
+    'NL East', 'NL Central', 'NL West'
+  ];
 
   // Helper function to get date range for API calls
   const getDateRangeParams = useCallback(() => {
@@ -170,7 +190,7 @@ const Teams = () => {
     
     // Debounce the search to avoid too many API calls
     const searchTimeout = setTimeout(() => {
-      if (searchTerm || selectedLeagues.length > 0 || selectedDivisions.length > 0 || dateRange !== 'all') {
+      if (searchTerm || selectedDivisions.length > 0 || dateRange !== 'all') {
         setSearchLoading(true);
         loadTeams().finally(() => setSearchLoading(false));
       } else {
@@ -179,12 +199,12 @@ const Teams = () => {
     }, 300); // 300ms delay
 
     return () => clearTimeout(searchTimeout);
-  }, [searchTerm, selectedLeagues, selectedDivisions, dateRange]);
+  }, [searchTerm, selectedDivisions, dateRange]);
 
   // Debounced API call for real-time search
   const loadTeams = useCallback(async () => {
     try {
-      if (!searchTerm && selectedLeagues.length === 0 && selectedDivisions.length === 0 && dateRange === 'all') {
+      if (!searchTerm && selectedDivisions.length === 0 && dateRange === 'all') {
         setLoading(true);
       }
       setError(null);
@@ -196,16 +216,6 @@ const Teams = () => {
         sortOrder,
         limit: 100 // Get all teams
       };
-
-      // Add league filter if selected
-      if (selectedLeagues.length === 1) {
-        apiParams.league = selectedLeagues[0];
-      }
-
-      // Add division filter if selected
-      if (selectedDivisions.length === 1) {
-        apiParams.division = selectedDivisions[0];
-      }
 
       // Add date range filter if not 'all'
       const dateParams = getDateRangeParams();
@@ -225,7 +235,44 @@ const Teams = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeCategory, sortBy, sortOrder, selectedLeagues, selectedDivisions, searchTerm, dateRange, customStartDate, customEndDate, getDateRangeParams]);
+  }, [activeCategory, sortBy, sortOrder, selectedDivisions, searchTerm, dateRange, customStartDate, customEndDate, getDateRangeParams]);
+
+  // Division organization
+  const divisions = {
+    'AL East': ['BAL', 'BOS', 'NYY', 'TB', 'TOR'],
+    'AL Central': ['CWS', 'CHW', 'CLE', 'DET', 'KC', 'KCR', 'MIN'],
+    'AL West': ['HOU', 'LAA', 'OAK', 'ATH', 'SEA', 'TEX'],
+    'NL East': ['ATL', 'MIA', 'NYM', 'PHI', 'WSH', 'WSN'],
+    'NL Central': ['CHC', 'CIN', 'MIL', 'PIT', 'STL'],
+    'NL West': ['ARI', 'AZ', 'COL', 'LAD', 'SD', 'SDP', 'SF', 'SFG']
+  };
+
+  // Helper functions to get league and division from team ID
+  const getTeamLeague = (teamId) => {
+    for (const [divisionName, teamIds] of Object.entries(divisions)) {
+      if (teamIds.includes(teamId)) {
+        return divisionName.startsWith('AL') ? 'AL' : 'NL';
+      }
+    }
+    return 'Unknown';
+  };
+
+  const getTeamDivision = (teamId) => {
+    for (const [divisionName, teamIds] of Object.entries(divisions)) {
+      if (teamIds.includes(teamId)) {
+        return divisionName.split(' ')[1]; // Extract 'East', 'Central', or 'West'
+      }
+    }
+    return 'Unknown';
+  };
+
+  const getTeamsByDivision = (divisionTeams) => {
+    return teams.filter(team => divisionTeams.includes(team.id)).sort((a, b) => {
+      const aWinPct = a.standings?.winPercentage || 0;
+      const bWinPct = b.standings?.winPercentage || 0;
+      return bWinPct - aWinPct; // Sort by win percentage descending
+    });
+  };
 
   // Filter and sort teams with real-time search
   const filteredTeams = useMemo(() => {
@@ -242,18 +289,12 @@ const Teams = () => {
       );
     }
 
-    // League filter (handled by API for single league, client-side for multiple)
-    if (selectedLeagues.length > 1) {
-      filtered = filtered.filter(team =>
-        selectedLeagues.includes(team.league)
-      );
-    }
-
-    // Division filter (handled by API for single division, client-side for multiple)
-    if (selectedDivisions.length > 1) {
-      filtered = filtered.filter(team =>
-        selectedDivisions.includes(team.division)
-      );
+    // Division filter (full division names like "AL East", "NL Central")
+    if (selectedDivisions.length > 0) {
+      filtered = filtered.filter(team => {
+        const teamFullDivision = `${getTeamLeague(team.id)} ${getTeamDivision(team.id)}`;
+        return selectedDivisions.includes(teamFullDivision);
+      });
     }
 
     // Client-side sorting
@@ -288,7 +329,7 @@ const Teams = () => {
     }
 
     return filtered;
-  }, [teams, searchTerm, selectedLeagues, selectedDivisions, sortBy, sortOrder]);
+  }, [teams, searchTerm, selectedDivisions, sortBy, sortOrder]);
 
   // Calculate category-specific filtered teams (for stats display)
   const categoryFilteredTeams = useMemo(() => {
@@ -316,136 +357,108 @@ const Teams = () => {
     return categoryFilteredTeams.slice(startIndex, startIndex + rowsPerPage);
   }, [categoryFilteredTeams, page, rowsPerPage]);
 
-  // Stat configurations for different categories
+  // Stat configurations for the three categories
   const statConfigs = {
-    batting: [
-      // Team Identity
-      { key: 'id', label: 'Team', format: (val) => val || '---', sticky: true },
+    primary: [
+      // Primary: Wins, Losses, Last 10, Total WAR, Total CVR, Pythagorean %
       { key: 'record.wins', label: 'W', format: (val) => val || 0 },
       { key: 'record.losses', label: 'L', format: (val) => val || 0 },
       { key: 'standings.winPercentage', label: 'PCT', format: (val) => val?.toFixed(3) || '---' },
-      
-      // Advanced Team Metrics
-      { key: 'war.total', label: 'WAR', format: (val) => val?.toFixed(1) || '---' },
-      { key: 'cvr', label: 'CVR', format: (val) => {
+      { key: 'standings.lastTen', label: 'L10', format: (val) => {
+        if (!val || !val.wins || !val.losses) return '---';
+        return `${val.wins}-${val.losses}`;
+      }},
+      { key: 'war.total', label: 'Total WAR', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'cvr', label: 'Total CVR', format: (val) => {
         if (!val) return '---';
         const display = getCVRDisplay(val);
         return `${display.value} ${display.emoji}`;
       }},
-      
-      // Traditional Triple Slash (Team)
+      { key: 'standings.pythagoreanWinPct', label: 'Pyth %', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
+      { key: 'standings.runDifferential', label: 'Run Diff', format: (val) => val >= 0 ? `+${val}` : val || 0 }
+    ],
+    batting: [
+      // Batting: Generic batting stats + batting WAR and CVR
+      { key: 'standings.runsScored', label: 'R', format: (val) => val || 0 },
       { key: 'stats.batting.avg', label: 'AVG', format: (val) => val?.toFixed(3) || '---' },
       { key: 'stats.batting.obp', label: 'OBP', format: (val) => val?.toFixed(3) || '---' },
       { key: 'stats.batting.slg', label: 'SLG', format: (val) => val?.toFixed(3) || '---' },
       { key: 'stats.batting.ops', label: 'OPS', format: (val) => val?.toFixed(3) || '---' },
-      
-      // Power Metrics
       { key: 'stats.batting.homeRuns', label: 'HR', format: (val) => val || 0 },
-      { key: 'stats.batting.iso', label: 'ISO', format: (val) => val?.toFixed(3) || '---' },
-      { key: 'stats.batting.extraBaseHits', label: 'XBH', format: (val) => val || 0 },
-      { key: 'stats.batting.extraBaseHitRate', label: 'XBH%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
-      
-      // Plate Discipline
-      { key: 'stats.batting.kRate', label: 'K%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
-      { key: 'stats.batting.bbRate', label: 'BB%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
-      { key: 'stats.batting.contactRate', label: 'Contact%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
-      { key: 'stats.batting.walkToStrikeoutRatio', label: 'BB/K', format: (val) => val && val < 999 ? val.toFixed(2) : val > 0 ? '∞' : '---' },
-      
-      // Advanced Sabermetrics
-      { key: 'stats.batting.wOBA', label: 'wOBA', format: (val) => val?.toFixed(3) || '---' },
-      { key: 'stats.batting.babip', label: 'BABIP', format: (val) => val?.toFixed(3) || '---' },
-      
-      // Run Production
-      { key: 'standings.runsScored', label: 'R', format: (val) => val || 0 },
       { key: 'stats.batting.rbi', label: 'RBI', format: (val) => val || 0 },
       { key: 'stats.batting.hits', label: 'H', format: (val) => val || 0 },
       { key: 'stats.batting.doubles', label: '2B', format: (val) => val || 0 },
-      { key: 'stats.batting.triples', label: '3B', format: (val) => val || 0 },
-      { key: 'stats.batting.stolenBases', label: 'SB', format: (val) => val || 0 },
-      { key: 'stats.batting.plateAppearances', label: 'PA', format: (val) => val || 0 },
+      { key: 'stats.batting.strikeOuts', label: 'K', format: (val) => val || 0 },
       { key: 'stats.batting.baseOnBalls', label: 'BB', format: (val) => val || 0 },
-      { key: 'stats.batting.strikeOuts', label: 'K', format: (val) => val || 0 }
-    ],
-    pitching: [
-      // Team Identity
-      { key: 'id', label: 'Team', format: (val) => val || '---', sticky: true },
-      { key: 'record.wins', label: 'W', format: (val) => val || 0 },
-      { key: 'record.losses', label: 'L', format: (val) => val || 0 },
-      { key: 'standings.winPercentage', label: 'PCT', format: (val) => val?.toFixed(3) || '---' },
-      
-      // Advanced Team Metrics
-      { key: 'war.total', label: 'WAR', format: (val) => val?.toFixed(1) || '---' },
-      { key: 'war.pitching', label: 'pWAR', format: (val) => val?.toFixed(1) || '---' },
-      { key: 'cvr', label: 'CVR', format: (val) => {
+      { key: 'war.batting', label: 'Batting WAR', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'cvrDetails.batting', label: 'Batting CVR', format: (val) => {
         if (!val) return '---';
         const display = getCVRDisplay(val);
         return `${display.value} ${display.emoji}`;
-      }},
-      
-      // Innings (Primary Volume)
-      { key: 'stats.pitching.inningsPitched', label: 'IP', format: (val) => val || '---' },
-      
-      // Traditional Rate Stats
+      }}
+    ],
+    pitching: [
+      // Pitching: Generic pitching stats + pitching WAR and CVR
+      { key: 'standings.runsAllowed', label: 'RA', format: (val) => val || 0 },
       { key: 'stats.pitching.era', label: 'ERA', format: (val) => val?.toFixed(2) || '---' },
       { key: 'stats.pitching.whip', label: 'WHIP', format: (val) => val?.toFixed(2) || '---' },
-      { key: 'stats.pitching.winPercentage', label: 'WIN%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
-      
-      // Advanced Sabermetrics
       { key: 'stats.pitching.fip', label: 'FIP', format: (val) => val?.toFixed(2) || '---' },
-      { key: 'stats.pitching.xFip', label: 'xFIP', format: (val) => val?.toFixed(2) || '---' },
-      { key: 'stats.pitching.babip', label: 'BABIP', format: (val) => val?.toFixed(3) || '---' },
-      { key: 'stats.pitching.strandRate', label: 'LOB%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
-      
-      // Strikeout Metrics
-      { key: 'stats.pitching.strikeoutWalkRatio', label: 'K/BB', format: (val) => val && val < 999 ? val.toFixed(2) : val > 0 ? '∞' : '---' },
-      { key: 'stats.pitching.strikeoutsPer9Inn', label: 'K/9', format: (val) => val?.toFixed(1) || '---' },
-      { key: 'stats.pitching.walksPer9Inn', label: 'BB/9', format: (val) => val?.toFixed(1) || '---' },
-      { key: 'stats.pitching.hitsPer9Inn', label: 'H/9', format: (val) => val?.toFixed(1) || '---' },
-      { key: 'stats.pitching.homeRunsPer9', label: 'HR/9', format: (val) => val?.toFixed(1) || '---' },
-      
-      // Efficiency Metrics
-      { key: 'stats.pitching.pitchesPerInning', label: 'P/IP', format: (val) => val?.toFixed(1) || '---' },
-      { key: 'stats.pitching.strikePercentage', label: 'Strike%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
-      
-      // Run Prevention
-      { key: 'standings.runsAllowed', label: 'RA', format: (val) => val || 0 },
-      { key: 'standings.runDifferential', label: 'DIFF', format: (val) => val >= 0 ? `+${val}` : val || 0 },
-      { key: 'stats.pitching.earnedRuns', label: 'ER', format: (val) => val || 0 },
-      { key: 'stats.pitching.homeRuns', label: 'HR', format: (val) => val || 0 },
       { key: 'stats.pitching.strikeOuts', label: 'K', format: (val) => val || 0 },
       { key: 'stats.pitching.baseOnBalls', label: 'BB', format: (val) => val || 0 },
       { key: 'stats.pitching.hits', label: 'H', format: (val) => val || 0 },
-      { key: 'stats.pitching.saves', label: 'SV', format: (val) => val || 0 }
-    ],
-    fielding: [
-      // Team Identity
-      { key: 'id', label: 'Team', format: (val) => val || '---', sticky: true },
-      { key: 'record.wins', label: 'W', format: (val) => val || 0 },
-      { key: 'record.losses', label: 'L', format: (val) => val || 0 },
-      { key: 'standings.winPercentage', label: 'PCT', format: (val) => val?.toFixed(3) || '---' },
-      
-      // Advanced Team Metrics
-      { key: 'war.total', label: 'WAR', format: (val) => val?.toFixed(1) || '---' },
-      { key: 'cvr', label: 'CVR', format: (val) => {
+      { key: 'stats.pitching.homeRuns', label: 'HR', format: (val) => val || 0 },
+      { key: 'stats.pitching.saves', label: 'SV', format: (val) => val || 0 },
+      { key: 'stats.pitching.inningsPitched', label: 'IP', format: (val) => val || '---' },
+      { key: 'stats.pitching.strikeoutsPer9Inn', label: 'K/9', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'war.pitching', label: 'Pitching WAR', format: (val) => val?.toFixed(1) || '---' },
+      { key: 'cvrDetails.pitching', label: 'Pitching CVR', format: (val) => {
         if (!val) return '---';
         const display = getCVRDisplay(val);
         return `${display.value} ${display.emoji}`;
-      }},
-      
-      // Primary Fielding Stats
-      { key: 'stats.fielding.fieldingPercentage', label: 'FLD%', format: (val) => val?.toFixed(3) || '---' },
-      { key: 'stats.fielding.errors', label: 'E', format: (val) => val || 0 },
-      { key: 'stats.fielding.assists', label: 'A', format: (val) => val || 0 },
-      { key: 'stats.fielding.putOuts', label: 'PO', format: (val) => val || 0 },
-      { key: 'stats.fielding.chances', label: 'TC', format: (val) => val || 0 },
-      
-      // Advanced Fielding
-      { key: 'stats.fielding.caughtStealingPercentage', label: 'CS%', format: (val) => val ? (val * 100).toFixed(1) + '%' : '---' },
-      
-      // Related Stats
-      { key: 'stats.pitching.groundOutsToAirouts', label: 'GO/AO', format: (val) => val?.toFixed(2) || '---' },
-      { key: 'standings.runDifferential', label: 'DIFF', format: (val) => val >= 0 ? `+${val}` : val || 0 }
+      }}
     ]
+  };
+
+  // Team name mapping for full names
+  const teamNameMap = {
+    'ARI': 'Arizona Diamondbacks',
+    'AZ': 'Arizona Diamondbacks',
+    'ATL': 'Atlanta Braves',
+    'BAL': 'Baltimore Orioles',
+    'BOS': 'Boston Red Sox',
+    'CHC': 'Chicago Cubs',
+    'CWS': 'Chicago White Sox',
+    'CHW': 'Chicago White Sox',
+    'CIN': 'Cincinnati Reds',
+    'CLE': 'Cleveland Guardians',
+    'COL': 'Colorado Rockies',
+    'DET': 'Detroit Tigers',
+    'HOU': 'Houston Astros',
+    'KC': 'Kansas City Royals',
+    'KCR': 'Kansas City Royals',
+    'LAA': 'Los Angeles Angels',
+    'LAD': 'Los Angeles Dodgers',
+    'MIA': 'Miami Marlins',
+    'MIL': 'Milwaukee Brewers',
+    'MIN': 'Minnesota Twins',
+    'NYM': 'New York Mets',
+    'NYY': 'New York Yankees',
+    'OAK': 'Oakland Athletics',
+    'ATH': 'Oakland Athletics',
+    'PHI': 'Philadelphia Phillies',
+    'PIT': 'Pittsburgh Pirates',
+    'SD': 'San Diego Padres',
+    'SDP': 'San Diego Padres',
+    'SF': 'San Francisco Giants',
+    'SFG': 'San Francisco Giants',
+    'SEA': 'Seattle Mariners',
+    'STL': 'St. Louis Cardinals',
+    'TB': 'Tampa Bay Rays',
+    'TBR': 'Tampa Bay Rays',
+    'TEX': 'Texas Rangers',
+    'TOR': 'Toronto Blue Jays',
+    'WSH': 'Washington Nationals',
+    'WSN': 'Washington Nationals'
   };
 
   const currentStats = statConfigs[activeCategory] || [];
@@ -553,29 +566,8 @@ const Teams = () => {
           />
         </Grid>
 
-        {/* League Filter */}
-        <Grid item xs={12} md={2}>
-          <FormControl fullWidth size="small">
-            <InputLabel>League</InputLabel>
-            <Select
-              multiple
-              value={selectedLeagues}
-              onChange={(e) => setSelectedLeagues(e.target.value)}
-              input={<OutlinedInput label="League" />}
-              renderValue={(selected) => selected.length === 0 ? 'All Leagues' : selected.join(', ')}
-            >
-              {leagues.map((league) => (
-                <MenuItem key={league} value={league}>
-                  <Checkbox checked={selectedLeagues.indexOf(league) > -1} />
-                  <ListItemText primary={league} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Grid>
-
         {/* Division Filter */}
-        <Grid item xs={12} md={2}>
+        <Grid item xs={12} md={3}>
           <FormControl fullWidth size="small">
             <InputLabel>Division</InputLabel>
             <Select
@@ -585,7 +577,7 @@ const Teams = () => {
               input={<OutlinedInput label="Division" />}
               renderValue={(selected) => selected.length === 0 ? 'All Divisions' : selected.join(', ')}
             >
-              {divisions.map((division) => (
+              {divisionOptions.map((division) => (
                 <MenuItem key={division} value={division}>
                   <Checkbox checked={selectedDivisions.indexOf(division) > -1} />
                   <ListItemText primary={division} />
@@ -596,7 +588,7 @@ const Teams = () => {
         </Grid>
 
         {/* Date Range */}
-        <Grid item xs={12} md={2}>
+        <Grid item xs={12} md={3}>
           <FormControl fullWidth size="small">
             <InputLabel>Date Range</InputLabel>
             <Select
@@ -623,20 +615,28 @@ const Teams = () => {
 
         {/* View Controls */}
         <Grid item xs={12} md={2}>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <IconButton 
-              onClick={() => setViewMode('table')}
-              color={viewMode === 'table' ? 'primary' : 'default'}
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
+            <ToggleButton
+              value="divisions"
+              selected={viewMode === 'divisions'}
+              onChange={() => setViewMode('divisions')}
+              size="small"
+              color="primary"
+              title="Division View"
             >
-              <ViewList />
-            </IconButton>
-            <IconButton 
-              onClick={() => setViewMode('cards')}
-              color={viewMode === 'cards' ? 'primary' : 'default'}
+              <ViewModule fontSize="small" />
+            </ToggleButton>
+            <ToggleButton
+              value="unified"
+              selected={viewMode === 'unified'}
+              onChange={() => setViewMode('unified')}
+              size="small"
+              color="primary"
+              title="Unified Table View"
             >
-              <ViewModule />
-            </IconButton>
-            <IconButton onClick={loadTeams} color="primary">
+              <TableView fontSize="small" />
+            </ToggleButton>
+            <IconButton onClick={loadTeams} color="primary" title="Refresh Data">
               <Refresh />
             </IconButton>
           </Box>
@@ -663,6 +663,15 @@ const Teams = () => {
           <Tab 
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Analytics />
+                Primary
+              </Box>
+            } 
+            value="primary" 
+          />
+          <Tab 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Sports />
                 Batting
               </Box>
@@ -678,167 +687,274 @@ const Teams = () => {
             } 
             value="pitching" 
           />
-          <Tab 
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Groups />
-                Fielding
-              </Box>
-            } 
-            value="fielding" 
-          />
         </Tabs>
       </Card>
 
       {/* Results Summary */}
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="body2" color="text.secondary">
-          Showing {categoryFilteredTeams.length} teams
-          {dateRange !== 'all' && ` (${dateRange} data)`}
-        </Typography>
-        
-        {dateRange === 'custom' && customStartDate && customEndDate && (
-          <Chip 
-            label={`${format(new Date(customStartDate), 'MMM dd')} - ${format(new Date(customEndDate), 'MMM dd')}`}
-            size="small"
-            onDelete={() => setDateRange('all')}
-            color="primary"
-            variant="outlined"
-          />
-        )}
-      </Box>
+      {/* Content based on view mode */}
+      {viewMode === 'divisions' ? (
+        <>
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              Showing all teams organized by division ({activeCategory} statistics)
+              {dateRange !== 'all' && ` (${dateRange} data)`}
+            </Typography>
+            
+            {dateRange === 'custom' && customStartDate && customEndDate && (
+              <Chip 
+                label={`${format(new Date(customStartDate), 'MMM dd')} - ${format(new Date(customEndDate), 'MMM dd')}`}
+                size="small"
+                onDelete={() => setDateRange('all')}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+          </Box>
 
-      {/* Teams Table */}
-      <AnimatePresence mode="wait">
-        {viewMode === 'table' ? (
-          <motion.div
-            key="table"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            <Card elevation={0}>
-              <TableContainer sx={{ maxHeight: '70vh' }}>
-                <Table stickyHeader size="small">
-                  <TableHead>
-                    <TableRow>
-                      {currentStats.map((stat) => (
-                        <TableCell
-                          key={stat.key}
-                          sx={{
-                            fontWeight: 700,
-                            bgcolor: 'background.paper',
-                            cursor: stat.key !== 'id' ? 'pointer' : 'default',
-                            position: stat.sticky ? 'sticky' : 'static',
-                            left: stat.sticky ? 0 : 'auto',
-                            zIndex: stat.sticky ? 1000 : 'auto',
-                            minWidth: stat.key === 'id' ? 120 : 80,
-                            '&:hover': {
-                              bgcolor: stat.key !== 'id' ? alpha(theme.palette.primary.main, 0.04) : 'inherit'
-                            }
-                          }}
-                          onClick={() => stat.key !== 'id' && handleSort(stat.key)}
-                        >
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            {stat.label}
-                            {sortBy === stat.key && (
-                              <Box component="span" sx={{ ml: 0.5 }}>
-                                {sortOrder === 'desc' ? <ArrowDownward sx={{ fontSize: 16 }} /> : <ArrowUpward sx={{ fontSize: 16 }} />}
-                              </Box>
-                            )}
-                          </Box>
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {paginatedTeams.map((team, index) => (
-                      <TableRow
-                        key={`${team.id}-${index}`}
-                        hover
+          {/* Division Tables */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="divisions"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <Grid container spacing={3}>
+                {Object.entries(divisions).map(([divisionName, divisionTeams]) => {
+                  const divisionTeamData = getTeamsByDivision(divisionTeams);
+                  
+                  return (
+                    <Grid item xs={12} lg={6} key={divisionName}>
+                      <Card elevation={2}>
+                        <Box sx={{ 
+                          p: 2, 
+                          bgcolor: 'primary.main', 
+                          color: 'primary.contrastText',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 1
+                        }}>
+                          <Typography variant="h6" fontWeight={700}>
+                            {divisionName}
+                          </Typography>
+                          <Chip 
+                            label={`${divisionTeamData.length} teams`}
+                            size="small"
+                            sx={{ 
+                              bgcolor: 'rgba(255,255,255,0.2)', 
+                              color: 'inherit',
+                              fontWeight: 600
+                            }}
+                          />
+                        </Box>
+                        
+                        <TableContainer sx={{ maxHeight: '400px' }}>
+                          <Table size="small" stickyHeader>
+                            <TableHead>
+                              <TableRow>
+                                <TableCell sx={{ fontWeight: 700, bgcolor: 'background.paper', width: 200 }}>
+                                  Team
+                                </TableCell>
+                                {currentStats.map((stat) => (
+                                  <TableCell
+                                    key={stat.key}
+                                    sx={{
+                                      fontWeight: 700,
+                                      bgcolor: 'background.paper',
+                                      cursor: 'pointer',
+                                      minWidth: 80,
+                                      textAlign: 'center',
+                                      '&:hover': {
+                                        bgcolor: alpha(theme.palette.primary.main, 0.04)
+                                      }
+                                    }}
+                                    onClick={() => handleSort(stat.key)}
+                                  >
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                                      {stat.label}
+                                      {sortBy === stat.key && (
+                                        <Box component="span" sx={{ ml: 0.5 }}>
+                                          {sortOrder === 'desc' ? <ArrowDownward sx={{ fontSize: 14 }} /> : <ArrowUpward sx={{ fontSize: 14 }} />}
+                                        </Box>
+                                      )}
+                                    </Box>
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {divisionTeamData.map((team, index) => (
+                                <TableRow
+                                  key={`${team.id}-${index}`}
+                                  hover
+                                  sx={{
+                                    cursor: 'pointer',
+                                    '&:hover': {
+                                      bgcolor: alpha(theme.palette.primary.main, 0.04)
+                                    }
+                                  }}
+                                  onClick={() => navigate(`/teams/${team.id}/2025`)}
+                                >
+                                  <TableCell sx={{ borderRight: '1px solid', borderColor: 'divider' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                      <Avatar
+                                        src={getTeamLogoUrl(team.id)}
+                                        alt={team.id}
+                                        sx={{
+                                          width: 28,
+                                          height: 28,
+                                          bgcolor: themeUtils.getTeamColor(team.id),
+                                          fontSize: '0.7rem',
+                                          fontWeight: 'bold'
+                                        }}
+                                        imgProps={{
+                                          style: { objectFit: 'contain', background: 'white' }
+                                        }}
+                                      >
+                                        {team.id}
+                                      </Avatar>
+                                      <Box>
+                                        <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.2 }}>
+                                          {teamNameMap[team.id] || team.name || team.id}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
+                                          {team.league} {team.division}
+                                        </Typography>
+                                      </Box>
+                                    </Box>
+                                  </TableCell>
+                                  {currentStats.map((stat) => (
+                                    <TableCell key={stat.key} sx={{ textAlign: 'center' }}>
+                                      <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>
+                                        {stat.format(getNestedValue(team, stat.key))}
+                                      </Typography>
+                                    </TableCell>
+                                  ))}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      </Card>
+                    </Grid>
+                  );
+                })}
+              </Grid>
+            </motion.div>
+          </AnimatePresence>
+        </>
+      ) : (
+        <>
+          {/* Unified Table View */}
+          <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              Showing all {filteredTeams.length} teams in sortable table ({activeCategory} statistics)
+              {dateRange !== 'all' && ` (${dateRange} data)`}
+            </Typography>
+            
+            {dateRange === 'custom' && customStartDate && customEndDate && (
+              <Chip 
+                label={`${format(new Date(customStartDate), 'MMM dd')} - ${format(new Date(customEndDate), 'MMM dd')}`}
+                size="small"
+                onDelete={() => setDateRange('all')}
+                color="primary"
+                variant="outlined"
+              />
+            )}
+          </Box>
+
+          {/* Unified Table */}
+          <Card elevation={2}>
+            <TableContainer>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700, bgcolor: 'background.paper', width: 250 }}>
+                      Team
+                    </TableCell>
+                    {currentStats.map((stat) => (
+                      <TableCell
+                        key={stat.key}
                         sx={{
+                          fontWeight: 700,
+                          bgcolor: 'background.paper',
                           cursor: 'pointer',
+                          minWidth: 100,
+                          textAlign: 'center',
                           '&:hover': {
                             bgcolor: alpha(theme.palette.primary.main, 0.04)
                           }
                         }}
-                        onClick={() => navigate(`/teams/${team.id}/2025`)}
+                        onClick={() => handleSort(stat.key)}
                       >
-                        {currentStats.map((stat) => (
-                          <TableCell
-                            key={stat.key}
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                          {stat.label}
+                          {sortBy === stat.key && (
+                            <Box component="span" sx={{ ml: 0.5 }}>
+                              {sortOrder === 'desc' ? <ArrowDownward sx={{ fontSize: 14 }} /> : <ArrowUpward sx={{ fontSize: 14 }} />}
+                            </Box>
+                          )}
+                        </Box>
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filteredTeams.map((team, index) => (
+                    <TableRow
+                      key={`${team.id}-${index}`}
+                      hover
+                      sx={{
+                        cursor: 'pointer',
+                        '&:hover': {
+                          bgcolor: alpha(theme.palette.primary.main, 0.04)
+                        }
+                      }}
+                      onClick={() => navigate(`/teams/${team.id}/2025`)}
+                    >
+                      <TableCell sx={{ borderRight: '1px solid', borderColor: 'divider' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Avatar
+                            src={getTeamLogoUrl(team.id)}
+                            alt={team.id}
                             sx={{
-                              position: stat.sticky ? 'sticky' : 'static',
-                              left: stat.sticky ? 0 : 'auto',
-                              bgcolor: stat.sticky ? 'background.paper' : 'inherit',
-                              zIndex: stat.sticky ? 999 : 'auto',
-                              borderRight: stat.sticky ? '1px solid' : 'none',
-                              borderColor: stat.sticky ? 'divider' : 'transparent'
+                              width: 32,
+                              height: 32,
+                              bgcolor: themeUtils.getTeamColor(team.id),
+                              fontSize: '0.8rem',
+                              fontWeight: 'bold'
+                            }}
+                            imgProps={{
+                              style: { objectFit: 'contain', background: 'white' }
                             }}
                           >
-                            {stat.key === 'id' ? (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Avatar
-                                  sx={{
-                                    width: 32,
-                                    height: 32,
-                                    bgcolor: themeUtils.getTeamColor(team.id),
-                                    fontSize: '0.75rem',
-                                    fontWeight: 'bold'
-                                  }}
-                                >
-                                  {team.id}
-                                </Avatar>
-                                <Box>
-                                  <Typography variant="body2" fontWeight={600}>
-                                    {team.name || team.id}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    {team.league} {team.division}
-                                  </Typography>
-                                </Box>
-                              </Box>
-                            ) : (
-                              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                                {stat.format(getNestedValue(team, stat.key))}
-                              </Typography>
-                            )}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Card>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="cards"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-          >
-            <Typography>Cards view coming soon...</Typography>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Pagination */}
-      <Card elevation={0} sx={{ mt: 3 }}>
-        <TablePagination
-          component="div"
-          count={categoryFilteredTeams.length}
-          page={page}
-          onPageChange={(_, newPage) => setPage(newPage)}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
-          }}
-          rowsPerPageOptions={[10, 25, 50, 100]}
-        />
-      </Card>
+                            {team.id}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.2 }}>
+                              {teamNameMap[team.id] || team.name || team.id}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
+                              {getTeamLeague(team.id)} {getTeamDivision(team.id)}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      </TableCell>
+                      {currentStats.map((stat) => (
+                        <TableCell key={stat.key} sx={{ textAlign: 'center' }}>
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>
+                            {stat.format(getNestedValue(team, stat.key))}
+                          </Typography>
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Card>
+        </>
+      )}
 
       {/* Custom Date Range Dialog */}
       <Dialog 

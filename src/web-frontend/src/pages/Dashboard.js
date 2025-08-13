@@ -336,7 +336,7 @@ const Dashboard = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <ActionCard
                   title="Statistical Leaders"
-                  description="CVR, WAR, and traditional metrics"
+                  description="TBD"
                   icon={<Star />}
                   onClick={() => navigate('/leaders')}
                   color={theme.palette.warning.main}
@@ -346,7 +346,7 @@ const Dashboard = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <ActionCard
                   title="Advanced Analytics"
-                  description="Deep dive statistical analysis"
+                  description="TBD"
                   icon={<Assessment />}
                   onClick={() => navigate('/analytics')}
                   color={theme.palette.secondary.main}
@@ -415,7 +415,7 @@ const Dashboard = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
                     <Box sx={{ flex: 1 }}>
                       <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>
-                        Statistical Leaders & Standings
+                        Current Leaders
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {statCategories[selectedStatCategory].description}

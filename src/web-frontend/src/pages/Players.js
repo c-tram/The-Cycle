@@ -100,6 +100,7 @@ const Players = () => {
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTeams, setSelectedTeams] = useState([]);
+  const [selectedPosition, setSelectedPosition] = useState('all'); // Position filter
   const [activeCategory, setActiveCategory] = useState('batting');
   const [sortBy, setSortBy] = useState('stats.batting.avg');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -119,6 +120,7 @@ const Players = () => {
 
   // Available teams and positions
   const [teams, setTeams] = useState([]);
+  const [positions, setPositions] = useState([]);
 
   // Helper function to get date range for API calls
   const getDateRangeParams = useCallback(() => {
@@ -242,7 +244,7 @@ const Players = () => {
     
     // Debounce the search to avoid too many API calls
     const searchTimeout = setTimeout(() => {
-      if (searchTerm || selectedTeams.length > 0 || dateRange !== 'all') {
+      if (searchTerm || selectedTeams.length > 0 || selectedPosition !== 'all' || dateRange !== 'all') {
         // Only show search loading for subsequent searches, not initial load
         setSearchLoading(true);
         loadPlayers().finally(() => setSearchLoading(false));
@@ -252,7 +254,7 @@ const Players = () => {
     }, 300); // 300ms delay
 
     return () => clearTimeout(searchTimeout);
-  }, [searchTerm, selectedTeams, dateRange]);
+  }, [searchTerm, selectedTeams, selectedPosition, dateRange]);
 
   // Debounced API call for real-time search
   const loadPlayers = useCallback(async () => {
@@ -288,10 +290,13 @@ const Players = () => {
       const newPlayers = response.players || [];
       setPlayers(newPlayers);
       
-      // Update teams list with the new players data
+      // Update teams and positions lists with the new players data
       if (newPlayers.length > 0) {
         const uniqueTeams = [...new Set(newPlayers.map(p => p.team))].sort();
         setTeams(uniqueTeams);
+        
+        const uniquePositions = [...new Set(newPlayers.map(p => p.position).filter(pos => pos))].sort();
+        setPositions(uniquePositions);
       }
     } catch (err) {
       console.error('Error loading players:', err);
@@ -321,6 +326,13 @@ const Players = () => {
       );
     }
 
+    // Position filter (client-side)
+    if (selectedPosition !== 'all') {
+      filtered = filtered.filter(player =>
+        player.position === selectedPosition
+      );
+    }
+
     // Client-side sorting
     if (sortBy) {
       filtered.sort((a, b) => {
@@ -332,7 +344,7 @@ const Players = () => {
         if (aValue == null) return 1;
         if (bValue == null) return -1;
 
-        // Always try to parse as float for numeric columns (G, WAR, CVR)
+        // Always try to parse as float for numeric columns (G, WAR, CVR) - position uses string sorting
         const numericSortKeys = ['gameCount', 'war', 'cvr'];
         if (numericSortKeys.includes(sortBy)) {
           aValue = parseFloat(aValue);
@@ -359,7 +371,7 @@ const Players = () => {
     }
 
     return filtered;
-  }, [players, searchTerm, selectedTeams, sortBy, sortOrder]);
+  }, [players, searchTerm, selectedTeams, selectedPosition, sortBy, sortOrder]);
 
   // Determine available tabs based on player data
   const availableTabs = useMemo(() => {
@@ -402,9 +414,9 @@ const Players = () => {
     }
   }, [availableTabs, activeCategory]);
 
-  // Update sort field when category changes, but do NOT override top-level sort keys (gameCount, war, cvr)
+  // Update sort field when category changes, but do NOT override top-level sort keys (gameCount, war, cvr, position)
   useEffect(() => {
-    const topLevelKeys = ['gameCount', 'war', 'cvr'];
+    const topLevelKeys = ['gameCount', 'war', 'cvr', 'position'];
     // Only reset sortBy if it's not a top-level key
     if (topLevelKeys.includes(sortBy)) return;
     if (activeCategory === 'batting' && !sortBy.includes('batting')) {
@@ -700,6 +712,25 @@ const Players = () => {
               </FormControl>
             </Grid>
 
+            {/* Position Filter */}
+            <Grid item xs={12} md={1.5}>
+              <FormControl fullWidth>
+                <InputLabel>Position</InputLabel>
+                <Select
+                  value={selectedPosition}
+                  onChange={(e) => setSelectedPosition(e.target.value)}
+                  label="Position"
+                >
+                  <MenuItem value="all">All Positions</MenuItem>
+                  {positions.map((position) => (
+                    <MenuItem key={position} value={position}>
+                      {position}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+
             {/* Date Range Filter */}
             <Grid item xs={12} md={2}>
               <FormControl fullWidth>
@@ -823,13 +854,14 @@ const Players = () => {
           <Grid container spacing={2} alignItems="center" sx={{ mt: 1 }}>
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                {(searchTerm || selectedTeams.length > 0 || dateRange !== 'all' || gamesIpFilterEnabled) && (
+                {(searchTerm || selectedTeams.length > 0 || selectedPosition !== 'all' || dateRange !== 'all' || gamesIpFilterEnabled) && (
                   <Button
                     size="small"
                     variant="outlined"
                     onClick={() => {
                       setSearchTerm('');
                       setSelectedTeams([]);
+                      setSelectedPosition('all');
                       setDateRange('all');
                       setCustomStartDate('');
                       setCustomEndDate('');
@@ -850,6 +882,7 @@ const Players = () => {
                 Showing {paginatedPlayers.length} of {categoryFilteredPlayers.length} players
                 {searchTerm && ` for "${searchTerm}"`}
                 {selectedTeams.length > 0 && ` • ${selectedTeams.length} team(s) selected`}
+                {selectedPosition !== 'all' && ` • Position: ${selectedPosition}`}
                 {dateRange !== 'all' && ` • ${getDateRangeDescription()}`}
                 {gamesIpFilterEnabled && activeCategory === 'batting' && ` • Min ${minGames} games`}
                 {gamesIpFilterEnabled && activeCategory === 'pitching' && ` • Min ${minInnings} IP`}
@@ -863,7 +896,7 @@ const Players = () => {
                   sx={{ ml: 'auto' }}
                 />
               )}
-              {!searchLoading && !loading && (searchTerm || selectedTeams.length > 0 || dateRange !== 'all' || gamesIpFilterEnabled) && (
+              {!searchLoading && !loading && (searchTerm || selectedTeams.length > 0 || selectedPosition !== 'all' || dateRange !== 'all' || gamesIpFilterEnabled) && (
                 <Chip 
                   label="Filters Active" 
                   size="small" 
@@ -1127,6 +1160,35 @@ const PlayersTable = ({ players, stats, sortBy, sortOrder, selectedStatGroup, on
                 Team
               </TableCell>
               <TableCell 
+                align="center"
+                sx={{ 
+                  position: 'sticky', 
+                  left: 280, 
+                  backgroundColor: 'background.paper',
+                  zIndex: 1100,
+                  minWidth: 70,
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                  '&:hover': {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                  },
+                  ...(sortBy === 'position' && {
+                    backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                    color: theme.palette.primary.main
+                  })
+                }}
+                onClick={() => onSort('position')}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                  <Typography variant="caption" fontWeight={600}>
+                    POS
+                  </Typography>
+                  {sortBy === 'position' && (
+                    sortOrder === 'desc' ? <ArrowDownward sx={{ fontSize: '0.875rem' }} /> : <ArrowUpward sx={{ fontSize: '0.875rem' }} />
+                  )}
+                </Box>
+              </TableCell>
+              <TableCell 
                 align="center" 
                 sx={{ 
                   minWidth: 60,
@@ -1211,6 +1273,23 @@ const PlayersTable = ({ players, stats, sortBy, sortOrder, selectedStatGroup, on
                       color: '#ffffff',
                       fontWeight: 600
                     }}
+                  />
+                </TableCell>
+                <TableCell 
+                  align="center"
+                  sx={{ 
+                    position: 'sticky', 
+                    left: 280, 
+                    backgroundColor: 'background.paper',
+                    zIndex: 1000
+                  }}
+                >
+                  <Chip
+                    label={player.position || 'UNK'}
+                    size="small"
+                    variant="outlined"
+                    color="primary"
+                    sx={{ minWidth: 50 }}
                   />
                 </TableCell>
                 <TableCell align="center">

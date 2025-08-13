@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Grid,
@@ -28,7 +28,11 @@ import {
   CircularProgress,
   Paper,
   Tooltip,
-  IconButton
+  IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   ArrowBack,
@@ -43,7 +47,9 @@ import {
   Groups,
   EmojiEvents,
   Stadium,
-  LocationOn
+  LocationOn,
+  ArrowUpward,
+  ArrowDownward
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -68,6 +74,11 @@ const getTeamLogoUrl = (teamCode) => {
   };
   const logoCode = codeMap[code] || code;
   return `https://a.espncdn.com/i/teamlogos/mlb/500/${logoCode}.png`;
+};
+
+// Helper function to safely get nested object values
+const getNestedValue = (obj, path) => {
+  return path.split('.').reduce((current, key) => current?.[key], obj);
 };
 
 // CVR Display Helper
@@ -220,16 +231,12 @@ const TeamDetail = () => {
       
       // Get team schedule/game log
       try {
-        const scheduleUrl = `/api/teams/${teamId}/schedule?year=${year || '2025'}&limit=15`;
-        const scheduleResponse = await fetch(scheduleUrl);
-        if (scheduleResponse.ok) {
-          const scheduleData = await scheduleResponse.json();
-          console.log('Schedule response:', scheduleData);
-          setGameLog(scheduleData.games || []);
-        } else {
-          console.log('No schedule data available');
-          setGameLog([]);
-        }
+        const scheduleData = await teamsApi.getTeamSchedule(teamId, { 
+          year: year || '2025', 
+          limit: 15 
+        });
+        console.log('Schedule response:', scheduleData);
+        setGameLog(scheduleData.games || []);
       } catch (scheduleErr) {
         console.log('Schedule fetch failed:', scheduleErr);
         setGameLog([]);
@@ -423,63 +430,169 @@ const TeamStatsTab = ({ team, teamStats }) => {
   const pitching = teamStats?.pitching || {};
   const fielding = teamStats?.fielding || {};
   
+  // Calculate comprehensive team statistics
   const statCategories = [
     {
-      title: 'Team Performance',
+      title: 'Team Record & Standing',
+      color: theme.palette.primary.main,
       stats: [
-        { label: 'Wins', value: record.wins || 0 },
-        { label: 'Losses', value: record.losses || 0 },
-        { label: 'Win %', value: standings.winPercentage ? (standings.winPercentage * 100).toFixed(1) + '%' : ((record.wins || 0) / ((record.wins || 0) + (record.losses || 0)) * 100).toFixed(1) + '%' },
-        { label: 'Games Played', value: (record.wins || 0) + (record.losses || 0) }
+        { label: 'Wins', value: record.wins || 0, format: 'number' },
+        { label: 'Losses', value: record.losses || 0, format: 'number' },
+        { label: 'Win %', value: standings.winPercentage || ((record.wins || 0) / ((record.wins || 0) + (record.losses || 0))) || 0, format: 'percentage' },
+        { label: 'Games Played', value: (record.wins || 0) + (record.losses || 0), format: 'number' },
+        { label: 'Home Record', value: `${team?.standings?.homeRecord?.wins || 0}-${team?.standings?.homeRecord?.losses || 0}`, format: 'text' },
+        { label: 'Away Record', value: `${team?.standings?.awayRecord?.wins || 0}-${team?.standings?.awayRecord?.losses || 0}`, format: 'text' }
       ]
     },
     {
-      title: 'Advanced Metrics',
+      title: 'Advanced Team Metrics',
+      color: theme.palette.success.main,
       stats: [
-        { label: 'CVR', value: (team?.analytics?.overall?.cvr || team?.cvr || 0).toFixed(2) },
-        { label: 'WAR', value: (team?.analytics?.overall?.war?.total || team?.war?.total || 0).toFixed(1) },
-        { label: 'Run Differential', value: `${standings.runDifferential >= 0 ? '+' : ''}${standings.runDifferential || 0}` },
-        { label: 'Runs Scored', value: standings.runsScored || batting.runs || 0 }
+        { label: 'CVR (Team)', value: team?.analytics?.overall?.cvr || team?.cvr || 0, format: 'decimal' },
+        { label: 'WAR (Total)', value: team?.analytics?.overall?.war?.total || team?.war?.total || 0, format: 'decimal' },
+        { label: 'WAR (Batting)', value: team?.analytics?.overall?.war?.batting || team?.war?.batting || 0, format: 'decimal' },
+        { label: 'WAR (Pitching)', value: team?.analytics?.overall?.war?.pitching || team?.war?.pitching || 0, format: 'decimal' },
+        { label: 'Run Differential', value: standings.runDifferential || 0, format: 'signed' },
+        { label: 'Pythagorean W%', value: analytics?.overall?.pythagoreanWinPct || standings?.pythagoreanWinPct || 0, format: 'percentage' }
       ]
     },
     {
-      title: 'Offensive Stats',
+      title: 'Offensive Statistics',
+      color: theme.palette.warning.main,
       stats: [
-        { label: 'Batting Avg', value: (batting.average || 0).toFixed(3) },
-        { label: 'On-Base %', value: (batting.obp || 0).toFixed(3) },
-        { label: 'Slugging %', value: (batting.slg || 0).toFixed(3) },
-        { label: 'OPS', value: ((batting.obp || 0) + (batting.slg || 0)).toFixed(3) }
+        { label: 'Runs Scored', value: standings.runsScored || batting.runs || 0, format: 'number' },
+        { label: 'Batting Average', value: batting.average || 0, format: 'average' },
+        { label: 'On-Base %', value: batting.obp || 0, format: 'average' },
+        { label: 'Slugging %', value: batting.slg || 0, format: 'average' },
+        { label: 'OPS', value: (batting.obp || 0) + (batting.slg || 0), format: 'average' },
+        { label: 'Home Runs', value: batting.homeRuns || 0, format: 'number' },
+        { label: 'RBIs', value: batting.rbi || 0, format: 'number' },
+        { label: 'Hits', value: batting.hits || 0, format: 'number' },
+        { label: 'Doubles', value: batting.doubles || 0, format: 'number' },
+        { label: 'Triples', value: batting.triples || 0, format: 'number' },
+        { label: 'Walks', value: batting.baseOnBalls || 0, format: 'number' },
+        { label: 'Strikeouts', value: batting.strikeOuts || 0, format: 'number' }
       ]
     },
     {
-      title: 'Pitching Stats',
+      title: 'Pitching Statistics',
+      color: theme.palette.error.main,
       stats: [
-        { label: 'Team ERA', value: (pitching.era || 0).toFixed(2) },
-        { label: 'WHIP', value: (pitching.whip || 0).toFixed(2) },
-        { label: 'Strikeouts', value: pitching.strikeouts || 0 },
-        { label: 'Saves', value: pitching.saves || 0 }
+        { label: 'Runs Allowed', value: standings.runsAllowed || pitching.runs || 0, format: 'number' },
+        { label: 'Team ERA', value: pitching.era || 0, format: 'era' },
+        { label: 'WHIP', value: pitching.whip || 0, format: 'decimal' },
+        { label: 'FIP', value: pitching.fip || 0, format: 'era' },
+        { label: 'xFIP', value: pitching.xFip || 0, format: 'era' },
+        { label: 'BABIP', value: pitching.babip || 0, format: 'average' },
+        { label: 'K/9', value: pitching.strikeoutsPer9Inn || 0, format: 'decimal' },
+        { label: 'BB/9', value: pitching.walksPer9Inn || 0, format: 'decimal' },
+        { label: 'HR/9', value: pitching.homeRunsPer9 || 0, format: 'decimal' },
+        { label: 'LOB%', value: pitching.strandRate || 0, format: 'percentage' },
+        { label: 'Innings Pitched', value: pitching.inningsPitched || 0, format: 'text' },
+        { label: 'Strikeouts', value: pitching.strikeOuts || 0, format: 'number' },
+        { label: 'Walks', value: pitching.baseOnBalls || 0, format: 'number' },
+        { label: 'Saves', value: pitching.saves || 0, format: 'number' }
+      ]
+    },
+    {
+      title: 'Fielding Statistics',
+      color: theme.palette.info.main,
+      stats: [
+        { label: 'Fielding %', value: fielding.fieldingPercentage || 0, format: 'average' },
+        { label: 'Errors', value: fielding.errors || 0, format: 'number' },
+        { label: 'Assists', value: fielding.assists || 0, format: 'number' },
+        { label: 'Putouts', value: fielding.putOuts || 0, format: 'number' },
+        { label: 'Total Chances', value: fielding.chances || 0, format: 'number' },
+        { label: 'Double Plays', value: fielding.doublePlays || 0, format: 'number' }
+      ]
+    },
+    {
+      title: 'Advanced Sabermetrics',
+      color: theme.palette.secondary.main,
+      stats: [
+        { label: 'wOBA', value: batting.wOBA || 0, format: 'average' },
+        { label: 'ISO', value: batting.iso || 0, format: 'average' },
+        { label: 'BABIP (Off)', value: batting.babip || 0, format: 'average' },
+        { label: 'K%', value: batting.kRate || 0, format: 'percentage' },
+        { label: 'BB%', value: batting.bbRate || 0, format: 'percentage' },
+        { label: 'Contact%', value: batting.contactRate || 0, format: 'percentage' },
+        { label: 'XBH', value: batting.extraBaseHits || 0, format: 'number' },
+        { label: 'XBH%', value: batting.extraBaseHitRate || 0, format: 'percentage' }
       ]
     }
   ];
 
+  // Format value based on type
+  const formatValue = (value, format) => {
+    if (value === null || value === undefined || value === '' || isNaN(value)) {
+      return '---';
+    }
+    
+    switch (format) {
+      case 'percentage':
+        return (value * 100).toFixed(1) + '%';
+      case 'average':
+        return value.toFixed(3);
+      case 'decimal':
+        return value.toFixed(1);
+      case 'era':
+        return value.toFixed(2);
+      case 'signed':
+        return value >= 0 ? `+${value}` : value.toString();
+      case 'number':
+        return Math.round(value).toString();
+      case 'text':
+      default:
+        return value.toString();
+    }
+  };
+
   return (
     <Grid container spacing={3}>
       {statCategories.map((category, index) => (
-        <Grid item xs={12} md={6} key={index}>
-          <Card elevation={0}>
+        <Grid item xs={12} md={6} lg={4} key={index}>
+          <Card 
+            elevation={0}
+            sx={{
+              height: '100%',
+              border: `1px solid ${alpha(category.color, 0.2)}`,
+              backgroundColor: alpha(category.color, 0.02)
+            }}
+          >
             <CardContent sx={{ p: 3 }}>
-              <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-                {category.title}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: category.color
+                  }}
+                />
+                <Typography variant="h6" fontWeight={700} sx={{ color: category.color }}>
+                  {category.title}
+                </Typography>
+              </Box>
               
               <Grid container spacing={2}>
                 {category.stats.map((stat, statIndex) => (
                   <Grid item xs={6} key={statIndex}>
-                    <Box sx={{ textAlign: 'center', p: 2 }}>
-                      <Typography variant="h4" fontWeight={800} color="primary">
-                        {stat.value}
+                    <Box sx={{ textAlign: 'center', p: 1.5 }}>
+                      <Typography 
+                        variant="h5" 
+                        fontWeight={800} 
+                        sx={{ 
+                          color: category.color,
+                          mb: 0.5
+                        }}
+                      >
+                        {formatValue(stat.value, stat.format)}
                       </Typography>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography 
+                        variant="caption" 
+                        color="text.secondary"
+                        sx={{ fontSize: '0.7rem' }}
+                      >
                         {stat.label}
                       </Typography>
                     </Box>
@@ -494,30 +607,345 @@ const TeamStatsTab = ({ team, teamStats }) => {
   );
 };
 
-// Roster Tab
+// Professional Roster Tab with Sortable Tables
 const RosterTab = ({ roster, teamId }) => {
   const navigate = useNavigate();
+  const theme = useTheme();
   
+  // Roster state management
+  const [playerType, setPlayerType] = useState('batting'); // 'batting' or 'pitching'
+  const [sortBy, setSortBy] = useState('stats.batting.avg');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [selectedStatGroup, setSelectedStatGroup] = useState('primary');
+  const [selectedPosition, setSelectedPosition] = useState('all'); // Position filter
+
+  // Get all unique positions from roster
+  const availablePositions = useMemo(() => {
+    const positions = new Set();
+    roster.forEach(player => {
+      if (player.position) {
+        positions.add(player.position);
+      }
+    });
+    return Array.from(positions).sort();
+  }, [roster]);
+
+  // Separate batters and pitchers with position filtering
+  const batters = useMemo(() => {
+    return roster.filter(player => {
+      const batting = player.stats?.batting;
+      const hasStats = batting && (batting.atBats > 0 || batting.plateAppearances > 0);
+      const matchesPosition = selectedPosition === 'all' || player.position === selectedPosition;
+      return hasStats && matchesPosition;
+    });
+  }, [roster, selectedPosition]);
+
+  const pitchers = useMemo(() => {
+    return roster.filter(player => {
+      const pitching = player.stats?.pitching;
+      const hasStats = pitching && (parseFloat(pitching.inningsPitched) > 0 || pitching.gamesPlayed > 0);
+      const matchesPosition = selectedPosition === 'all' || player.position === selectedPosition;
+      return hasStats && matchesPosition;
+    });
+  }, [roster, selectedPosition]);
+
+  // Auto-switch to available player type
+  useEffect(() => {
+    if (playerType === 'batting' && batters.length === 0 && pitchers.length > 0) {
+      setPlayerType('pitching');
+      setSortBy('stats.pitching.era');
+    } else if (playerType === 'pitching' && pitchers.length === 0 && batters.length > 0) {
+      setPlayerType('batting');
+      setSortBy('stats.batting.avg');
+    }
+  }, [batters.length, pitchers.length, playerType]);
+
+  // Get current players based on selected type
+  const currentPlayers = playerType === 'batting' ? batters : pitchers;
+
+  // Sort players
+  const sortedPlayers = useMemo(() => {
+    if (!sortBy) return currentPlayers;
+
+    return [...currentPlayers].sort((a, b) => {
+      let aValue = getNestedValue(a, sortBy);
+      let bValue = getNestedValue(b, sortBy);
+
+      // Handle null/undefined values
+      if (aValue == null && bValue == null) return 0;
+      if (aValue == null) return 1;
+      if (bValue == null) return -1;
+
+      // Convert to numbers for numeric comparison
+      const aNum = typeof aValue === 'string' ? parseFloat(aValue) : aValue;
+      const bNum = typeof bValue === 'string' ? parseFloat(bValue) : bValue;
+
+      let comparison = 0;
+      if (typeof aNum === 'number' && typeof bNum === 'number' && !isNaN(aNum) && !isNaN(bNum)) {
+        comparison = aNum - bNum;
+      } else {
+        comparison = String(aValue).localeCompare(String(bValue));
+      }
+
+      return sortOrder === 'desc' ? -comparison : comparison;
+    });
+  }, [currentPlayers, sortBy, sortOrder]);
+
+  // Handle sorting
+  const handleSort = (field) => {
+    if (field === sortBy) {
+      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortBy(field);
+      setSortOrder('desc');
+    }
+  };
+
+  // Render sortable header
+  const renderSortableHeader = (stat) => {
+    const isActive = sortBy === stat.key;
+    const isDesc = sortOrder === 'desc';
+    
+    return (
+      <TableCell 
+        key={stat.key} 
+        align="center" 
+        sx={{ 
+          minWidth: 80,
+          cursor: 'pointer',
+          userSelect: 'none',
+          '&:hover': {
+            backgroundColor: alpha(theme.palette.primary.main, 0.05)
+          },
+          ...(isActive && {
+            backgroundColor: alpha(theme.palette.primary.main, 0.1),
+            color: theme.palette.primary.main
+          })
+        }}
+        onClick={() => handleSort(stat.key)}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+          <Typography variant="caption" fontWeight={600}>
+            {stat.label}
+          </Typography>
+          {isActive && (
+            isDesc ? <ArrowDownward sx={{ fontSize: '0.875rem' }} /> : <ArrowUpward sx={{ fontSize: '0.875rem' }} />
+          )}
+        </Box>
+      </TableCell>
+    );
+  };
+
+  // Define stat configurations
+  const battingStats = [
+    { key: 'stats.batting.avg', label: 'AVG' },
+    { key: 'stats.batting.onBasePercentage', label: 'OBP' },
+    { key: 'stats.batting.sluggingPercentage', label: 'SLG' },
+    { key: 'stats.batting.ops', label: 'OPS' },
+    { key: 'stats.batting.homeRuns', label: 'HR' },
+    { key: 'stats.batting.rbi', label: 'RBI' },
+    { key: 'stats.batting.runs', label: 'R' },
+    { key: 'stats.batting.hits', label: 'H' },
+    { key: 'stats.batting.doubles', label: '2B' },
+    { key: 'stats.batting.triples', label: '3B' },
+    { key: 'stats.batting.baseOnBalls', label: 'BB' },
+    { key: 'stats.batting.strikeOuts', label: 'K' },
+    { key: 'war', label: 'WAR' },
+    { key: 'cvr', label: 'CVR' }
+  ];
+
+  const pitchingStats = [
+    { key: 'stats.pitching.era', label: 'ERA' },
+    { key: 'stats.pitching.whip', label: 'WHIP' },
+    { key: 'stats.pitching.inningsPitched', label: 'IP' },
+    { key: 'stats.pitching.strikeOuts', label: 'K' },
+    { key: 'stats.pitching.baseOnBalls', label: 'BB' },
+    { key: 'stats.pitching.hits', label: 'H' },
+    { key: 'stats.pitching.homeRuns', label: 'HR' },
+    { key: 'stats.pitching.earnedRuns', label: 'ER' },
+    { key: 'stats.pitching.wins', label: 'W' },
+    { key: 'stats.pitching.losses', label: 'L' },
+    { key: 'stats.pitching.saves', label: 'SV' },
+    { key: 'war', label: 'WAR' },
+    { key: 'cvr', label: 'CVR' }
+  ];
+
+  // Stat groups for filtering
+  const statGroups = {
+    batting: {
+      primary: battingStats.slice(0, 6), // AVG, OBP, SLG, OPS, HR, RBI
+      power: battingStats.slice(4, 10), // HR, RBI, R, H, 2B, 3B
+      discipline: [battingStats[10], battingStats[11], battingStats[0], battingStats[1]], // BB, K, AVG, OBP
+      advanced: [battingStats[12], battingStats[13], battingStats[3]], // WAR, CVR, OPS
+    },
+    pitching: {
+      primary: pitchingStats.slice(0, 6), // ERA, WHIP, IP, K, BB, H
+      efficiency: [pitchingStats[0], pitchingStats[1], pitchingStats[3], pitchingStats[4]], // ERA, WHIP, K, BB
+      counting: pitchingStats.slice(5, 11), // H, HR, ER, W, L, SV
+      advanced: [pitchingStats[11], pitchingStats[12], pitchingStats[2]], // WAR, CVR, IP
+    }
+  };
+
+  const currentStats = playerType === 'batting' ? battingStats : pitchingStats;
+  const currentGroups = statGroups[playerType];
+  
+  // Determine which stats to show based on selected group
+  let displayStats;
+  if (selectedStatGroup === 'all') {
+    displayStats = currentStats;
+  } else {
+    displayStats = currentGroups[selectedStatGroup] || currentStats.slice(0, 6);
+  }
+
   return (
     <Card elevation={0}>
-      <CardContent sx={{ p: 3 }}>
-        <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>
-          Team Roster ({roster.length} players)
-        </Typography>
-        
+      <CardContent sx={{ p: 0 }}>
+        {/* Header with Player Type Toggle and Position Filter */}
+        <Box sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6" fontWeight={700}>
+              Team Roster ({currentPlayers.length} players{selectedPosition !== 'all' ? ` - ${selectedPosition}` : ''})
+            </Typography>
+            
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+              {/* Position Filter Dropdown */}
+              <FormControl size="small" sx={{ minWidth: 120 }}>
+                <InputLabel>Position</InputLabel>
+                <Select
+                  value={selectedPosition}
+                  label="Position"
+                  onChange={(e) => setSelectedPosition(e.target.value)}
+                >
+                  <MenuItem value="all">All Positions</MenuItem>
+                  {availablePositions.map((position) => (
+                    <MenuItem key={position} value={position}>
+                      {position}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              
+              {/* Player Type Toggle */}
+              {batters.length > 0 && (
+                <Chip
+                  label={`Batters (${batters.length})`}
+                  variant={playerType === 'batting' ? 'filled' : 'outlined'}
+                  color={playerType === 'batting' ? 'primary' : 'default'}
+                  onClick={() => {
+                    setPlayerType('batting');
+                    setSortBy('stats.batting.avg');
+                    setSelectedStatGroup('primary');
+                  }}
+                  sx={{ cursor: 'pointer' }}
+                />
+              )}
+              {pitchers.length > 0 && (
+                <Chip
+                  label={`Pitchers (${pitchers.length})`}
+                  variant={playerType === 'pitching' ? 'filled' : 'outlined'}
+                  color={playerType === 'pitching' ? 'primary' : 'default'}
+                  onClick={() => {
+                    setPlayerType('pitching');
+                    setSortBy('stats.pitching.era');
+                    setSelectedStatGroup('primary');
+                  }}
+                  sx={{ cursor: 'pointer' }}
+                />
+              )}
+            </Box>
+          </Box>
+
+          {/* Stat Group Filter */}
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {Object.entries(currentGroups).map(([groupKey, groupStats]) => (
+              <Chip
+                key={groupKey}
+                label={groupKey.charAt(0).toUpperCase() + groupKey.slice(1)}
+                variant={selectedStatGroup === groupKey ? 'filled' : 'outlined'}
+                color={selectedStatGroup === groupKey ? 'primary' : 'default'}
+                onClick={() => setSelectedStatGroup(groupKey)}
+                sx={{ cursor: 'pointer' }}
+              />
+            ))}
+            <Chip
+              label="All Stats"
+              variant={selectedStatGroup === 'all' ? 'filled' : 'outlined'}
+              color={selectedStatGroup === 'all' ? 'primary' : 'default'}
+              onClick={() => setSelectedStatGroup('all')}
+              sx={{ cursor: 'pointer' }}
+            />
+          </Box>
+        </Box>
+
+        {/* Professional Sortable Table */}
         <TableContainer>
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell>Player</TableCell>
-                <TableCell align="center">Position</TableCell>
-                <TableCell align="center">Games</TableCell>
-                <TableCell align="center">CVR</TableCell>
-                <TableCell align="center">WAR</TableCell>
+                {/* Player Name Column */}
+                <TableCell 
+                  sx={{ 
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                    },
+                    ...(sortBy === 'name' && {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      color: theme.palette.primary.main
+                    })
+                  }}
+                  onClick={() => handleSort('name')}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <Typography variant="caption" fontWeight={600}>
+                      Player
+                    </Typography>
+                    {sortBy === 'name' && (
+                      sortOrder === 'desc' ? <ArrowDownward sx={{ fontSize: '0.875rem' }} /> : <ArrowUpward sx={{ fontSize: '0.875rem' }} />
+                    )}
+                  </Box>
+                </TableCell>
+
+                {/* Position Column */}
+                <TableCell align="center">
+                  <Typography variant="caption" fontWeight={600}>
+                    POS
+                  </Typography>
+                </TableCell>
+
+                {/* Games Column */}
+                <TableCell 
+                  align="center"
+                  sx={{ 
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    '&:hover': {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.05)
+                    },
+                    ...(sortBy === 'gameCount' && {
+                      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+                      color: theme.palette.primary.main
+                    })
+                  }}
+                  onClick={() => handleSort('gameCount')}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
+                    <Typography variant="caption" fontWeight={600}>
+                      G
+                    </Typography>
+                    {sortBy === 'gameCount' && (
+                      sortOrder === 'desc' ? <ArrowDownward sx={{ fontSize: '0.875rem' }} /> : <ArrowUpward sx={{ fontSize: '0.875rem' }} />
+                    )}
+                  </Box>
+                </TableCell>
+
+                {/* Dynamic Stat Columns */}
+                {displayStats.map((stat) => renderSortableHeader(stat))}
               </TableRow>
             </TableHead>
             <TableBody>
-              {roster.map((player, index) => (
+              {sortedPlayers.map((player, index) => (
                 <TableRow
                   key={index}
                   hover
@@ -527,9 +955,11 @@ const RosterTab = ({ roster, teamId }) => {
                     navigate(`/players/${teamId}/${playerName}/2025`);
                   }}
                 >
+                  {/* Player Name */}
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                       <Avatar
+                        src={getTeamLogoUrl(teamId)}
                         sx={{
                           width: 32,
                           height: 32,
@@ -538,46 +968,85 @@ const RosterTab = ({ roster, teamId }) => {
                           fontWeight: 700
                         }}
                       >
-                        {player.name.charAt(0)}
+                        {!getTeamLogoUrl(teamId) && player.name.charAt(0)}
                       </Avatar>
                       <Typography variant="body2" fontWeight={600}>
                         {player.name}
                       </Typography>
                     </Box>
                   </TableCell>
+
+                  {/* Position */}
                   <TableCell align="center">
                     <Chip
                       label={player.position || 'UNK'}
                       size="small"
                       variant="outlined"
+                      color="primary"
                     />
                   </TableCell>
+
+                  {/* Games */}
                   <TableCell align="center">
-                    {player.gameCount || 0}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Typography
-                      variant="body2"
-                      fontWeight={600}
-                      color={(player.cvr || 0) >= 1.0 ? 'success.main' : 'text.secondary'}
-                    >
-                      {(player.cvr || 0).toFixed(2)}
+                    <Typography variant="body2" fontWeight={500}>
+                      {player.gameCount || 0}
                     </Typography>
                   </TableCell>
-                  <TableCell align="center">
-                    <Typography
-                      variant="body2"
-                      fontWeight={600}
-                      color={(player.war || 0) >= 1.0 ? 'success.main' : 'text.secondary'}
-                    >
-                      {(player.war || 0).toFixed(1)}
-                    </Typography>
-                  </TableCell>
+
+                  {/* Dynamic Stat Columns */}
+                  {displayStats.map((stat) => {
+                    const value = getNestedValue(player, stat.key);
+                    const displayValue = value != null ? 
+                      (typeof value === 'number' ? 
+                        (stat.key.includes('avg') || stat.key.includes('era') || stat.key.includes('whip') ? 
+                          value.toFixed(3) : 
+                          stat.key === 'cvr' ? value.toFixed(2) :
+                          stat.key === 'war' ? value.toFixed(1) :
+                          Math.round(value)) : 
+                        value) : 
+                      '--';
+
+                    const isGoodStat = (stat.key === 'war' && value >= 1.0) || 
+                                     (stat.key === 'cvr' && value >= 1.0) ||
+                                     (stat.key.includes('avg') && value >= 0.280) ||
+                                     (stat.key.includes('ops') && value >= 0.800);
+
+                    return (
+                      <TableCell key={stat.key} align="center">
+                        <Typography
+                          variant="body2"
+                          fontWeight={500}
+                          color={isGoodStat ? 'success.main' : 'text.secondary'}
+                        >
+                          {displayValue}
+                        </Typography>
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
+
+        {/* Empty State */}
+        {sortedPlayers.length === 0 && (
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              No {playerType === 'batting' ? 'batters' : 'pitchers'} found{selectedPosition !== 'all' ? ` at position ${selectedPosition}` : ''} with sufficient playing time.
+            </Typography>
+            {selectedPosition !== 'all' && (
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => setSelectedPosition('all')}
+                sx={{ mt: 1 }}
+              >
+                Show All Positions
+              </Button>
+            )}
+          </Box>
+        )}
       </CardContent>
     </Card>
   );
