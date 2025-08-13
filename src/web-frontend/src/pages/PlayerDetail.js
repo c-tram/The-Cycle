@@ -49,6 +49,23 @@ import { playersApi, statsApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
 import { calculatePlayerCVR, getCVRDisplay, formatSalary } from '../utils/cvrCalculations'; // v3.0 - FIXED EXPORTS
 
+// Team logo utility
+const getTeamLogoUrl = (teamCode) => {
+  if (!teamCode) return null;
+  const code = teamCode.toUpperCase();
+  const codeMap = {
+    AZ: 'ARI',
+    CWS: 'CHW',
+    KC: 'KCR',
+    SD: 'SDP',
+    SF: 'SFG',
+    TB: 'TBR',
+    WSH: 'WSN',
+  };
+  const logoCode = codeMap[code] || code;
+  return `https://a.espncdn.com/i/teamlogos/mlb/500/${logoCode}.png`;
+};
+
 // WAR Display Helper
 const getWARDisplay = (war) => {
   const warValue = war || 0;
@@ -439,6 +456,8 @@ const PlayerDetail = () => {
             <CardContent sx={{ p: 4 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Avatar
+                  src={getTeamLogoUrl(player?.team || team)}
+                  alt={player?.team || team}
                   sx={{
                     width: 80,
                     height: 80,
@@ -446,6 +465,9 @@ const PlayerDetail = () => {
                     mr: 3,
                     fontSize: '1.5rem',
                     fontWeight: 700
+                  }}
+                  imgProps={{
+                    style: { objectFit: 'contain', background: 'white' }
                   }}
                 >
                   {player.team || team}

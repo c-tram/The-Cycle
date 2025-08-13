@@ -133,11 +133,25 @@ const Dashboard = () => {
               data: data?.standings || [] 
             }));
           } else {
-            // For CVR/WAR team stats, use teams API
-            return teamsApi.getTeams({ limit: 5 }).then(data => ({ 
-              key: column.key, 
-              data: data?.teams || [] 
-            }));
+            // For CVR/WAR team stats, get all teams and sort by the specific stat
+            return teamsApi.getTeams({ limit: 50 }).then(data => {
+              const teams = data?.teams || [];
+              
+              // Sort teams by the specific stat in descending order
+              const sortedTeams = teams
+                .map(team => ({
+                  ...team,
+                  statValue: getTeamStatValue(team, column.stat)
+                }))
+                .filter(team => team.statValue > 0) // Filter out teams with no/zero stat
+                .sort((a, b) => b.statValue - a.statValue) // Descending order
+                .slice(0, 5); // Take top 5
+              
+              return { 
+                key: column.key, 
+                data: sortedTeams 
+              };
+            });
           }
         } else {
           // Player stats
@@ -205,16 +219,20 @@ const Dashboard = () => {
         value = team.winPercentage || 0;
         break;
       case 'cvr':
+        // Check multiple possible locations for CVR and ensure numeric casting
         value = team.stats?.overall?.cvr || team.cvr || 0;
+        value = typeof value === 'number' ? value : parseFloat(value) || 0;
         break;
       case 'war':
         // WAR might be an object with {total, batting, pitching} or just a number
         const warData = team.stats?.overall?.war || team.war;
-        if (typeof warData === 'object' && warData.total !== undefined) {
+        if (typeof warData === 'object' && warData !== null && warData.total !== undefined) {
           value = warData.total;
         } else {
           value = warData || 0;
         }
+        // Ensure numeric casting for WAR
+        value = typeof value === 'number' ? value : parseFloat(value) || 0;
         break;
       default:
         value = 0;
@@ -454,6 +472,16 @@ const Dashboard = () => {
                           emptyMessage={`No qualifying ${column.category === 'team' ? 'teams' : 'players'}`}
                           isTeamStat={column.category === 'team'}
                           statType={column.stat}
+                          onItemClick={(item) => {
+                            if (column.category === 'team') {
+                              // Navigate to team detail page
+                              navigate(`/teams/${item.id || item.name}/2025`);
+                            } else {
+                              // Navigate to player detail page
+                              const playerName = item.name.replace(/\s+/g, '_');
+                              navigate(`/players/${item.team}/${playerName}/2025`);
+                            }
+                          }}
                         />
                       </Grid>
                     ))}
@@ -469,7 +497,7 @@ const Dashboard = () => {
 };
 
 // Professional Statistical Column Component
-const StatColumn = ({ title, icon, color, data, emptyMessage, isTeamStat, statType }) => {
+const StatColumn = ({ title, icon, color, data, emptyMessage, isTeamStat, statType, onItemClick }) => {
   const theme = useTheme();
   
   const formatValue = (item) => {
@@ -543,10 +571,12 @@ const StatColumn = ({ title, icon, color, data, emptyMessage, isTeamStat, statTy
                   px: 0, 
                   py: 0.5,
                   borderRadius: 1,
+                  cursor: onItemClick ? 'pointer' : 'default',
                   '&:hover': {
                     backgroundColor: alpha(color, 0.05)
                   }
                 }}
+                onClick={() => onItemClick && onItemClick(item)}
               >
 
                 <ListItemAvatar>
