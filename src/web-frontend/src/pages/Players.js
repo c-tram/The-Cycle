@@ -59,6 +59,24 @@ import { playersApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
 import { getCVRDisplay } from '../utils/cvrCalculations';
 
+// Utility: Get MLB team logo URL by team code (3-letter abbreviation)
+const getTeamLogoUrl = (teamCode) => {
+  if (!teamCode) return null;
+  const code = teamCode.toUpperCase();
+  const codeMap = {
+    AZ: 'ARI',
+    CWS: 'CHW',
+    KC: 'KCR',
+    SD: 'SDP',
+    SF: 'SFG',
+    TB: 'TBR',
+    WSH: 'WSN',
+    // Add more mappings as needed
+  };
+  const logoCode = codeMap[code] || code;
+  return `https://a.espncdn.com/i/teamlogos/mlb/500/${logoCode}.png`;
+};
+
 // Helper function to safely get nested object values
 const getNestedValue = (obj, path) => {
   return path.split('.').reduce((current, key) => current?.[key], obj);
@@ -474,8 +492,18 @@ const Players = () => {
       { key: 'gameCount', label: 'Games', format: (val) => val || 0 },
       { key: 'war', label: 'WAR', format: (val) => val ? val.toFixed(1) : '0.0' },
       { key: 'cvr', label: 'CVR', format: (val) => {
-        if (!val) return '0.00';
-        const display = getCVRDisplay(val);
+        // Fix: Use player.cvr or player.stats.cvr, whichever is valid
+        let cvrValue = val;
+        if ((!cvrValue || cvrValue === 0) && typeof this === 'object' && this.player) {
+          // Defensive: try to get from player object if available
+          cvrValue = this.player.cvr || this.player.stats?.cvr || 0;
+        }
+        if (!cvrValue || cvrValue === 0) {
+          // Try to get from stats.cvr if val is 0 or falsy
+          cvrValue = this?.stats?.cvr || 0;
+        }
+        if (!cvrValue || cvrValue === 0) return '0.00';
+        const display = getCVRDisplay(cvrValue);
         return `${display.value} ${display.emoji}`;
       }}
     ],
@@ -1144,12 +1172,17 @@ const PlayersTable = ({ players, stats, sortBy, sortOrder, selectedStatGroup, on
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <Avatar
+                      src={getTeamLogoUrl(player.team)}
+                      alt={player.team}
                       sx={{
                         width: 32,
                         height: 32,
                         backgroundColor: themeUtils.getTeamColor(player.team) || '#1976d2',
                         fontSize: '0.75rem',
                         fontWeight: 700
+                      }}
+                      imgProps={{
+                        style: { objectFit: 'contain', background: 'white' }
                       }}
                     >
                       {player.team}
@@ -1242,12 +1275,17 @@ const PlayersGrid = ({ players, stats, onPlayerClick }) => {
                 {/* Player Header */}
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                   <Avatar
+                    src={getTeamLogoUrl(player.team)}
+                    alt={player.team}
                     sx={{
                       width: 48,
                       height: 48,
                       backgroundColor: themeUtils.getTeamColor(player.team) || '#1976d2',
                       mr: 2,
                       fontWeight: 700
+                    }}
+                    imgProps={{
+                      style: { objectFit: 'contain', background: 'white' }
                     }}
                   >
                     {player.team}

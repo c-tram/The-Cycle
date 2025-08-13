@@ -18,7 +18,11 @@ import {
   ListItemAvatar,
   Button,
   LinearProgress,
-  Tooltip
+  Tooltip,
+  FormControl,
+  Select,
+  MenuItem,
+  InputLabel
 } from '@mui/material';
 import {
   TrendingUp,
@@ -39,8 +43,31 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 // API and utils
+
 import { statsApi, playersApi, teamsApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
+
+// Utility: Get MLB team logo URL by team code (3-letter abbreviation)
+const getTeamLogoUrl = (teamCode) => {
+  if (!teamCode) return null;
+  // You can use ESPN, MLB, or your own CDN. Example below uses ESPN CDN:
+  // https://a.espncdn.com/i/teamlogos/mlb/500/{teamCode}.png
+  // Team codes must be uppercase and mapped to ESPN/MLB codes if needed
+  const code = teamCode.toUpperCase();
+  // Some codes may need mapping (e.g., "CWS" -> "CHW", "AZ" -> "ARI")
+  const codeMap = {
+    AZ: 'ARI',
+    CWS: 'CHW',
+    KC: 'KCR',
+    SD: 'SDP',
+    SF: 'SFG',
+    TB: 'TBR',
+    WSH: 'WSN',
+    // Add more mappings as needed
+  };
+  const logoCode = codeMap[code] || code;
+  return `https://a.espncdn.com/i/teamlogos/mlb/500/${logoCode}.png`;
+};
 
 const Dashboard = () => {
   const theme = useTheme();
@@ -53,77 +80,172 @@ const Dashboard = () => {
   const [topPerformers, setTopPerformers] = useState([]);
   const [standings, setStandings] = useState([]);
   const [error, setError] = useState(null);
+  const [selectedStatCategory, setSelectedStatCategory] = useState('cvr');
+
+  // Define stat categories with proper API calls
+  const statCategories = {
+    cvr: {
+      label: 'CVR (Cycle Value Rating)',
+      description: 'Our proprietary comprehensive value metric',
+      columns: [
+        { key: 'cvrBatters', title: 'CVR - Batters', stat: 'cvr', category: 'batting', minGames: 50, icon: SportsBaseball },
+        { key: 'cvrPitchers', title: 'CVR - Pitchers', stat: 'cvr', category: 'pitching', minInnings: 30, icon: Speed },
+        { key: 'cvrTeams', title: 'CVR - Teams', stat: 'cvr', category: 'team', icon: EmojiEvents },
+        { key: 'warPlayers', title: 'WAR - Players', stat: 'war', category: 'batting', minGames: 30, icon: Star },
+        { key: 'warTeams', title: 'WAR - Teams', stat: 'war', category: 'team', icon: Groups }
+      ]
+    },
+    traditional: {
+      label: 'Traditional Stats',
+      description: 'Classic baseball statistics',
+      columns: [
+        { key: 'battingAvg', title: 'Batting Average', stat: 'avg', category: 'batting', minAtBats: 50, icon: SportsBaseball },
+        { key: 'era', title: 'ERA Leaders', stat: 'era', category: 'pitching', minInnings: 20, icon: Speed },
+        { key: 'winPct', title: 'Win Percentage', stat: 'winPercentage', category: 'team', icon: EmojiEvents },
+        { key: 'homeRuns', title: 'Home Runs', stat: 'homeRuns', category: 'batting', minAtBats: 50, icon: LocalFireDepartment },
+        { key: 'strikeouts', title: 'Strikeouts (P)', stat: 'strikeouts', category: 'pitching', minInnings: 20, icon: Timeline }
+      ]
+    }
+  };
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [selectedStatCategory]);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // Load all data for the 5-column leaders grid
-      const [
-        summaryData,
-        cvrBatting,
-        cvrPitching,
-        cvrTeam,
-        last10Teams,
-        divisionLeaders
-      ] = await Promise.all([
-        statsApi.getSummary().catch(() => null),
-        // CVR Batting: top 5 batters by CVR (min 30 games)
-        statsApi.getLeaders({ category: 'batting', stat: 'cvr', limit: 5, minGames: 30 }).catch(() => ({ leaders: [] })),
-        // CVR Pitching: top 5 pitchers by CVR (min 20 IP)
-        statsApi.getLeaders({ category: 'pitching', stat: 'cvr', limit: 5, minInnings: 20 }).catch(() => ({ leaders: [] })),
-        // CVR Team: top 5 teams by team CVR
-        statsApi.getLeaders({ category: 'team', stat: 'cvr', limit: 5 }).catch(() => ({ leaders: [] })),
-        // Best Last 10 Game Records: top 5 teams by last 10 games
-        teamsApi.getTeams({ sortBy: 'last10', limit: 5 }).catch(() => ({ teams: [] })),
-        // Division Leaders: top 5 division leaders by win pct
-        teamsApi.getStandings().catch(() => ({ standings: [] }))
-      ]);
+      const currentCategory = statCategories[selectedStatCategory];
+      const columns = currentCategory.columns;
 
-      // Parse and format data for the grid
+      // Load summary first
+      const summaryData = await statsApi.getSummary().catch(() => null);
       setSummary(summaryData);
-      setLeaders({
-        cvrBatting: (cvrBatting.leaders || []).map(p => ({
-          name: p.player?.name,
-          team: p.player?.team,
-          games: p.games,
-          cvr: p.value
-        })),
-        cvrPitching: (cvrPitching.leaders || []).map(p => ({
-          name: p.player?.name,
-          team: p.player?.team,
-          games: p.games,
-          cvr: p.value
-        })),
-        cvrTeam: (cvrTeam.leaders || []).map(t => ({
-          id: t.player?.team || t.team || t.id,
-          name: t.player?.team || t.team || t.id,
-          cvr: t.value
-        })),
-        last10: (last10Teams.teams || []).map(t => ({
-          id: t.id,
-          name: t.name,
-          last10: t.standings?.last10 || t.last10 || 'N/A'
-        })),
-        divisionLeaders: (divisionLeaders.standings || []).slice(0, 5).map(t => ({
-          id: t.id,
-          name: t.name,
-          league: t.league,
-          division: t.division,
-          record: t.record
-        }))
+
+      // Load data for each column based on selected category
+      const columnPromises = columns.map(async (column) => {
+        if (column.category === 'team') {
+          if (column.stat === 'winPercentage') {
+            return teamsApi.getStandings().then(data => ({ 
+              key: column.key, 
+              data: data?.standings || [] 
+            }));
+          } else {
+            // For CVR/WAR team stats, use teams API
+            return teamsApi.getTeams({ limit: 5 }).then(data => ({ 
+              key: column.key, 
+              data: data?.teams || [] 
+            }));
+          }
+        } else {
+          // Player stats
+          return statsApi.getLeaders({
+            category: column.category,
+            stat: column.stat,
+            limit: 5,
+            minGames: column.minGames || 15,
+            minAtBats: column.minAtBats || undefined,
+            minInnings: column.minInnings || undefined
+          }).then(data => ({ 
+            key: column.key, 
+            data: data?.leaders || [] 
+          }));
+        }
       });
+
+      const results = await Promise.all(columnPromises);
+      
+      // Parse and format data for the professional grid
+      const newLeaders = {};
+      
+      results.forEach((result, index) => {
+        const column = columns[index];
+        const rawData = result.data;
+        
+        if (column.category === 'team') {
+          // Team data formatting
+          newLeaders[result.key] = rawData.slice(0, 5).map(t => ({
+            id: t.id || t.name || 'UNK',
+            name: t.name || t.id || 'Unknown Team',
+            value: getTeamStatValue(t, column.stat),
+            statLabel: column.stat.toUpperCase(),
+            record: t.record || { wins: t.wins || 0, losses: t.losses || 0 },
+            subtitle: `${(t.record?.wins || t.wins || 0)}-${(t.record?.losses || t.losses || 0)}`
+          }));
+        } else {
+          // Player data formatting
+          newLeaders[result.key] = rawData.map(p => ({
+            name: p.player?.name || 'Unknown Player',
+            team: p.player?.team || 'UNK',
+            games: p.games || 0,
+            value: typeof p.value === 'number' ? p.value : parseFloat(p.value) || 0,  // Ensure number
+            statLabel: column.stat.toUpperCase(),
+            subtitle: getPlayerSubtitle(p, column)
+          }));
+        }
+      });
+
+      setLeaders(newLeaders);
+      
     } catch (err) {
       console.error('Error loading dashboard data:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper functions
+  const getTeamStatValue = (team, stat) => {
+    let value;
+    switch (stat) {
+      case 'winPercentage':
+        value = team.winPercentage || 0;
+        break;
+      case 'cvr':
+        value = team.stats?.overall?.cvr || team.cvr || 0;
+        break;
+      case 'war':
+        // WAR might be an object with {total, batting, pitching} or just a number
+        const warData = team.stats?.overall?.war || team.war;
+        if (typeof warData === 'object' && warData.total !== undefined) {
+          value = warData.total;
+        } else {
+          value = warData || 0;
+        }
+        break;
+      default:
+        value = 0;
+    }
+    
+    // Ensure we return a number for sorting
+    return typeof value === 'number' ? value : parseFloat(value) || 0;
+  };
+
+  const getPlayerSubtitle = (player, column) => {
+    const games = player.games || 0;
+    if (column.category === 'batting') {
+      const atBats = player.qualifyingStats?.atBats || 0;
+      return `${games}G • ${atBats} AB`;
+    } else if (column.category === 'pitching') {
+      const ip = player.qualifyingStats?.inningsPitched || 0;
+      return `${games}G • ${ip} IP`;
+    }
+    return `${games}G`;
+  };
+
+  // Get colors for columns
+  const getColumnColor = (index) => {
+    const colors = [
+      theme.palette.success.main,    // Green
+      theme.palette.info.main,       // Blue  
+      theme.palette.warning.main,    // Orange
+      theme.palette.error.main,      // Red
+      theme.palette.primary.main     // Purple
+    ];
+    return colors[index % colors.length];
   };
 
   if (loading) {
@@ -196,7 +318,7 @@ const Dashboard = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <ActionCard
                   title="Statistical Leaders"
-                  description="TBD"
+                  description="CVR, WAR, and traditional metrics"
                   icon={<Star />}
                   onClick={() => navigate('/leaders')}
                   color={theme.palette.warning.main}
@@ -206,7 +328,7 @@ const Dashboard = () => {
               <Grid item xs={12} sm={6} md={3}>
                 <ActionCard
                   title="Advanced Analytics"
-                  description="TBD"
+                  description="Deep dive statistical analysis"
                   icon={<Assessment />}
                   onClick={() => navigate('/analytics')}
                   color={theme.palette.secondary.main}
@@ -273,268 +395,68 @@ const Dashboard = () => {
               <Card elevation={0} sx={{ height: '100%' }}>
                 <CardContent sx={{ p: 3 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
-                    <Typography variant="h6" fontWeight={700}>
-                      Statistical Leaders (CVR & Standings)
-                    </Typography>
-                    <Button 
-                      endIcon={<ArrowForward />}
-                      onClick={() => navigate('/leaders')}
-                      size="small"
-                    >
-                      View All
-                    </Button>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="h6" fontWeight={700} sx={{ mb: 0.5 }}>
+                        Statistical Leaders & Standings
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {statCategories[selectedStatCategory].description}
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <FormControl size="small" sx={{ minWidth: 200 }}>
+                        <InputLabel>Stat Category</InputLabel>
+                        <Select
+                          value={selectedStatCategory}
+                          label="Stat Category"
+                          onChange={(e) => setSelectedStatCategory(e.target.value)}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              borderRadius: 2
+                            }
+                          }}
+                        >
+                          {Object.entries(statCategories).map(([key, category]) => (
+                            <MenuItem key={key} value={key}>
+                              <Box>
+                                <Typography variant="body2" fontWeight={600}>
+                                  {category.label}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {category.description}
+                                </Typography>
+                              </Box>
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                      
+                      <Button 
+                        endIcon={<ArrowForward />}
+                        onClick={() => navigate('/leaders')}
+                        size="small"
+                        variant="outlined"
+                      >
+                        View All Leaders
+                      </Button>
+                    </Box>
                   </Box>
                   
-                  <Grid container spacing={3}>
-                    {/* CVR Batting Leaders */}
-                    <Grid item xs={12} sm={6} md={2.4}>
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                          CVR Batting
-                        </Typography>
-                        <List dense>
-                          {leaders.cvrBatting?.length > 0 ? leaders.cvrBatting.map((player, idx) => (
-                            <ListItem key={idx} sx={{ px: 0, py: 0.5 }}>
-                              <ListItemAvatar>
-                                <Avatar sx={{
-                                  width: 28,
-                                  height: 28,
-                                  backgroundColor: themeUtils.getTeamColor(player.team),
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700
-                                }}>
-                                  {player.team}
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText
-                                primary={player.name}
-                                secondary={`${player.team} • ${player.games}G`}
-                                primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }}
-                                secondaryTypographyProps={{ fontSize: '0.7rem' }}
-                              />
-                              <Chip
-                                label={player.cvr?.toFixed(2) || '---'}
-                                size="small"
-                                sx={{
-                                  backgroundColor: alpha(theme.palette.success.main, 0.1),
-                                  color: theme.palette.success.main,
-                                  fontWeight: 700,
-                                  minWidth: 50,
-                                  fontSize: '0.7rem'
-                                }}
-                              />
-                            </ListItem>
-                          )) : (
-                            <ListItem sx={{ px: 0 }}>
-                              <ListItemText
-                                primary="No data available"
-                                primaryTypographyProps={{ fontSize: '0.8rem', color: 'text.secondary' }}
-                              />
-                            </ListItem>
-                          )}
-                        </List>
-                      </Box>
-                    </Grid>
-
-                    {/* CVR Pitching Leaders */}
-                    <Grid item xs={12} sm={6} md={2.4}>
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                          CVR Pitching
-                        </Typography>
-                        <List dense>
-                          {leaders.cvrPitching?.length > 0 ? leaders.cvrPitching.map((player, idx) => (
-                            <ListItem key={idx} sx={{ px: 0, py: 0.5 }}>
-                              <ListItemAvatar>
-                                <Avatar sx={{
-                                  width: 28,
-                                  height: 28,
-                                  backgroundColor: themeUtils.getTeamColor(player.team),
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700
-                                }}>
-                                  {player.team}
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText
-                                primary={player.name}
-                                secondary={`${player.team} • ${player.games}G`}
-                                primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }}
-                                secondaryTypographyProps={{ fontSize: '0.7rem' }}
-                              />
-                              <Chip
-                                label={player.cvr?.toFixed(2) || '---'}
-                                size="small"
-                                sx={{
-                                  backgroundColor: alpha(theme.palette.info.main, 0.1),
-                                  color: theme.palette.info.main,
-                                  fontWeight: 700,
-                                  minWidth: 50,
-                                  fontSize: '0.7rem'
-                                }}
-                              />
-                            </ListItem>
-                          )) : (
-                            <ListItem sx={{ px: 0 }}>
-                              <ListItemText
-                                primary="No data available"
-                                primaryTypographyProps={{ fontSize: '0.8rem', color: 'text.secondary' }}
-                              />
-                            </ListItem>
-                          )}
-                        </List>
-                      </Box>
-                    </Grid>
-
-                    {/* CVR Team Leaders */}
-                    <Grid item xs={12} sm={6} md={2.4}>
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                          CVR Team
-                        </Typography>
-                        <List dense>
-                          {leaders.cvrTeam?.length > 0 ? leaders.cvrTeam.map((team, idx) => (
-                            <ListItem key={idx} sx={{ px: 0, py: 0.5 }}>
-                              <ListItemAvatar>
-                                <Avatar sx={{
-                                  width: 28,
-                                  height: 28,
-                                  backgroundColor: themeUtils.getTeamColor(team.id),
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700
-                                }}>
-                                  {team.id}
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText
-                                primary={team.name || team.id}
-                                secondary={team.id}
-                                primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }}
-                                secondaryTypographyProps={{ fontSize: '0.7rem' }}
-                              />
-                              <Chip
-                                label={team.cvr?.toFixed(2) || '---'}
-                                size="small"
-                                sx={{
-                                  backgroundColor: alpha(theme.palette.warning.main, 0.1),
-                                  color: theme.palette.warning.main,
-                                  fontWeight: 700,
-                                  minWidth: 50,
-                                  fontSize: '0.7rem'
-                                }}
-                              />
-                            </ListItem>
-                          )) : (
-                            <ListItem sx={{ px: 0 }}>
-                              <ListItemText
-                                primary="No data available"
-                                primaryTypographyProps={{ fontSize: '0.8rem', color: 'text.secondary' }}
-                              />
-                            </ListItem>
-                          )}
-                        </List>
-                      </Box>
-                    </Grid>
-
-                    {/* Best Last 10 Game Records */}
-                    <Grid item xs={12} sm={6} md={2.4}>
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                          Best Last 10 Games
-                        </Typography>
-                        <List dense>
-                          {leaders.last10?.length > 0 ? leaders.last10.map((team, idx) => (
-                            <ListItem key={idx} sx={{ px: 0, py: 0.5 }}>
-                              <ListItemAvatar>
-                                <Avatar sx={{
-                                  width: 28,
-                                  height: 28,
-                                  backgroundColor: themeUtils.getTeamColor(team.id),
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700
-                                }}>
-                                  {team.id}
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText
-                                primary={team.name || team.id}
-                                secondary={`Last 10: ${team.last10}`}
-                                primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }}
-                                secondaryTypographyProps={{ fontSize: '0.7rem' }}
-                              />
-                              <Chip
-                                label={team.last10 || '---'}
-                                size="small"
-                                sx={{
-                                  backgroundColor: alpha(theme.palette.success.main, 0.1),
-                                  color: theme.palette.success.main,
-                                  fontWeight: 700,
-                                  minWidth: 50,
-                                  fontSize: '0.7rem'
-                                }}
-                              />
-                            </ListItem>
-                          )) : (
-                            <ListItem sx={{ px: 0 }}>
-                              <ListItemText
-                                primary="No data available"
-                                primaryTypographyProps={{ fontSize: '0.8rem', color: 'text.secondary' }}
-                              />
-                            </ListItem>
-                          )}
-                        </List>
-                      </Box>
-                    </Grid>
-
-                    {/* Division Leaders (Total Standings) */}
-                    <Grid item xs={12} sm={6} md={2.4}>
-                      <Box sx={{ mb: 2 }}>
-                        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                          Division Leaders
-                        </Typography>
-                        <List dense>
-                          {leaders.divisionLeaders?.length > 0 ? leaders.divisionLeaders.map((team, idx) => (
-                            <ListItem key={idx} sx={{ px: 0, py: 0.5 }}>
-                              <ListItemAvatar>
-                                <Avatar sx={{
-                                  width: 28,
-                                  height: 28,
-                                  backgroundColor: themeUtils.getTeamColor(team.id),
-                                  fontSize: '0.7rem',
-                                  fontWeight: 700
-                                }}>
-                                  {team.id}
-                                </Avatar>
-                              </ListItemAvatar>
-                              <ListItemText
-                                primary={team.name || team.id}
-                                secondary={`${team.league} ${team.division}`}
-                                primaryTypographyProps={{ fontSize: '0.8rem', fontWeight: 600 }}
-                                secondaryTypographyProps={{ fontSize: '0.7rem' }}
-                              />
-                              <Chip
-                                label={team.record ? `${team.record.wins}-${team.record.losses}` : '---'}
-                                size="small"
-                                sx={{
-                                  backgroundColor: alpha(theme.palette.info.main, 0.1),
-                                  color: theme.palette.info.main,
-                                  fontWeight: 700,
-                                  minWidth: 50,
-                                  fontSize: '0.7rem'
-                                }}
-                              />
-                            </ListItem>
-                          )) : (
-                            <ListItem sx={{ px: 0 }}>
-                              <ListItemText
-                                primary="No data available"
-                                primaryTypographyProps={{ fontSize: '0.8rem', color: 'text.secondary' }}
-                              />
-                            </ListItem>
-                          )}
-                        </List>
-                      </Box>
-                    </Grid>
+                  <Grid container spacing={2}>
+                    {statCategories[selectedStatCategory].columns.map((column, index) => (
+                      <Grid item xs={12} sm={6} md={2.4} key={column.key}>
+                        <StatColumn
+                          title={column.title}
+                          icon={<column.icon />}
+                          color={getColumnColor(index)}
+                          data={leaders[column.key] || []}
+                          emptyMessage={`No qualifying ${column.category === 'team' ? 'teams' : 'players'}`}
+                          isTeamStat={column.category === 'team'}
+                          statType={column.stat}
+                        />
+                      </Grid>
+                    ))}
                   </Grid>
                 </CardContent>
               </Card>
@@ -543,6 +465,180 @@ const Dashboard = () => {
         </Grid>
       </Box>
     </motion.div>
+  );
+};
+
+// Professional Statistical Column Component
+const StatColumn = ({ title, icon, color, data, emptyMessage, isTeamStat, statType }) => {
+  const theme = useTheme();
+  
+  const formatValue = (item) => {
+    // Ensure item.value is a valid number
+    const value = typeof item.value === 'number' ? item.value : parseFloat(item.value);
+    
+    if (isNaN(value) || value === null || value === undefined) {
+      return '---';
+    }
+    
+    if (statType === 'winPercentage') {
+      return (value * 100).toFixed(1) + '%';
+    }
+    if (statType === 'era') {
+      return value.toFixed(2);
+    }
+    if (statType === 'cvr' || statType === 'war') {
+      return value.toFixed(1);
+    }
+    if (statType === 'avg') {
+      return value.toFixed(3);
+    }
+    if (statType === 'homeRuns' || statType === 'strikeouts') {
+      return Math.round(value).toString();
+    }
+    if (isTeamStat && statType !== 'cvr' && statType !== 'war') {
+      return (value * 100).toFixed(1) + '%';
+    }
+    return value.toFixed(3);
+  };
+
+  const getChipColor = (index) => {
+    switch (index) {
+      case 0: return theme.palette.warning.main; // Gold
+      case 1: return alpha(theme.palette.grey[400], 0.8); // Silver
+      case 2: return alpha(theme.palette.error.main, 0.6); // Bronze
+      default: return alpha(color, 0.6);
+    }
+  };
+
+  return (
+    <Box sx={{ 
+      height: '100%',
+      border: `1px solid ${alpha(color, 0.1)}`,
+      borderRadius: 2,
+      overflow: 'hidden',
+      backgroundColor: alpha(color, 0.02)
+    }}>
+      {/* Header */}
+      <Box sx={{ 
+        p: 2, 
+        backgroundColor: alpha(color, 0.08),
+        borderBottom: `1px solid ${alpha(color, 0.1)}`
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+          <Box sx={{ color: color }}>{icon}</Box>
+          <Typography variant="subtitle2" fontWeight={700} color={color}>
+            {title}
+          </Typography>
+        </Box>
+      </Box>
+
+      {/* Data */}
+      <Box sx={{ p: 1.5 }}>
+        {data?.length > 0 ? (
+          <List dense sx={{ p: 0 }}>
+            {data.map((item, idx) => (
+              <ListItem 
+                key={idx} 
+                sx={{ 
+                  px: 0, 
+                  py: 0.5,
+                  borderRadius: 1,
+                  '&:hover': {
+                    backgroundColor: alpha(color, 0.05)
+                  }
+                }}
+              >
+
+                <ListItemAvatar>
+                  {(() => {
+                    const teamCode = item.team || item.id || 'UNK';
+                    const logoUrl = getTeamLogoUrl(teamCode);
+                    return (
+                      <Avatar
+                        src={logoUrl}
+                        alt={teamCode}
+                        sx={{
+                          width: 32,
+                          height: 32,
+                          backgroundColor: themeUtils.getTeamColor(teamCode),
+                          fontSize: '0.65rem',
+                          fontWeight: 800,
+                          border: `2px solid ${idx < 3 ? getChipColor(idx) : 'transparent'}`
+                        }}
+                        imgProps={{
+                          style: { objectFit: 'contain', background: 'white' }
+                        }}
+                      >
+                        {/* Fallback to abbreviation if logo fails to load */}
+                        {teamCode.substring(0, 3)}
+                      </Avatar>
+                    );
+                  })()}
+                </ListItemAvatar>
+                
+                <ListItemText
+                  primary={
+                    <Typography variant="body2" fontWeight={600} sx={{ fontSize: '0.85rem' }}>
+                      {item.name || 'Unknown'}
+                    </Typography>
+                  }
+                  secondary={
+                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                      {item.subtitle || `${item.statLabel || 'STAT'}`}
+                    </Typography>
+                  }
+                />
+                
+                <Box sx={{ textAlign: 'right', minWidth: 60 }}>
+                  <Chip
+                    label={formatValue(item)}
+                    size="small"
+                    sx={{
+                      backgroundColor: alpha(getChipColor(idx), 0.1),
+                      color: getChipColor(idx),
+                      fontWeight: 800,
+                      fontSize: '0.7rem',
+                      height: 24,
+                      '& .MuiChip-label': {
+                        px: 1
+                      }
+                    }}
+                  />
+                  {idx < 3 && (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 0.5 }}>
+                      <Chip
+                        label={`#${idx + 1}`}
+                        size="small"
+                        sx={{
+                          backgroundColor: getChipColor(idx),
+                          color: 'white',
+                          fontWeight: 700,
+                          fontSize: '0.6rem',
+                          height: 16,
+                          '& .MuiChip-label': {
+                            px: 0.5
+                          }
+                        }}
+                      />
+                    </Box>
+                  )}
+                </Box>
+              </ListItem>
+            ))}
+          </List>
+        ) : (
+          <Box sx={{ 
+            textAlign: 'center', 
+            py: 3,
+            color: 'text.secondary'
+          }}>
+            <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
+              {emptyMessage}
+            </Typography>
+          </Box>
+        )}
+      </Box>
+    </Box>
   );
 };
 

@@ -35,8 +35,18 @@ router.get('/', async (req, res) => {
         stats: {
           batting: team.data.batting || {},
           pitching: team.data.pitching || {},
-          fielding: team.data.fielding || {}
+          fielding: team.data.fielding || {},
+          overall: {
+            cvr: team.data.cvr || 0,  // CVR at root level
+            war: team.data.war || {   // WAR object at root level
+              total: 0,
+              batting: 0,
+              pitching: 0
+            }
+          }
         },
+        cvr: team.data.cvr || 0,      // Also at top level for easy access
+        war: team.data.war || { total: 0, batting: 0, pitching: 0 },
         standings: {
           winPercentage: calculateWinPercentage(team.data.record),
           runsScored: team.data.batting?.runs || 0,

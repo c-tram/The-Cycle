@@ -104,19 +104,31 @@ router.get('/leaders', async (req, res) => {
     
     // Filter players based on minimums and stat availability
     let validPlayers = players.filter(player => {
-      const stats = player.data[category];
-      if (!stats || stats[stat] === undefined || stats[stat] === null) return false;
+      // Check if player has the required stat
+      let statValue;
+      
+      if (stat === 'cvr' || stat === 'war') {
+        // CVR and WAR are stored at the root level of season stats
+        statValue = player.data[stat];
+      } else {
+        // Traditional stats are in category subobjects
+        const stats = player.data[category];
+        if (!stats) return false;
+        statValue = stats[stat];
+      }
+      
+      if (statValue === undefined || statValue === null) return false;
       
       // Apply minimum thresholds based on category
       if (category === 'batting') {
         return player.data.gameCount >= minGames && 
-               (stats.atBats || 0) >= minAtBats;
+               (player.data.batting?.atBats || 0) >= minAtBats;
       } else if (category === 'pitching') {
-        const ip = parseFloat(stats.inningsPitched) || 0;
+        const ip = parseFloat(player.data.pitching?.inningsPitched) || 0;
         return player.data.gameCount >= minGames && ip >= minInnings;
       } else if (category === 'fielding') {
         return player.data.gameCount >= minGames && 
-               (stats.chances || 0) >= 10;
+               (player.data.fielding?.chances || 0) >= 10;
       }
       
       return player.data.gameCount >= minGames;
@@ -127,8 +139,18 @@ router.get('/leaders', async (req, res) => {
     const isAscending = ascendingStats.includes(stat);
     
     validPlayers.sort((a, b) => {
-      const aValue = parseFloat(a.data[category][stat]) || 0;
-      const bValue = parseFloat(b.data[category][stat]) || 0;
+      let aValue, bValue;
+      
+      if (stat === 'cvr' || stat === 'war') {
+        // CVR and WAR are stored at root level
+        aValue = parseFloat(a.data[stat]) || 0;
+        bValue = parseFloat(b.data[stat]) || 0;
+      } else {
+        // Traditional stats are in category subobjects
+        aValue = parseFloat(a.data[category][stat]) || 0;
+        bValue = parseFloat(b.data[category][stat]) || 0;
+      }
+      
       return isAscending ? aValue - bValue : bValue - aValue;
     });
     
@@ -138,6 +160,14 @@ router.get('/leaders', async (req, res) => {
       const team = playerInfo[0];
       const name = playerInfo.slice(1, -1).join(' ').replace(/_/g, ' ');
       
+      // Get the stat value - handle CVR/WAR vs traditional stats
+      let statValue;
+      if (stat === 'cvr' || stat === 'war') {
+        statValue = player.data[stat];
+      } else {
+        statValue = player.data[category][stat];
+      }
+      
       return {
         rank: index + 1,
         player: {
@@ -145,10 +175,12 @@ router.get('/leaders', async (req, res) => {
           team,
           year: playerInfo[playerInfo.length - 1]
         },
-        value: player.data[category][stat],
+        value: statValue,
         games: player.data.gameCount,
-        qualifyingStats: getQualifyingStats(player.data[category], category),
-        fullStats: player.data[category]
+        qualifyingStats: getQualifyingStats(player.data[category] || {}, category),
+        fullStats: player.data[category] || {},
+        cvr: player.data.cvr || 0,  // Always include CVR
+        war: player.data.war || 0   // Always include WAR
       };
     });
     
@@ -356,11 +388,13 @@ function getAvailableStats(category) {
   const stats = {
     batting: [
       'avg', 'obp', 'slg', 'ops', 'iso', 'babip', 'kRate', 'bbRate',
-      'hits', 'homeRuns', 'rbi', 'runs', 'stolenBases', 'atBats'
+      'hits', 'homeRuns', 'rbi', 'runs', 'stolenBases', 'atBats',
+      'cvr', 'war'  // Added CVR and WAR for batting
     ],
     pitching: [
       'era', 'whip', 'fip', 'strikeoutsPer9Inn', 'walksPer9Inn', 'hitsPer9Inn',
-      'strikeOuts', 'wins', 'saves', 'inningsPitched', 'strikeoutWalkRatio'
+      'strikeOuts', 'wins', 'saves', 'inningsPitched', 'strikeoutWalkRatio',
+      'cvr', 'war'  // Added CVR and WAR for pitching
     ],
     fielding: [
       'fieldingPercentage', 'assists', 'putOuts', 'errors', 'chances'
