@@ -747,10 +747,15 @@ function calculatePitchingStats(countingStats) {
 
   // Additional advanced pitching metrics
   const xFip = ip > 0 ? (((13 * 0.11 * flyOuts) + (3 * (baseOnBalls + countingStats.hitByPitch || 0)) - (2 * strikeOuts)) / ip) + fipConstant : 0; // xFIP using league avg HR/FB
-  const babip = (battersFaced - strikeOuts - homeRuns - baseOnBalls) > 0 
-    ? (hits - homeRuns) / (battersFaced - strikeOuts - homeRuns - baseOnBalls) : 0;
-  const leftOnBase = battersFaced > 0 ? (battersFaced - hits - baseOnBalls - countingStats.hitByPitch || 0) / battersFaced : 0;
-  const strandRate = ip > 0 ? 1 - ((runs - homeRuns) / (hits + baseOnBalls + countingStats.hitByPitch || 0 - homeRuns)) : 0;
+  
+  // Fixed BABIP calculation for pitchers
+  const battedBalls = battersFaced - strikeOuts - baseOnBalls - (countingStats.hitByPitch || 0);
+  const babip = battedBalls > 0 ? (hits - homeRuns) / (battedBalls - homeRuns) : 0;
+  
+  // Fixed LOB% calculation - proper strand rate
+  const baseRunners = hits + baseOnBalls + (countingStats.hitByPitch || 0);
+  const leftOnBasePercentage = baseRunners > 0 ? ((baseRunners - runs) / baseRunners) * 100 : 0;
+  
   const outs = Math.floor(ip) * 3 + ((ip % 1) * 10);
   const gameScore = ip >= 4 ? 50 + outs + (2 * strikeOuts) - (2 * hits) - (4 * earnedRuns) - (2 * runs - earnedRuns) - baseOnBalls : 0; // Game Score calculation
   const qualityStart = ip >= 6 && earnedRuns <= 3 ? 1 : 0;
@@ -761,7 +766,7 @@ function calculatePitchingStats(countingStats) {
   // Relief pitcher specific metrics
   const holds = 0; // Would need game situation data
   const blownSaves = 0; // Would need save situation data
-  const saves = 0; // Would need save situation data
+  const saves = countingStats.saves || 0; // Use actual saves data
   const savePercentage = (saves + blownSaves) > 0 ? saves / (saves + blownSaves) : 0;
 
   return {
@@ -785,8 +790,7 @@ function calculatePitchingStats(countingStats) {
     fip: Number(fip.toFixed(2)),
     xFip: Number(xFip.toFixed(2)),
     babip: Number(babip.toFixed(3)),
-    strandRate: Number(strandRate.toFixed(3)),
-    leftOnBase: Number(leftOnBase.toFixed(3)),
+    leftOnBasePercentage: Number(leftOnBasePercentage.toFixed(1)), // Fixed LOB%
     
     // Efficiency metrics
     pitchesPerInning: Number(pitchesPerInning.toFixed(1)),
@@ -819,17 +823,20 @@ function calculatePitchingStats(countingStats) {
 function calculateFieldingStats(countingStats) {
   const {
     assists = 0, putOuts = 0, errors = 0, chances = 0,
-    caughtStealing = 0, stolenBases = 0
+    caughtStealing = 0, stolenBases = 0, doublePlays = 0
   } = countingStats;
 
-  const fieldingPercentage = chances > 0 ? (putOuts + assists) / chances : 0;
+  const totalChances = chances > 0 ? chances : (putOuts + assists + errors);
+  const fieldingPercentage = totalChances > 0 ? (putOuts + assists) / totalChances : 0;
   const caughtStealingPercentage = (caughtStealing + stolenBases) > 0 
     ? caughtStealing / (caughtStealing + stolenBases) : 0;
 
   return {
     ...countingStats,
+    chances: totalChances,
     fieldingPercentage: Number(fieldingPercentage.toFixed(3)),
-    caughtStealingPercentage: Number(caughtStealingPercentage.toFixed(3))
+    caughtStealingPercentage: Number(caughtStealingPercentage.toFixed(3)),
+    doublePlays // Ensure double plays are included
   };
 }
 
@@ -1278,6 +1285,7 @@ async function updatePlayerSeasonStats(playerSeasonKey, gameStats, team, playerN
       seasonStats.fielding.putOuts += fielding.putOuts || 0;
       seasonStats.fielding.errors += fielding.errors || 0;
       seasonStats.fielding.chances += fielding.chances || 0;
+      seasonStats.fielding.doublePlays += fielding.doublePlays || 0;
     }
     
     // Update position if provided
@@ -1422,7 +1430,8 @@ async function updateTeamSeasonStats(teamSeasonKey, gameStats, team) {
           errors: 0,
           assists: 0,
           putOuts: 0,
-          chances: 0
+          chances: 0,
+          doublePlays: 0
         },
         name: `Team ${team}`,
         league: 'Unknown',
@@ -1472,6 +1481,7 @@ async function updateTeamSeasonStats(teamSeasonKey, gameStats, team) {
     seasonStats.fielding.assists += fielding.assists || 0;
     seasonStats.fielding.putOuts += fielding.putOuts || 0;
     seasonStats.fielding.chances += fielding.chances || 0;
+    seasonStats.fielding.doublePlays += fielding.doublePlays || 0;
     
     // Update wins/losses based on game result
     if (gameStats.gameInfo?.result === 'W') {
@@ -1892,8 +1902,8 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 if (require.main === module) {
   const season = process.argv[2] || '2025';
   // Full MLB season: Opening Day (late March) through current date (or full season)
-  const startDate = process.argv[3] || '2025-08-11';  // Opening Day 2025
-  const endDate = process.argv[4] || '2025-08-11';    // Current date (adjust to completed games)
+  const startDate = process.argv[3] || '2025-03-28';  // Opening Day 2025
+  const endDate = process.argv[4] || '2025-08-13';    // Current date (adjust to completed games)
   
   console.log(`🏁 Starting MLB data pull for ${season} season`);
   console.log(`📅 Date range: ${startDate} to ${endDate}`);
