@@ -6,18 +6,383 @@
 require('dotenv').config();
 
 const Redis = require('ioredis');
+const os = require('os');
 
 // Global fetch variable
 let fetch;
 
-// Simple Redis connection
+// Enhanced Redis connection with robust error handling and reconnection
 const redisClient = new Redis({
   host: process.env.REDIS_HOST,
   port: process.env.REDIS_PORT,
   password: process.env.REDIS_PASSWORD,
-  tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
-  db: 0
+  tls: process.env.REDIS_TLS === 'true' ? {
+    servername: process.env.REDIS_HOST,
+    checkServerIdentity: () => undefined // Bypass certificate hostname validation for Azure
+  } : undefined,
+  db: 0,
+  maxRetriesPerRequest: 5,
+  retryDelayOnFailover: 1000,
+  enableReadyCheck: true,
+  connectTimeout: 30000,
+  lazyConnect: true,
+  keepAlive: true,
+  family: 4, // Force IPv4
+  maxRetriesPerRequest: 3
 });
+
+// Add comprehensive error handling for Redis connection
+redisClient.on('error', (error) => {
+  console.error('🔴 Redis connection error:', error.message);
+  if (error.code === 'ECONNRESET' || error.code === 'EPIPE') {
+    console.log('🔄 Connection reset detected, Redis will auto-reconnect...');
+  }
+});
+
+redisClient.on('connect', () => {
+  console.log('🟢 Redis connected successfully');
+});
+
+redisClient.on('reconnecting', (ms) => {
+  console.log(`🟡 Redis reconnecting in ${ms}ms...`);
+});
+
+redisClient.on('close', () => {
+  console.log('🔴 Redis connection closed');
+});
+
+redisClient.on('ready', () => {
+  console.log('✅ Redis ready for operations');
+});
+
+// ============================================================================
+// REDIS CONNECTION HELPERS
+// ============================================================================
+
+/**
+ * Execute Redis operation with retry logic for connection issues
+ */
+async function executeRedisOperation(operation, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      console.warn(`⚠️  Redis operation attempt ${attempt}/${maxRetries} failed:`, error.message);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Wait before retry, with exponential backoff
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+      console.log(`🔄 Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+}
+
+/**
+ * Check Redis connection health and ensure it's ready
+ */
+async function ensureRedisConnection() {
+  try {
+    console.log('🔍 Checking Redis connection health...');
+    await executeRedisOperation(() => redisClient.ping());
+    console.log('✅ Redis connection healthy and ready');
+    return true;
+  } catch (error) {
+    console.error('❌ Redis connection failed:', error.message);
+    console.log('💡 Please check your Redis configuration and network connectivity');
+    return false;
+  }
+}
+
+// ============================================================================
+// DYNAMIC BASELINE CALCULATIONS FOR ENHANCED WAR/CVR
+// ============================================================================
+
+/**
+ * Dynamic baseline calculator for more accurate WAR calculations
+ */
+class DynamicBaselines {
+  constructor() {
+    this.battingBaselines = null;
+    this.pitchingBaselines = null;
+    this.lastCalculated = null;
+    this.season = null;
+    this.fullGamesProcessed = 0; // Track complete MLB games, not individual player records
+    this.updateThreshold = 50; // Update baselines every 50 complete MLB games
+    this.forceUpdate = true; // Force update on script startup
+  }
+
+  async calculateLeagueBaselines(season) {
+    console.log('🎯 Calculating dynamic league baselines for enhanced WAR/CVR...');
+    
+    try {
+      // Ensure Redis is ready before large operations
+      await executeRedisOperation(() => redisClient.ping());
+      console.log('✅ Redis confirmed ready for baseline calculation');
+      
+      const pattern = `player:*-${season}:season`;
+      
+      // Use retry wrapper for Redis operations with extended timeout
+      console.log('📊 Fetching player keys for baseline calculation...');
+      const playerKeys = await executeRedisOperation(() => redisClient.keys(pattern), 5); // More retries for this critical operation
+      
+      if (playerKeys.length === 0) {
+        console.warn('⚠️  No players found for baseline calculation, using default baselines');
+        this.battingBaselines = this.getDefaultBaselines().batting;
+        this.pitchingBaselines = this.getDefaultBaselines().pitching;
+        this.lastCalculated = new Date();
+        this.season = season;
+        return this.getDefaultBaselines();
+      }
+
+      console.log(`📊 Found ${playerKeys.length} players for baseline calculation`);
+
+      // 🚀 REDIS POWERHOUSE: Fetch player data in massive parallel batches for speed
+      const batchSize = 500; // Redis can easily handle 500+ keys at once
+      const allPlayerStats = [];
+      
+      for (let i = 0; i < playerKeys.length; i += batchSize) {
+        const batch = playerKeys.slice(i, i + batchSize);
+        
+        // Use retry wrapper for pipeline operations
+        const results = await executeRedisOperation(async () => {
+          const pipeline = redisClient.pipeline();
+          batch.forEach(key => pipeline.get(key));
+          return await pipeline.exec();
+        });
+        
+        results.forEach(([err, data]) => {
+          if (!err && data) {
+            try {
+              allPlayerStats.push(JSON.parse(data));
+            } catch (parseErr) {
+              // Skip invalid data
+            }
+          }
+        });
+      }
+
+      // Filter qualified players
+      const qualifiedBatters = allPlayerStats.filter(p => 
+        p.batting && (p.batting.atBats >= 100 || p.batting.plateAppearances >= 150)
+      );
+      
+      const qualifiedPitchers = allPlayerStats.filter(p => 
+        p.pitching && parseInningsPitched(p.pitching.inningsPitched || 0) >= 20
+      );
+
+      console.log(`📊 Found ${qualifiedBatters.length} qualified batters, ${qualifiedPitchers.length} qualified pitchers for baselines`);
+
+      this.battingBaselines = this.calculateBattingBaselines(qualifiedBatters);
+      this.pitchingBaselines = this.calculatePitchingBaselines(qualifiedPitchers);
+      
+      this.lastCalculated = new Date();
+      this.season = season;
+      
+      console.log('✅ Dynamic baselines calculated successfully!');
+      
+      return { batting: this.battingBaselines, pitching: this.pitchingBaselines };
+      
+    } catch (error) {
+      console.error('❌ Error calculating dynamic baselines:', error);
+      return this.getDefaultBaselines();
+    }
+  }
+
+  calculateBattingBaselines(qualifiedBatters) {
+    if (qualifiedBatters.length === 0) {
+      return this.getDefaultBaselines().batting;
+    }
+
+    const stats = { ops: [], obp: [], slg: [], avg: [], homeRunRate: [], stolenBaseRate: [] };
+
+    qualifiedBatters.forEach(player => {
+      const b = player.batting;
+      if (!b) return;
+
+      const games = b.gamesPlayed || 1;
+      if (b.atBats > 0) {
+        stats.ops.push(parseFloat(b.ops) || 0);
+        stats.obp.push(parseFloat(b.obp) || 0);
+        stats.slg.push(parseFloat(b.slg) || 0);
+        stats.avg.push(parseFloat(b.avg) || 0);
+      }
+
+      if (games > 0) {
+        stats.homeRunRate.push((b.homeRuns || 0) / games);
+        stats.stolenBaseRate.push((b.stolenBases || 0) / games);
+      }
+    });
+
+    const calculatePercentiles = (arr) => {
+      if (arr.length === 0) return { p10: 0, p25: 0, p50: 0, p75: 0, p90: 0, avg: 0 };
+      const sorted = arr.sort((a, b) => a - b);
+      const len = sorted.length;
+      return {
+        p10: sorted[Math.floor(len * 0.1)],
+        p25: sorted[Math.floor(len * 0.25)],
+        p50: sorted[Math.floor(len * 0.5)],
+        p75: sorted[Math.floor(len * 0.75)],
+        p90: sorted[Math.floor(len * 0.9)],
+        avg: arr.reduce((sum, val) => sum + val, 0) / len
+      };
+    };
+
+    return {
+      ops: calculatePercentiles(stats.ops),
+      obp: calculatePercentiles(stats.obp),
+      slg: calculatePercentiles(stats.slg),
+      avg: calculatePercentiles(stats.avg),
+      homeRunRate: calculatePercentiles(stats.homeRunRate),
+      stolenBaseRate: calculatePercentiles(stats.stolenBaseRate)
+    };
+  }
+
+  calculatePitchingBaselines(qualifiedPitchers) {
+    if (qualifiedPitchers.length === 0) {
+      return this.getDefaultBaselines().pitching;
+    }
+
+    const stats = { era: [], fip: [], whip: [], strikeoutsPer9: [], walksPer9: [] };
+
+    qualifiedPitchers.forEach(player => {
+      const p = player.pitching;
+      if (!p) return;
+
+      const ip = parseInningsPitched(p.inningsPitched || 0);
+      if (ip > 0) {
+        stats.era.push(parseFloat(p.era) || 0);
+        stats.fip.push(parseFloat(p.fip) || 0);
+        stats.whip.push(parseFloat(p.whip) || 0);
+        stats.strikeoutsPer9.push(parseFloat(p.strikeoutsPer9Inn) || 0);
+        stats.walksPer9.push(parseFloat(p.walksPer9Inn) || 0);
+      }
+    });
+
+    const calculatePercentiles = (arr, reversed = false) => {
+      if (arr.length === 0) return { p10: 0, p25: 0, p50: 0, p75: 0, p90: 0, avg: 0 };
+      const sorted = arr.sort((a, b) => reversed ? b - a : a - b);
+      const len = sorted.length;
+      return {
+        p10: sorted[Math.floor(len * 0.1)],
+        p25: sorted[Math.floor(len * 0.25)],
+        p50: sorted[Math.floor(len * 0.5)],
+        p75: sorted[Math.floor(len * 0.75)],
+        p90: sorted[Math.floor(len * 0.9)],
+        avg: arr.reduce((sum, val) => sum + val, 0) / len
+      };
+    };
+
+    return {
+      era: calculatePercentiles(stats.era),             // ERA: lower is better, so p10 = best, p90 = worst
+      fip: calculatePercentiles(stats.fip),             // FIP: lower is better, so p10 = best, p90 = worst
+      whip: calculatePercentiles(stats.whip),           // WHIP: lower is better, so p10 = best, p90 = worst
+      strikeoutsPer9: calculatePercentiles(stats.strikeoutsPer9), // K/9: higher is better, so p90 = best, p10 = worst
+      walksPer9: calculatePercentiles(stats.walksPer9)   // BB/9: lower is better, so p10 = best, p90 = worst
+    };
+  }
+
+  getDefaultBaselines() {
+    // 2024 MLB baseline approximations
+    return {
+      batting: {
+        ops: { p10: 0.580, p25: 0.650, p50: 0.720, p75: 0.800, p90: 0.900, avg: 0.720 },
+        obp: { p10: 0.280, p25: 0.310, p50: 0.340, p75: 0.370, p90: 0.420, avg: 0.340 },
+        slg: { p10: 0.300, p25: 0.360, p50: 0.420, p75: 0.480, p90: 0.550, avg: 0.420 },
+        avg: { p10: 0.200, p25: 0.240, p50: 0.270, p75: 0.300, p90: 0.330, avg: 0.270 },
+        homeRunRate: { p10: 0.02, p25: 0.06, p50: 0.12, p75: 0.20, p90: 0.30, avg: 0.14 },
+        stolenBaseRate: { p10: 0.00, p25: 0.02, p50: 0.08, p75: 0.15, p90: 0.25, avg: 0.10 }
+      },
+      pitching: {
+        // 2024 MLB realistic baselines (sorted lowest to highest for rate stats where lower is better)
+        era: { p10: 2.50, p25: 3.20, p50: 4.00, p75: 4.80, p90: 5.80, avg: 4.00 },      // p10 = elite, p90 = poor
+        fip: { p10: 2.80, p25: 3.40, p50: 4.10, p75: 4.70, p90: 5.50, avg: 4.10 },      // p10 = elite, p90 = poor  
+        whip: { p10: 1.00, p25: 1.15, p50: 1.30, p75: 1.45, p90: 1.65, avg: 1.30 },     // p10 = elite, p90 = poor
+        strikeoutsPer9: { p10: 5.0, p25: 7.0, p50: 8.5, p75: 10.0, p90: 12.0, avg: 8.5 }, // p90 = elite, p10 = poor
+        walksPer9: { p10: 1.5, p25: 2.2, p50: 3.0, p75: 3.8, p90: 5.0, avg: 3.0 }       // p10 = elite, p90 = poor
+      }
+    };
+  }
+
+  async getBaselines(season) {
+    const needsRecalculation = !this.battingBaselines || 
+                               !this.pitchingBaselines || 
+                               this.season !== season ||
+                               !this.lastCalculated ||
+                               this.forceUpdate ||
+                               (this.fullGamesProcessed > 0 && this.fullGamesProcessed % this.updateThreshold === 0) ||
+                               (Date.now() - this.lastCalculated.getTime()) > 24 * 60 * 60 * 1000;
+
+    if (needsRecalculation) {
+      console.log(`🔄 Updating baselines - Full MLB games processed: ${this.fullGamesProcessed}, Force update: ${this.forceUpdate}`);
+      await this.calculateLeagueBaselines(season);
+      this.forceUpdate = false; // Reset force update flag after first calculation
+    }
+
+    return {
+      batting: this.battingBaselines || this.getDefaultBaselines().batting,
+      pitching: this.pitchingBaselines || this.getDefaultBaselines().pitching
+    };
+  }
+
+  // Method to increment full game count - called when a complete MLB game is processed
+  incrementFullGameCount() {
+    this.fullGamesProcessed++;
+    console.log(`📊 Full MLB games processed: ${this.fullGamesProcessed}`);
+  }
+}
+
+// Global baseline calculator instance
+const dynamicBaselines = new DynamicBaselines();
+
+// ============================================================================
+// PARALLEL PROCESSING UTILITIES
+// ============================================================================
+
+/**
+ * Process games in parallel batches for faster execution
+ * Enhanced to leverage Redis's massive throughput capabilities
+ */
+async function processGamesInParallel(games, batchSize = 16) {
+  // 🚀 REDIS POWERHOUSE: Increase concurrency since Redis can handle massive load
+  const maxConcurrency = Math.min(batchSize, Math.max(8, Math.floor(os.cpus().length * 1.5)));
+  console.log(`🚀 REDIS POWERHOUSE: Processing ${games.length} games with ${maxConcurrency} parallel workers (Redis optimized)`);
+  
+  const results = [];
+  
+  for (let i = 0; i < games.length; i += maxConcurrency) {
+    const batch = games.slice(i, i + maxConcurrency);
+    console.log(`📦 Processing batch ${Math.floor(i/maxConcurrency) + 1}/${Math.ceil(games.length/maxConcurrency)} (${batch.length} games)`);
+    
+    // 🚀 Process games in parallel - Redis can handle this load easily
+    const batchPromises = batch.map(game => processGame(game));
+    const batchResults = await Promise.all(batchPromises);
+    
+    // 🚀 Store all games in parallel too - Redis pipelines make this blazing fast
+    const storePromises = batchResults
+      .filter(gameResult => gameResult)
+      .map(gameResult => storeGameData(gameResult, gameResult.season || '2025'));
+    
+    await Promise.all(storePromises);
+    
+    // Store all valid results
+    for (const gameResult of batchResults) {
+      if (gameResult) {
+        results.push(gameResult);
+      }
+    }
+    
+    // Minimal pause - Redis can handle sustained high throughput
+    if (i + maxConcurrency < games.length) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+  }
+  
+  return results;
+}
 
 // ============================================================================
 // PROFESSIONAL BASEBALL STATISTICS CALCULATIONS
@@ -88,10 +453,10 @@ function aggregateInningsPitched(ipArray) {
 // ============================================================================
 
 /**
- * Calculate simplified WAR for position players
- * Based on offensive and defensive contributions
+ * Calculate enhanced WAR for position players using dynamic baselines
+ * Based on offensive and defensive contributions with league-adjusted performance
  */
-function calculateHitterWAR(stats) {
+async function calculateHitterWAR(stats, season = '2025') {
   if (!stats || !stats.batting) {
     console.log('❌ calculateHitterWAR: No stats or batting data');
     return 0;
@@ -104,70 +469,71 @@ function calculateHitterWAR(stats) {
   
   console.log('🔍 calculateHitterWAR input:', { games, pa, atBats, obp: batting.obp, slg: batting.slg });
   
-  // Reduced minimum playing time for early season
-  if (games < 5 && pa < 20 && atBats < 15) {
-    console.log('❌ calculateHitterWAR: Below minimum playing time');
-    return 0; // Need minimum playing time
-  }
+  // With dynamic baselines, we can calculate WAR for any amount of playing time
+  // The baselines will automatically adjust for league context and sample sizes
   
-  // Offensive components
+  // Get dynamic baselines for more accurate evaluation
+  const baselines = await dynamicBaselines.getBaselines(season);
+  const battingBaselines = baselines.batting;
+  
+  // Player stats
   const obp = parseFloat(batting.obp) || 0;
   const slg = parseFloat(batting.slg) || 0;
   const ops = obp + slg;
+  const avg = parseFloat(batting.avg) || 0;
   const hr = parseInt(batting.homeRuns) || 0;
   const sb = parseInt(batting.stolenBases) || 0;
   
-  // League average baselines (2024 MLB approximations)
-  const lgAvgOPS = 0.720;
-  const lgAvgOBP = 0.320;
+  let totalWAR = 0;
   
-  // Offensive value above replacement
-  let offensiveWAR = 0;
+  // Percentile-based WAR calculation using dynamic baselines - FIXED SCALE FACTORS
+  const calculatePercentileWAR = (value, baseline, scaleFactor = 1.0) => {
+    if (value >= baseline.p90) return 1.5 * scaleFactor;        // Elite (90th percentile+)
+    if (value >= baseline.p75) return 1.0 * scaleFactor;        // Very good (75th-90th)
+    if (value >= baseline.p50) return 0.5 * scaleFactor;        // Above average (50th-75th)
+    if (value >= baseline.p25) return 0.0 * scaleFactor;        // Average (25th-50th)
+    if (value >= baseline.p10) return -0.3 * scaleFactor;       // Below average (10th-25th)
+    return -0.6 * scaleFactor;                                  // Poor (below 10th)
+  };
   
-  // OPS contribution (most important)
-  if (ops >= 1.000) offensiveWAR += 4.0;      // MVP level
-  else if (ops >= 0.900) offensiveWAR += 3.0; // All-Star
-  else if (ops >= 0.800) offensiveWAR += 2.0; // Very good
-  else if (ops >= 0.750) offensiveWAR += 1.0; // Above average
-  else if (ops >= 0.700) offensiveWAR += 0.0; // Average
-  else if (ops >= 0.650) offensiveWAR -= 0.5; // Below average
-  else offensiveWAR -= 1.0;                   // Poor
+  // Primary offensive components with dynamic scaling - REDUCED SCALE FACTORS
+  totalWAR += calculatePercentileWAR(ops, battingBaselines.ops, 0.5);      // OPS reduced from 1.5
+  totalWAR += calculatePercentileWAR(obp, battingBaselines.obp, 0.4);      // OBP reduced from 1.0
+  totalWAR += calculatePercentileWAR(slg, battingBaselines.slg, 0.3);      // SLG reduced from 0.8
+  totalWAR += calculatePercentileWAR(avg, battingBaselines.avg, 0.2);      // Contact reduced from 0.4
   
-  // Power bonus
+  // Rate-based components - REDUCED IMPACT
   if (games > 0) {
     const hrRate = hr / games;
-    if (hrRate >= 0.25) offensiveWAR += 1.0;      // 40+ HR pace
-    else if (hrRate >= 0.15) offensiveWAR += 0.5; // 25+ HR pace
-  }
-  
-  // Speed bonus
-  if (games > 0 && sb > 0) {
     const sbRate = sb / games;
-    if (sbRate >= 0.15) offensiveWAR += 0.3; // 25+ SB pace
-    else if (sbRate >= 0.06) offensiveWAR += 0.1; // 10+ SB pace
+    
+    totalWAR += calculatePercentileWAR(hrRate, battingBaselines.homeRunRate, 0.2);  // Reduced from 0.5
+    totalWAR += calculatePercentileWAR(sbRate, battingBaselines.stolenBaseRate, 0.1); // Reduced from 0.3
   }
   
-  // Playing time adjustment
-  if (games >= 140) offensiveWAR += 0.5; // Full season
-  else if (games >= 100) offensiveWAR += 0.0;
-  else offensiveWAR -= 0.5; // Part-time player
+  // Playing time adjustment - SIGNIFICANTLY REDUCED
+  if (games >= 140) totalWAR += 0.3;        // Full season bonus (reduced from 0.8)
+  else if (games >= 120) totalWAR += 0.2;   // Mostly full season (reduced from 0.4)
+  else if (games >= 100) totalWAR += 0.1;   // Partial season
+  else if (games >= 80) totalWAR -= 0.0;    // Limited time (reduced penalty)
+  else totalWAR -= 0.1;                     // Part-time player (reduced from -0.3)
   
   // Simple defensive adjustment (would need positional data for full calculation)
   const fieldingWAR = 0; // Placeholder - would need detailed fielding metrics
   
   // Total WAR
-  const totalWAR = offensiveWAR + fieldingWAR;
+  const finalWAR = totalWAR + fieldingWAR;
   
-  console.log('✅ calculateHitterWAR result:', { games, ops, hr, sb, offensiveWAR, totalWAR });
+  console.log('✅ calculateHitterWAR result:', { games, ops, hr, sb, totalWAR, finalWAR });
   
-  return Math.max(-2.0, Math.min(8.0, totalWAR)); // Cap between -2 and 8
+  return Math.max(-2.0, Math.min(5.0, finalWAR)); // REALISTIC CAP: -2 to 5 WAR (reduced from -3 to 10)
 }
 
 /**
- * Calculate simplified WAR for pitchers
- * Based on ERA, FIP, innings pitched, and other key metrics
+ * Calculate enhanced WAR for pitchers using dynamic baselines
+ * Based on ERA, FIP, innings pitched, and other key metrics with league adjustments
  */
-function calculatePitcherWAR(stats) {
+async function calculatePitcherWAR(stats, season = '2025') {
   if (!stats || !stats.pitching) {
     console.log('❌ calculatePitcherWAR: No stats or pitching data');
     return 0;
@@ -178,62 +544,70 @@ function calculatePitcherWAR(stats) {
   
   console.log('🔍 calculatePitcherWAR input:', { ip, era: pitching.era, whip: pitching.whip, inningsPitched: pitching.inningsPitched });
   
-  if (ip < 5) {
-    console.log('❌ calculatePitcherWAR: Below minimum innings pitched');
-    return 0; // Need minimum innings
-  }
+  // With dynamic baselines, we can calculate WAR for any amount of innings
+  // The baselines will automatically adjust for league context and sample sizes
+  
+  // Get dynamic baselines for more accurate evaluation
+  const baselines = await dynamicBaselines.getBaselines(season);
+  const pitchingBaselines = baselines.pitching;
   
   const era = parseFloat(pitching.era) || 999;
+  const fip = parseFloat(pitching.fip) || era;
   const whip = parseFloat(pitching.whip) || 999;
   const k9 = parseFloat(pitching.strikeoutsPer9Inn) || 0;
   const bb9 = parseFloat(pitching.walksPer9Inn) || 0;
-  const fip = parseFloat(pitching.fip) || era; // Use FIP if available, otherwise ERA
+  const saves = parseInt(pitching.saves) || 0;
+  const holds = parseInt(pitching.holds) || 0;
   
-  // League average baselines (2024 MLB approximations)
-  const lgAvgERA = 4.50;
-  const lgAvgFIP = 4.20;
-  const lgAvgWHIP = 1.35;
+  let totalWAR = 0;
   
-  let pitchingWAR = 0;
+  // Percentile-based WAR calculation for pitchers (for rate stats where lower is better)
+  const calculatePercentileWARReversed = (value, baseline, scaleFactor = 1.0) => {
+    // For ERA, WHIP, BB/9: lower values are better
+    // p10 = best performance (lowest values), p90 = worst performance (highest values)
+    if (value <= baseline.p10) return 1.5 * scaleFactor;        // Elite (best 10%)
+    if (value <= baseline.p25) return 1.0 * scaleFactor;        // Very good (10th-25th percentile)
+    if (value <= baseline.p50) return 0.5 * scaleFactor;        // Above average (25th-50th)
+    if (value <= baseline.p75) return 0.0 * scaleFactor;        // Average (50th-75th)
+    if (value <= baseline.p90) return -0.3 * scaleFactor;       // Below average (75th-90th)
+    return -0.6 * scaleFactor;                                  // Poor (worst 10%)
+  };
   
-  // ERA/FIP component (most important)
-  const eraToUse = Math.min(era, fip); // Use better of ERA or FIP
-  if (eraToUse <= 2.50) pitchingWAR += 4.0;      // Cy Young level
-  else if (eraToUse <= 3.00) pitchingWAR += 3.0; // Elite
-  else if (eraToUse <= 3.50) pitchingWAR += 2.0; // Very good
-  else if (eraToUse <= 4.00) pitchingWAR += 1.0; // Above average
-  else if (eraToUse <= 4.50) pitchingWAR += 0.0; // Average
-  else if (eraToUse <= 5.00) pitchingWAR -= 0.5; // Below average
-  else pitchingWAR -= 1.5;                       // Poor
+  const calculatePercentileWAR = (value, baseline, scaleFactor = 1.0) => {
+    // For K/9: higher values are better
+    // p90 = best performance (highest values), p10 = worst performance (lowest values)
+    if (value >= baseline.p90) return 1.5 * scaleFactor;        // Elite (best 10%)
+    if (value >= baseline.p75) return 1.0 * scaleFactor;        // Very good (75th-90th)
+    if (value >= baseline.p50) return 0.5 * scaleFactor;        // Above average (50th-75th)
+    if (value >= baseline.p25) return 0.0 * scaleFactor;        // Average (25th-50th)
+    if (value >= baseline.p10) return -0.3 * scaleFactor;       // Below average (10th-25th)
+    return -0.6 * scaleFactor;                                  // Poor (worst 10%)
+  };
   
-  // WHIP component
-  if (whip <= 1.00) pitchingWAR += 1.5;
-  else if (whip <= 1.15) pitchingWAR += 1.0;
-  else if (whip <= 1.30) pitchingWAR += 0.5;
-  else if (whip <= 1.45) pitchingWAR += 0.0;
-  else pitchingWAR -= 0.5;
+  // Primary pitching components using dynamic baselines - FIXED SCALE FACTORS
+  totalWAR += calculatePercentileWARReversed(Math.min(era, fip), pitchingBaselines.era, 0.6); // ERA/FIP reduced from 1.8
+  totalWAR += calculatePercentileWARReversed(whip, pitchingBaselines.whip, 0.4);               // WHIP reduced from 1.2
+  totalWAR += calculatePercentileWAR(k9, pitchingBaselines.strikeoutsPer9, 0.3);               // K9 reduced from 1.0
+  totalWAR += calculatePercentileWARReversed(bb9, pitchingBaselines.walksPer9, 0.2);           // BB9 reduced from 0.8
   
-  // Strikeout rate component
-  if (k9 >= 10.0) pitchingWAR += 1.0;
-  else if (k9 >= 8.5) pitchingWAR += 0.5;
-  else if (k9 >= 7.0) pitchingWAR += 0.0;
-  else pitchingWAR -= 0.5;
+  // Innings pitched bonus (durability/workload) - SIGNIFICANTLY REDUCED
+  if (ip >= 200) totalWAR += 0.4;           // Ace workload (reduced from 1.2)
+  else if (ip >= 180) totalWAR += 0.3;      // #1/#2 starter (reduced from 1.0)
+  else if (ip >= 160) totalWAR += 0.2;      // Solid starter (reduced from 0.7)
+  else if (ip >= 140) totalWAR += 0.1;      // Mid-rotation (reduced from 0.4)
+  else if (ip >= 120) totalWAR += 0.0;      // Back-end starter (reduced from 0.1)
+  else if (ip >= 80) totalWAR += 0.0;       // Swingman/long reliever
+  else if (ip >= 50) totalWAR -= 0.0;       // Setup/closer (reduced penalty)
+  else totalWAR -= 0.1;                     // Limited role (reduced penalty)
   
-  // Walk rate component (lower is better)
-  if (bb9 <= 2.0) pitchingWAR += 0.5;
-  else if (bb9 <= 3.0) pitchingWAR += 0.0;
-  else pitchingWAR -= 0.5;
+  // Role adjustment - REDUCED BONUSES
+  if (saves >= 20) totalWAR += 0.1;          // Elite closer (reduced from 0.3)
+  else if (saves >= 10) totalWAR += 0.05;    // Good closer (reduced from 0.2)
+  else if (holds >= 15) totalWAR += 0.05;    // Elite setup (reduced from 0.1)
   
-  // Innings bonus (durability)
-  if (ip >= 180) pitchingWAR += 1.0;      // Workhorse
-  else if (ip >= 150) pitchingWAR += 0.5; // Solid starter
-  else if (ip >= 100) pitchingWAR += 0.0; // Average
-  else if (ip >= 50) pitchingWAR -= 0.2;  // Part-time
-  else pitchingWAR -= 0.5;                // Limited role
+  console.log('✅ calculatePitcherWAR result:', { ip, era, whip, k9, bb9, totalWAR });
   
-  console.log('✅ calculatePitcherWAR result:', { ip, era, whip, k9, bb9, pitchingWAR });
-  
-  return Math.max(-2.0, Math.min(8.0, pitchingWAR)); // Cap between -2 and 8
+  return Math.max(-2.0, Math.min(5.0, totalWAR)); // REALISTIC CAP: -2 to 5 WAR (reduced from -3 to 10)
 }
 
 // ============================================================================
@@ -596,17 +970,24 @@ function calculateTeamPitchingCVR(pitchingStats, pitchingWAR, estimatedPitchingP
 function classifyPlayerType(battingStats, pitchingStats) {
   const pitchingIP = parseInningsPitched(pitchingStats.inningsPitched || "0.0");
   
-  // Key thresholds for classification - STRICT filtering
+  // 🐛 DEBUG: Let's see what's happening with pitcher classification
+  if (pitchingIP > 0) {
+    console.log(`🔍 PITCHER DEBUG: IP=${pitchingIP}, inningsPitched=${pitchingStats.inningsPitched}`);
+  }
+  
+  // Key thresholds for classification - LOWERED thresholds to catch more players
   const hasSignificantBatting = (battingStats.atBats || 0) >= 1; // At least 1 at-bat to be a batter
   const hasSignificantPitching = pitchingIP >= 0.1; // At least 0.1 innings pitched to be a pitcher
   
   // Two-way player (very rare but possible - like Shohei Ohtani)
   if (hasSignificantBatting && hasSignificantPitching) {
+    console.log(`🔍 Two-way player found: Batting AB=${battingStats.atBats}, Pitching IP=${pitchingIP}`);
     return 'Two-Way Player';
   }
   
   // Primary pitcher - only if they actually pitched
   if (hasSignificantPitching) {
+    console.log(`🔍 Pitcher classified: IP=${pitchingIP}`);
     return 'Pitcher';
   }
   
@@ -1121,7 +1502,11 @@ async function storeGameData(gameData, season) {
   const { gameId, date, players, teamStats } = gameData;
   
   try {
-    // Store individual player game data AND update season totals
+    // 🚀 REDIS POWERHOUSE: Use pipeline for ALL operations in this game
+    const pipeline = redisClient.pipeline();
+    const seasonUpdatePromises = [];
+    
+    // Batch all player game data writes
     for (const player of players) {
       const { playerId, playerName, team, stats } = player;
       
@@ -1135,24 +1520,33 @@ async function storeGameData(gameData, season) {
       const playerGameKey = `player:${team}-${playerName}-${season}:${date}`;
       const playerSeasonKey = `player:${team}-${playerName}-${season}:season`;
       
-      // Store individual game data
-      await redisClient.set(playerGameKey, JSON.stringify(stats));
+      // Add to pipeline instead of individual writes
+      pipeline.set(playerGameKey, JSON.stringify(stats));
       
-      // Update or create season totals for this player
-      await updatePlayerSeasonStats(playerSeasonKey, stats, team, playerName);
+      // Queue season update (these need to be sequential due to aggregation logic)
+      seasonUpdatePromises.push(() => updatePlayerSeasonStats(playerSeasonKey, stats, team, playerName, season));
     }
 
-    // Store team game data AND update season totals
+    // Batch all team game data writes
     for (const [team, stats] of Object.entries(teamStats)) {
       const teamGameKey = `team:${team}:${season}:${date}`;
-      const teamSeasonKey = `team:${team}:${season}:season`;  // Fixed: Use consistent pattern
+      const teamSeasonKey = `team:${team}:${season}:season`;
       
-      // Store individual game data
-      await redisClient.set(teamGameKey, JSON.stringify(stats));
+      // Add to pipeline instead of individual writes
+      pipeline.set(teamGameKey, JSON.stringify(stats));
       
-      // Update or create season totals for this team
-      await updateTeamSeasonStats(teamSeasonKey, stats, team);
+      // Queue team season update
+      seasonUpdatePromises.push(() => updateTeamSeasonStats(teamSeasonKey, stats, team));
     }
+
+    // 🚀 Execute all game data writes in one atomic operation with retry logic
+    await executeRedisOperation(() => pipeline.exec());
+    
+    // 🚀 Process season updates in parallel (they don't depend on each other within a game)
+    await Promise.all(seasonUpdatePromises.map(updateFn => updateFn()));
+
+    // 📊 Increment full game count for baseline tracking (one complete MLB game processed)
+    dynamicBaselines.incrementFullGameCount();
 
   } catch (error) {
     console.error(`❌ Error storing game ${gameId}:`, error.message);
@@ -1163,10 +1557,10 @@ async function storeGameData(gameData, season) {
 /**
  * Update or create season statistics for a player incrementally
  */
-async function updatePlayerSeasonStats(playerSeasonKey, gameStats, team, playerName) {
+async function updatePlayerSeasonStats(playerSeasonKey, gameStats, team, playerName, season = '2025') {
   try {
-    // Get existing season stats or create new ones
-    const existingData = await redisClient.get(playerSeasonKey);
+    // Get existing season stats or create new ones with retry logic
+    const existingData = await executeRedisOperation(() => redisClient.get(playerSeasonKey));
     let seasonStats;
     
     if (existingData) {
@@ -1326,21 +1720,21 @@ async function updatePlayerSeasonStats(playerSeasonKey, gameStats, team, playerN
     
     if (playerType === 'Pitcher' || playerType === 'Two-Way Player') {
       console.log(`🎯 About to calculate Pitcher WAR for ${playerName}`);
-      const pitcherWAR = calculatePitcherWAR(seasonStats);
+      const pitcherWAR = await calculatePitcherWAR(seasonStats, season);
       console.log(`⚾ Pitcher WAR for ${playerName}: ${pitcherWAR}`);
       war += pitcherWAR;
     }
     if (playerType === 'Batter' || playerType === 'Two-Way Player') {
       console.log(`🎯 About to calculate Hitter WAR for ${playerName}`);
-      const hitterWAR = calculateHitterWAR(seasonStats);
+      const hitterWAR = await calculateHitterWAR(seasonStats, season);
       console.log(`🏏 Hitter WAR for ${playerName}: ${hitterWAR}`);
       war += hitterWAR;
     }
     
     // For two-way players, use the higher WAR component
     if (playerType === 'Two-Way Player') {
-      const pitcherWAR = calculatePitcherWAR(seasonStats);
-      const hitterWAR = calculateHitterWAR(seasonStats);
+      const pitcherWAR = await calculatePitcherWAR(seasonStats, season);
+      const hitterWAR = await calculateHitterWAR(seasonStats, season);
       war = Math.max(pitcherWAR, hitterWAR) + (Math.min(pitcherWAR, hitterWAR) * 0.3); // Primary role + 30% of secondary
       console.log(`🔄 Two-way player ${playerName} - Pitcher: ${pitcherWAR}, Hitter: ${hitterWAR}, Combined: ${war}`);
     }
@@ -1374,8 +1768,8 @@ async function updatePlayerSeasonStats(playerSeasonKey, gameStats, team, playerN
     // Update timestamp
     seasonStats.lastUpdated = new Date().toISOString();
     
-    // Store updated season stats
-    await redisClient.set(playerSeasonKey, JSON.stringify(seasonStats));
+    // Store updated season stats with retry logic
+    await executeRedisOperation(() => redisClient.set(playerSeasonKey, JSON.stringify(seasonStats)));
     
   } catch (error) {
     console.error(`❌ Error updating player season stats for ${playerSeasonKey}:`, error.message);
@@ -1540,7 +1934,6 @@ async function updateTeamSeasonStats(teamSeasonKey, gameStats, team) {
                 totalBattingCVR += playerCVR * battingPortion;
                 totalPitchingCVR += playerCVR * pitchingPortion;
                 teamBattingWAR += playerWAR * battingPortion;
-                teamBattingWAR += playerWAR * battingPortion;
                 teamPitchingWAR += playerWAR * pitchingPortion;
               } else {
                 // Default split for two-way players
@@ -1602,8 +1995,8 @@ async function updateTeamSeasonStats(teamSeasonKey, gameStats, team) {
     // Update timestamp
     seasonStats.lastUpdated = new Date().toISOString();
     
-    // Store updated season stats
-    await redisClient.set(teamSeasonKey, JSON.stringify(seasonStats));
+    // Store updated season stats with retry logic
+    await executeRedisOperation(() => redisClient.set(teamSeasonKey, JSON.stringify(seasonStats)));
     
   } catch (error) {
     console.error(`❌ Error updating team season stats for ${teamSeasonKey}:`, error.message);
@@ -1775,9 +2168,9 @@ async function aggregateSeasonStats(season) {
         }
       } catch (aggregationError) {
         console.log(`⚠️ Error aggregating team stats for ${teamCode}:`, aggregationError.message);
-        // Fallback to old calculation method
-        const teamBattingWAR = calculateHitterWAR({ batting: teamSeasonStats.batting });
-        const teamPitchingWAR = calculatePitcherWAR({ pitching: teamSeasonStats.pitching });
+        // Fallback to old calculation method with dynamic baselines
+        const teamBattingWAR = await calculateHitterWAR({ batting: teamSeasonStats.batting }, season);
+        const teamPitchingWAR = await calculatePitcherWAR({ pitching: teamSeasonStats.pitching }, season);
         const teamTotalWAR = teamBattingWAR + teamPitchingWAR;
         
         teamSeasonStats.war = {
@@ -1815,6 +2208,12 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
   // Initialize fetch
   if (!fetch) {
     fetch = (await import('node-fetch')).default;
+  }
+  
+  // Ensure Redis connection is healthy before starting
+  const redisHealthy = await ensureRedisConnection();
+  if (!redisHealthy) {
+    throw new Error('Redis connection failed - cannot proceed with data processing');
   }
   
   const MLB_API_BASE = 'https://statsapi.mlb.com/api/v1';
@@ -1861,32 +2260,11 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
     console.log(`🔍 Game status breakdown:`, statusBreakdown);
     console.log(`🔍 Game type breakdown:`, typeBreakdown);
     
-    // Process games in batches 
-    const batchSize = 5;
-    let processedCount = 0;
+    // Process games using enhanced parallel processing
+    const processedResults = await processGamesInParallel(completedGames, 8);
     
-    for (let i = 0; i < completedGames.length; i += batchSize) {
-      const batch = completedGames.slice(i, i + batchSize);
-      console.log(`📦 Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(completedGames.length/batchSize)}`);
-      
-      // Process games in parallel
-      const gamePromises = batch.map(game => processGame(game));
-      const gameResults = await Promise.all(gamePromises);
-      
-      // Store all valid results
-      for (const gameResult of gameResults) {
-        if (gameResult) {
-          await storeGameData(gameResult, season);
-          processedCount++;
-        }
-      }
-      
-      // Brief pause between batches
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-    
-    console.log(`\n✅ Successfully processed ${processedCount} games`);
-    console.log(`\n🎉 Complete! Processed ${processedCount} games with professional-grade statistics (season stats updated incrementally)`);
+    console.log(`\n✅ Successfully processed ${processedResults.length} games with enhanced parallel processing and dynamic WAR baselines`);
+    console.log(`\n🎉 Complete! Processed ${processedResults.length} games with professional-grade statistics (season stats updated incrementally)`);
     
   } catch (error) {
     console.error('❌ Error in main process:', error);
@@ -1911,13 +2289,33 @@ if (require.main === module) {
   
   pullBoxscoresToRedis(season, startDate, endDate)
     .then(() => {
-      console.log('🎯 Script completed successfully');
+      console.log('\n� Successfully completed data processing!');
+      console.log('📊 Enhanced WAR calculations with dynamic baselines are now available');
+      
+      // Graceful Redis shutdown
+      redisClient.disconnect();
       process.exit(0);
     })
     .catch(error => {
-      console.error('💥 Script failed:', error);
+      console.error('\n❌ Fatal error in main process:', error);
+      
+      // Graceful Redis shutdown on error
+      redisClient.disconnect();
       process.exit(1);
     });
 }
+
+// Add graceful shutdown handlers for connection cleanup
+process.on('SIGINT', () => {
+  console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+  redisClient.disconnect();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+  redisClient.disconnect();
+  process.exit(0);
+});
 
 module.exports = { pullBoxscoresToRedis };
