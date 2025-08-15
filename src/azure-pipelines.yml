@@ -117,17 +117,33 @@ stages:
     pool:
       vmImage: $(vmImageName)
     steps:
-    - task: Docker@2
-      displayName: Build and push combined app image
+    - task: AzureCLI@2
+      displayName: 'Login to ACR and build/push image'
       inputs:
-        command: buildAndPush
-        repository: $(imageRepository)
-        dockerfile: $(Build.SourcesDirectory)/Dockerfile.combined
-        containerRegistry: $(dockerRegistryServiceConnection)
-        buildArgs: |
-          NODE_ENV=production
-        tags: |
-          $(tag)
+        azureSubscription: $(AZURE_SUBSCRIPTION)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Extract registry name from full URL if needed
+          REGISTRY_NAME=$(echo "$(containerRegistry)" | sed 's/.azurecr.io//')
+          FULL_REGISTRY_URL="$REGISTRY_NAME.azurecr.io"
+          
+          echo "Registry name: $REGISTRY_NAME"
+          echo "Full registry URL: $FULL_REGISTRY_URL"
+          
+          # Login to Azure Container Registry
+          az acr login --name $REGISTRY_NAME
+          
+          # Build and tag the image
+          docker build -f $(Build.SourcesDirectory)/Dockerfile.combined \
+            --build-arg NODE_ENV=production \
+            -t $FULL_REGISTRY_URL/$(imageRepository):$(tag) \
+            $(Build.SourcesDirectory)
+          
+          # Push the image
+          docker push $FULL_REGISTRY_URL/$(imageRepository):$(tag)
+          
+          echo "Successfully built and pushed $FULL_REGISTRY_URL/$(imageRepository):$(tag)"
 
 - stage: Deploy
   displayName: Deploy to production slot
