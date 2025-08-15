@@ -2280,8 +2280,8 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 if (require.main === module) {
   const season = process.argv[2] || '2025';
   // Full MLB season: Opening Day (late March) through current date (or full season)
-  const startDate = process.argv[3] || '2025-03-28';  // Opening Day 2025
-  const endDate = process.argv[4] || '2025-08-13';    // Current date (adjust to completed games)
+  const startDate = process.argv[3] || '2025-08-14';  // Opening Day 2025
+  const endDate = process.argv[4] || '2025-08-14';    // Current date (adjust to completed games)
   
   console.log(`🏁 Starting MLB data pull for ${season} season`);
   console.log(`📅 Date range: ${startDate} to ${endDate}`);

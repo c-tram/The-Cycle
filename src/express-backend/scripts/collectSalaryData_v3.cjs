@@ -556,91 +556,134 @@ async function collectAllSalaryDataEfficient(year = 2025, dryRun = false) {
     let totalFailed = 0;
     let requestCount = 0;
     
-    // Process each team
+    // Concurrent team processing - start a new team every 3 seconds
+    console.log(`\n🚀 MULTITHREADED PROCESSING: Starting teams with 3-second intervals...`);
+    
+    const teamPromises = [];
+    const teamResults = [];
+    
     for (let teamIndex = 0; teamIndex < teamsToProcess.length; teamIndex++) {
       const team = teamsToProcess[teamIndex];
-      const progress = `[Team ${teamIndex + 1}/${teamsToProcess.length}]`;
+      const startDelay = teamIndex * 3000; // 3 seconds between team starts
       
-      try {
-        console.log(`\n${'='.repeat(80)}`);
-        console.log(`${progress} Processing ${team}...`);
-        console.log(`${'='.repeat(80)}`);
-        
-        // Scrape team payroll page (this gets ALL players for the team in one request!)
-        console.log(`${progress} 🔍 Scraping payroll data for ${team}...`);
-        
-        let teamPayrollData;
+      console.log(`📅 Team ${teamIndex + 1}/${teamsToProcess.length}: ${team} will start in ${startDelay/1000}s`);
+      
+      // Create a promise for each team that starts after a delay
+      const teamPromise = new Promise(async (resolve) => {
         try {
-          teamPayrollData = await scrapeTeamPayrollFromSpotrac(team, year);
-          requestCount++;
-        } catch (error) {
-          if (error.message.includes('403') || error.message.includes('forbidden')) {
-            console.log(`${progress} 🚫 Spotrac blocked access (403 error) - this is likely rate limiting`);
-            console.log(`${progress} 💡 Suggestion: Wait longer between runs or use a VPN`);
-            
-            // Add exponential backoff for 403 errors
-            const backoffDelay = Math.min(60000, 15000 * (teamIndex + 1)); // Max 60s
-            console.log(`${progress} ⏰ Waiting ${backoffDelay/1000}s before continuing...`);
-            await sleep(backoffDelay);
-            
-            totalFailed++;
-            continue;
-          } else {
-            throw error; // Re-throw other errors
-          }
-        }
-        
-        if (teamPayrollData.length === 0) {
-          console.log(`${progress} ❌ No payroll data found for ${team}`);
-          continue;
-        }
-        
-        console.log(`${progress} ✅ Found payroll data for ${teamPayrollData.length} players on ${team}`);
-        
-        // Store each player's salary data
-        for (const playerData of teamPayrollData) {
+          // Wait for the staggered start time
+          await sleep(startDelay);
+          
+          const progress = `[Team ${teamIndex + 1}/${teamsToProcess.length}]`;
+          console.log(`\n🏃‍♂️ ${progress} Starting ${team} processing...`);
+          
+          // Scrape team payroll data
+          let teamPayrollData;
           try {
-            const stored = await storeSalaryData(
-              playerData.player, 
-              playerData.team, 
-              playerData.year, 
-              playerData, 
-              dryRun
-            );
-            
-            if (stored) {
-              totalCollected++;
-              if (dryRun) {
-                console.log(`   🧪 DRY RUN: Would store ${playerData.player}: $${playerData.salary.toLocaleString()}`);
-              } else {
-                console.log(`   ✅ Stored ${playerData.player}: $${playerData.salary.toLocaleString()}`);
-              }
-            } else {
-              totalFailed++;
-            }
+            teamPayrollData = await scrapeTeamPayrollFromSpotrac(team, year);
+            console.log(`${progress} ✅ Found payroll data for ${teamPayrollData.length} players on ${team}`);
           } catch (error) {
-            console.error(`   ❌ Error storing ${playerData.player}:`, error.message);
-            totalFailed++;
+            if (error.message.includes('403') || error.message.includes('forbidden')) {
+              console.log(`${progress} 🚫 Spotrac blocked access (403 error) for ${team}`);
+              return resolve({ team, success: 0, failed: 1, requests: 1, error: '403 blocked' });
+            } else {
+              console.error(`${progress} ❌ Error scraping ${team}:`, error.message);
+              return resolve({ team, success: 0, failed: 1, requests: 1, error: error.message });
+            }
           }
+          
+          if (teamPayrollData.length === 0) {
+            console.log(`${progress} ❌ No payroll data found for ${team}`);
+            return resolve({ team, success: 0, failed: 1, requests: 1, error: 'No data found' });
+          }
+          
+          // Small delay before processing to appear more natural
+          const processingDelay = 500 + Math.random() * 1000; // 0.5-1.5s random delay
+          await sleep(processingDelay);
+          
+          // Process all players for this team concurrently
+          const playerPromises = teamPayrollData.map(async (playerData) => {
+            try {
+              const stored = await storeSalaryData(
+                playerData.player, 
+                playerData.team, 
+                playerData.year, 
+                playerData, 
+                dryRun
+              );
+              
+              if (stored) {
+                if (dryRun) {
+                  console.log(`   🧪 ${team}: Would store ${playerData.player}: $${playerData.salary.toLocaleString()}`);
+                } else {
+                  console.log(`   ✅ ${team}: Stored ${playerData.player}: $${playerData.salary.toLocaleString()}`);
+                }
+                return { success: true, player: playerData.player };
+              } else {
+                return { success: false, player: playerData.player, error: 'Store failed' };
+              }
+            } catch (error) {
+              console.error(`   ❌ ${team}: Error storing ${playerData.player}:`, error.message);
+              return { success: false, player: playerData.player, error: error.message };
+            }
+          });
+          
+          // Wait for all players in this team to complete
+          const playerResults = await Promise.all(playerPromises);
+          
+          const teamSuccesses = playerResults.filter(r => r.success).length;
+          const teamFailures = playerResults.filter(r => !r.success).length;
+          
+          console.log(`${progress} 🏁 ${team} completed: ${teamSuccesses} stored, ${teamFailures} failed`);
+          
+          resolve({ 
+            team, 
+            success: teamSuccesses, 
+            failed: teamFailures, 
+            requests: 1,
+            playerCount: teamPayrollData.length
+          });
+          
+        } catch (error) {
+          console.error(`❌ Fatal error processing team ${team}:`, error.message);
+          resolve({ team, success: 0, failed: 1, requests: 1, error: error.message });
         }
-        
-        // Rate limiting between teams (be nice to Spotrac)
-        if (teamIndex < teamsToProcess.length - 1) {
-          const delay = dryRun ? 2000 : 5000; // 2s for dry run, 5s for real run
-          console.log(`⏱️  Waiting ${delay/1000}s before next team...`);
-          await sleep(delay);
-        }
-        
-      } catch (error) {
-        console.error(`${progress} ❌ Error processing team ${team}:`, error.message);
-        totalFailed++;
-      }
+      });
+      
+      teamPromises.push(teamPromise);
     }
     
-    console.log(`\n🎉 EFFICIENT salary data collection ${dryRun ? 'dry run' : ''} completed!`);
+    console.log(`\n⏳ All ${teamsToProcess.length} teams queued. Processing will complete as teams finish...`);
+    
+    // Wait for all teams to complete
+    const allResults = await Promise.all(teamPromises);
+    
+    // Aggregate results
+    for (const result of allResults) {
+      totalCollected += result.success;
+      totalFailed += result.failed;
+      requestCount += result.requests;
+      teamResults.push(result);
+    }
+    
+    // Display final results
+    console.log(`\n${'='.repeat(100)}`);
+    console.log(`🎊 MULTITHREADED SALARY COLLECTION COMPLETE!`);
+    console.log(`${'='.repeat(100)}`);
+    
+    // Show team-by-team results
+    teamResults.forEach(result => {
+      const status = result.error ? `❌ ${result.error}` : `✅ ${result.success} players`;
+      console.log(`   ${result.team}: ${status}`);
+    });
+    
+    console.log(`\n📊 FINAL STATISTICS:`);
     console.log(`   ✅ ${dryRun ? 'Would collect' : 'Collected'}: ${totalCollected} players`);
     console.log(`   ❌ Failed: ${totalFailed}`);
-    console.log(`   📊 Teams processed this run: ${teamsToProcess.length}/${allTeams.length}`);
+    console.log(`   � Teams processed: ${teamsToProcess.length}/${allTeams.length}`);
+    console.log(`   ⚡ Total processing time: ~${Math.max(teamsToProcess.length * 3, 30)}s (vs ~${teamsToProcess.length * 6}s sequential)`);
+    console.log(`   🌐 Total requests made: ${requestCount} (vs ${totalCollected + totalFailed} individual requests)`);
+    console.log(`   📈 Efficiency gain: ~${Math.round((totalCollected + totalFailed) / requestCount)}x fewer requests!`);
     
     if (!dryRun) {
       // Get updated count of teams with salary data
@@ -655,9 +698,6 @@ async function collectAllSalaryDataEfficient(year = 2025, dryRun = false) {
         console.log(`   🔄 Teams still needed: ${remaining.join(', ')}`);
       }
     }
-    
-    console.log(`   🚀 Total requests made: ${requestCount} (vs ${totalCollected + totalFailed} individual requests)`);
-    console.log(`   ⚡ Efficiency gain: ~${Math.round((totalCollected + totalFailed) / requestCount)}x fewer requests!`);
     
     if (dryRun) {
       console.log(`\n🧪 DRY RUN COMPLETE - No data was actually stored to Redis`);
