@@ -1148,10 +1148,23 @@ const GameLogTab = ({ gameLog, teamId }) => {
                   <TableRow key={index} hover>
                     <TableCell>
                       <Typography variant="body2" fontWeight={600}>
-                        {new Date(game.date).toLocaleDateString('en-US', { 
-                          month: 'short', 
-                          day: 'numeric'
-                        })}
+                        {(() => {
+                          // Prefer officialDate (YYYY-MM-DD) from API, otherwise use startLocal or the stored date
+                          const official = game.gameInfo?.officialDate || game.officialDate || null;
+                          const startLocal = game.gameInfo?.startLocal || game.startLocal || null;
+
+                          if (official) {
+                            return new Date(official + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          }
+
+                          if (startLocal) {
+                            // startLocal might be 'YYYY-MM-DD HH:MM' or 'YYYY-MM-DD, HH:MM' depending on ingestion
+                            const datePart = startLocal.split(/[ ,]/)[0];
+                            return new Date(datePart + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                          }
+
+                          return new Date(game.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        })()}
                       </Typography>
                     </TableCell>
                     <TableCell align="center">

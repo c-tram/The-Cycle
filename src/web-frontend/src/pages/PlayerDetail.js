@@ -1214,12 +1214,21 @@ const PlayerStats = ({ stats, playerType }) => {
 
 // Player game log component
 const PlayerGameLog = ({ games, playerType }) => {
-  const formatDate = (dateString) => {
+  const formatDate = (dateString, game = {}) => {
     try {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      });
+      const official = game.gameInfo?.officialDate || game.officialDate || null;
+      const startLocal = game.gameInfo?.startLocal || game.startLocal || null;
+
+      if (official) {
+        return new Date(official + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+
+      if (startLocal) {
+        const datePart = startLocal.split(/[ ,]/)[0];
+        return new Date(datePart + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      }
+
+      return new Date(dateString + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } catch {
       return dateString;
     }
@@ -1307,7 +1316,7 @@ const PlayerGameLog = ({ games, playerType }) => {
               {games && games.length > 0 ? (
                 games.map((game, index) => (
                   <TableRow key={index} hover>
-                    <TableCell>{formatDate(game.date)}</TableCell>
+                    <TableCell>{formatDate(game.date, game)}</TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         {game.gameInfo?.homeAway === 'home' ? 'vs' : '@'} {game.gameInfo?.opponent || '---'}

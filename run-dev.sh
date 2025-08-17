@@ -18,7 +18,7 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Enhanced Salary Data Collection, Multitheading included. Updated ReadMe to give a better scope of where project is.: $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Fix: Normalize game dates to America/Chicago (CST/CDT) in ingestion; add startLocal/officialDate fields and update frontend rendering to avoid UTC off-by-one. - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."

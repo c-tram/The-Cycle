@@ -1414,7 +1414,8 @@ function aggregateCountingStats(gamesStats, statType) {
  */
 async function processGame(gameData) {
   const gameId = gameData.gamePk;
-  const date = gameData.gameDate ? gameData.gameDate.split('T')[0] : '';
+  // `date` will be normalized later to the local official date (see startLocal/officialDate logic)
+  let date = '';
   const awayTeam = gameData.teams?.away?.team?.abbreviation?.toUpperCase() || 'AWAY';
   const homeTeam = gameData.teams?.home?.team?.abbreviation?.toUpperCase() || 'HOME';
 
@@ -1426,12 +1427,32 @@ async function processGame(gameData) {
     const response = await fetch(boxscoreUrl);
     const boxscoreData = await response.json();
 
+    // Normalize and attach start times
+    const startUtc = boxscoreData.gameData?.gameDate || gameData.gameDate || null;
+    let startLocal = null;
+    let officialDate = gameData.officialDate || null;
+    if (startUtc) {
+      try {
+        startLocal = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(startUtc));
+        // If no officialDate provided, derive the YYYY-MM-DD local date
+        if (!officialDate) {
+          officialDate = startLocal.split(/\s+/)[0];
+        }
+      } catch (e) {
+        startLocal = new Date(startUtc).toISOString().replace(/T.*$/, '');
+        if (!officialDate) officialDate = startLocal;
+      }
+    }
+
     const gameResults = {
       gameId,
-      date,
+      date: officialDate || date,
       teams: { away: awayTeam, home: homeTeam },
       players: [],
-      teamStats: {}
+      teamStats: {},
+      startUtc,
+      startLocal,
+      officialDate
     };
 
     // Determine game winner for team records
@@ -1454,12 +1475,15 @@ async function processGame(gameData) {
 
       const gameInfo = {
         gameId,
-        date,
+        date: gameResults.date,
         opponent,
         homeAway: side,
         result,
         runsScored: side === 'away' ? awayScore : homeScore,
-        runsAllowed: side === 'away' ? homeScore : awayScore
+        runsAllowed: side === 'away' ? homeScore : awayScore,
+        startUtc: gameResults.startUtc,
+        startLocal: gameResults.startLocal,
+        officialDate: gameResults.officialDate
       };
 
       // Process individual players
@@ -2280,8 +2304,8 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 if (require.main === module) {
   const season = process.argv[2] || '2025';
   // Full MLB season: Opening Day (late March) through current date (or full season)
-  const startDate = process.argv[3] || '2025-08-14';  // Opening Day 2025
-  const endDate = process.argv[4] || '2025-08-14';    // Current date (adjust to completed games)
+  const startDate = process.argv[3] || '2025-03-27';  // Opening Day 2025
+  const endDate = process.argv[4] || '2025-04-08';    // Current date (adjust to completed games)
   
   console.log(`🏁 Starting MLB data pull for ${season} season`);
   console.log(`📅 Date range: ${startDate} to ${endDate}`);
