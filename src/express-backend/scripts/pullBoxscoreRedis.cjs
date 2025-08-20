@@ -373,6 +373,37 @@ async function storeSalaryData(playerName, team, year, salaryData) {
 }
 
 /**
+ * Check if salary data already exists for all teams
+ */
+async function checkSalaryDataExists(year) {
+  const teams = [
+    'ARI', 'ATL', 'BAL', 'BOS', 'CHC', 'CWS', 'CIN', 'CLE', 'COL', 'DET',
+    'HOU', 'KC', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY', 'OAK',
+    'PHI', 'PIT', 'SD', 'SF', 'SEA', 'STL', 'TB', 'TEX', 'TOR', 'WAS'
+  ];
+  
+  let teamsWithSalaryData = 0;
+  let totalSalaryKeys = 0;
+  
+  for (const team of teams) {
+    const salaryKeys = await redisClient.keys(`salary:${team}-*-${year}`);
+    if (salaryKeys.length > 0) {
+      teamsWithSalaryData++;
+      totalSalaryKeys += salaryKeys.length;
+    }
+  }
+  
+  console.log(`💰 Salary check: ${teamsWithSalaryData}/${teams.length} teams have salary data (${totalSalaryKeys} total salary records)`);
+  
+  return {
+    hasCompleteData: teamsWithSalaryData === teams.length,
+    teamsWithData: teamsWithSalaryData,
+    totalTeams: teams.length,
+    totalSalaryKeys: totalSalaryKeys
+  };
+}
+
+/**
  * Collect salary data for all MLB teams
  */
 async function collectAllSalaryData(year) {
@@ -2844,13 +2875,21 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 
   // 💰 COLLECT SALARY DATA FIRST for accurate CVR calculations
   console.log(`\n🚀 Starting comprehensive MLB data processing for ${season}...`);
-  console.log('💰 Step 1: Collecting current salary data for enhanced CVR calculations...');
+  console.log('💰 Step 1: Checking existing salary data...');
   
   try {
-    await collectAllSalaryData(season);
-    console.log('✅ Salary data collection complete - CVR calculations will use real salary data!');
+    const salaryCheck = await checkSalaryDataExists(season);
+    
+    if (salaryCheck.hasCompleteData) {
+      console.log(`✅ Salary data already exists for all ${salaryCheck.totalTeams} teams (${salaryCheck.totalSalaryKeys} records) - skipping salary collection`);
+      console.log('📊 CVR calculations will use existing salary data!');
+    } else {
+      console.log(`⚡ Missing salary data for ${salaryCheck.totalTeams - salaryCheck.teamsWithData} teams - collecting salary data...`);
+      await collectAllSalaryData(season);
+      console.log('✅ Salary data collection complete - CVR calculations will use real salary data!');
+    }
   } catch (error) {
-    console.warn('⚠️  Salary data collection failed, CVR will use estimated salaries:', error.message);
+    console.warn('⚠️  Salary data check/collection failed, CVR will use estimated salaries:', error.message);
     console.log('📊 Continuing with boxscore processing...');
   }
   

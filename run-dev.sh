@@ -18,7 +18,7 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Major: Fix CVR calculations with WAR-weighted system, add doubleheader game support with unique Redis keys, restore player detail pages with updated API routes, implement comprehensive data integrity checks - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Enhance: Add intelligent salary data management - clearRedisCache preserves salary keys, pullBoxscores checks existing salary data before collection, prevents unnecessary API calls and protects valuable salary dataset - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."
