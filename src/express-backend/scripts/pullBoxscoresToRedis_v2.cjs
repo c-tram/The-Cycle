@@ -7,6 +7,8 @@ require('dotenv').config();
 
 const Redis = require('ioredis');
 const os = require('os');
+const cheerio = require('cheerio');
+const https = require('https');
 
 // Global fetch variable
 let fetch;
@@ -95,6 +97,336 @@ async function ensureRedisConnection() {
     console.log('💡 Please check your Redis configuration and network connectivity');
     return false;
   }
+}
+
+// ============================================================================
+// SALARY COLLECTION FUNCTIONS
+// ============================================================================
+
+/**
+ * Makes HTTP requests with basic error handling for salary scraping
+ */
+function makeRequest(url, maxRedirects = 5) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    }, (response) => {
+      if (response.statusCode === 301 || response.statusCode === 302) {
+        if (maxRedirects > 0 && response.headers.location) {
+          return resolve(makeRequest(response.headers.location, maxRedirects - 1));
+        } else {
+          return reject(new Error(`Too many redirects: ${response.statusCode}`));
+        }
+      }
+
+      if (response.statusCode !== 200) {
+        return reject(new Error(`HTTP Error: ${response.statusCode}`));
+      }
+
+      let data = '';
+      response.on('data', chunk => {
+        data += chunk;
+      });
+
+      response.on('end', () => {
+        resolve(data);
+      });
+    });
+
+    request.on('error', error => {
+      reject(error);
+    });
+
+    request.setTimeout(30000, () => {
+      request.destroy();
+      reject(new Error('Request timeout'));
+    });
+  });
+}
+
+/**
+ * Parse salary string into numeric value
+ */
+function parseSalaryString(salaryText) {
+  if (!salaryText || typeof salaryText !== 'string') return 0;
+  
+  let cleaned = salaryText.replace(/[$,\s]/g, '');
+  
+  if (cleaned.includes('M')) {
+    const num = parseFloat(cleaned.replace('M', ''));
+    return Math.round(num * 1000000);
+  } else if (cleaned.includes('K')) {
+    const num = parseFloat(cleaned.replace('K', ''));
+    return Math.round(num * 1000);
+  } else {
+    const match = cleaned.match(/(\d+\.?\d*)/);
+    if (match) {
+      const num = parseFloat(match[1]);
+      if (num > 50000) {
+        return Math.round(num);
+      } else if (num > 0.5 && num < 50) {
+        return Math.round(num * 1000000);
+      }
+      return Math.round(num);
+    }
+  }
+  
+  return 0;
+}
+
+/**
+ * Get team city name for Spotrac URLs
+ */
+function getTeamCity(teamAbbr) {
+  const cityMap = {
+    'ARI': 'arizona-diamondbacks', 'AZ': 'arizona-diamondbacks',
+    'ATL': 'atlanta-braves', 'BAL': 'baltimore-orioles', 'BOS': 'boston-red-sox',
+    'CHC': 'chicago-cubs', 'CWS': 'chicago-white-sox', 'CIN': 'cincinnati-reds',
+    'CLE': 'cleveland-guardians', 'COL': 'colorado-rockies', 'DET': 'detroit-tigers',
+    'HOU': 'houston-astros', 'KC': 'kansas-city-royals', 'LAA': 'los-angeles-angels',
+    'LAD': 'los-angeles-dodgers', 'MIA': 'miami-marlins', 'MIL': 'milwaukee-brewers',
+    'MIN': 'minnesota-twins', 'NYM': 'new-york-mets', 'NYY': 'new-york-yankees',
+    'OAK': 'athletics', 'ATH': 'athletics', 'PHI': 'philadelphia-phillies',
+    'PIT': 'pittsburgh-pirates', 'SD': 'san-diego-padres', 'SF': 'san-francisco-giants',
+    'SEA': 'seattle-mariners', 'STL': 'st-louis-cardinals', 'TB': 'tampa-bay-rays',
+    'TEX': 'texas-rangers', 'TOR': 'toronto-blue-jays', 'WAS': 'washington-nationals',
+    'WSH': 'washington-nationals'
+  };
+  return cityMap[teamAbbr] || 'mlb';
+}
+
+/**
+ * Normalize player names for matching
+ */
+function normalizeName(name) {
+  return name.toLowerCase()
+    .replace(/[áàâäã]/g, 'a')
+    .replace(/[éèêë]/g, 'e')
+    .replace(/[íìîï]/g, 'i')
+    .replace(/[óòôöõ]/g, 'o')
+    .replace(/[úùûü]/g, 'u')
+    .replace(/[ñ]/g, 'n')
+    .replace(/[ç]/g, 'c')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Process payroll table from Spotrac
+ */
+function processPayrollTable($, payrollTable, team, year, players, url) {
+  payrollTable.find('tbody tr').each((rowIndex, row) => {
+    const $row = $(row);
+    const cells = $row.find('td');
+    
+    if (cells.length < 6) return;
+    
+    try {
+      let playerName = null;
+      const playerCell = $(cells[0]);
+      const playerLink = playerCell.find('a');
+      
+      if (playerLink.length > 0) {
+        playerName = playerLink.text().trim();
+      } else {
+        const hiddenSpan = playerCell.find('span.d-none');
+        if (hiddenSpan.length > 0) {
+          hiddenSpan.remove();
+        }
+        playerName = playerCell.text().trim();
+      }
+      
+      if (!playerName || playerName.length < 2) return;
+      
+      const salaryCell = $(cells[5]);
+      let salaryText = salaryCell.attr('data-sort') || salaryCell.text().trim();
+      const salary = parseSalaryString(salaryText);
+      
+      if (salary > 0) {
+        players.push({
+          name: playerName,
+          team: team,
+          year: year,
+          salary: salary,
+          salaryFormatted: `$${salary.toLocaleString()}`,
+          source: 'spotrac'
+        });
+      }
+    } catch (error) {
+      // Skip problematic rows
+    }
+  });
+}
+
+/**
+ * Scrape team payroll from Spotrac
+ */
+async function scrapeTeamPayrollFromSpotrac(team, year) {
+  try {
+    const teamCity = getTeamCity(team);
+    const url = `https://www.spotrac.com/mlb/${teamCity}/cap/_/year/${year}`;
+    
+    console.log(`💰 Fetching ${team} payroll...`);
+    
+    const html = await makeRequest(url);
+    const $ = cheerio.load(html);
+    
+    const players = [];
+    
+    const tableSelectors = [
+      'table#table_active',
+      'table#table_injured', 
+      'table.dataTable-active',
+      'table.dataTable',
+      'table:contains("Payroll Salary")',
+      'table:contains("Player")'
+    ];
+    
+    for (const selector of tableSelectors) {
+      const table = $(selector);
+      if (table.length > 0) {
+        processPayrollTable($, table, team, year, players, url);
+      }
+    }
+    
+    return players;
+  } catch (error) {
+    console.error(`❌ Error fetching ${team} payroll:`, error.message);
+    return [];
+  }
+}
+
+/**
+ * Store salary data in Redis and update player season keys
+ */
+async function storeSalaryData(playerName, team, year, salaryData) {
+  try {
+    const playerKey = `${team}-${playerName.replace(/\s+/g, '_')}-${year}`;
+    const salaryKey = `salary:${playerKey}`;
+
+    // Check if salary key already exists
+    const existingResult = await checkKeyExistence(salaryKey, null, {
+      playerName,
+      team,
+      year,
+      salary: salaryData.salary
+    });
+
+    let salaryStored = false;
+    if (existingResult.action === 'create') {
+      await redisClient.set(salaryKey, JSON.stringify(salaryData));
+      salaryStored = true;
+      console.log(`💰 Created salary record for ${playerName} (${team}): $${salaryData.salary?.toLocaleString() || 'N/A'}`);
+    } else if (existingResult.action === 'update') {
+      await redisClient.set(salaryKey, JSON.stringify(salaryData));
+      salaryStored = true;
+      console.log(`💰 Updated salary record for ${playerName} (${team}): $${salaryData.salary?.toLocaleString() || 'N/A'}`);
+    } else {
+      console.log(`💰 Skipped salary for ${playerName} (${team}): ${existingResult.reason}`);
+    }
+
+    // Update player season key with salary
+    const playerSeasonKeys = await redisClient.keys(`player:${team}-*-${year}:season`);
+    let matchedPlayerKey = null;
+    let normalizedTarget = normalizeName(playerName);
+    
+    for (const key of playerSeasonKeys) {
+      const keyParts = key.split(':')[1].split('-');
+      if (keyParts.length >= 3) {
+        const keyName = keyParts.slice(1, -1).join('-').replace(/_/g, ' ');
+        if (normalizeName(keyName) === normalizedTarget) {
+          matchedPlayerKey = key;
+          break;
+        }
+      }
+    }
+    
+    // Update player season key with salary (only if salary was stored)
+    if (salaryStored && matchedPlayerKey) {
+      const playerSeasonRaw = await redisClient.get(matchedPlayerKey);
+      if (playerSeasonRaw) {
+        let playerSeason = {};
+        try { playerSeason = JSON.parse(playerSeasonRaw); } catch {}
+        
+        // Check if we should update the player season record
+        const currentSalary = playerSeason.salary;
+        const newSalary = salaryData.salary;
+        
+        if (!currentSalary || currentSalary !== newSalary) {
+          playerSeason.salary = newSalary;
+          await redisClient.set(matchedPlayerKey, JSON.stringify(playerSeason));
+          console.log(`📊 Updated season record salary for ${playerName}: $${newSalary?.toLocaleString() || 'N/A'}`);
+        } else {
+          console.log(`📊 Season salary unchanged for ${playerName}: $${currentSalary?.toLocaleString() || 'N/A'}`);
+        }
+      }
+    }
+
+    return { success: salaryStored, action: existingResult.action, reason: existingResult.reason };
+  } catch (error) {
+    console.error(`❌ Error storing salary for ${playerName}:`, error.message);
+    return { success: false, action: 'error', reason: error.message };
+  }
+}
+
+/**
+ * Collect salary data for all MLB teams
+ */
+async function collectAllSalaryData(year) {
+  console.log(`\n💰 Starting salary collection for ${year} season...`);
+  
+  const teams = [
+    'ARI', 'ATL', 'BAL', 'BOS', 'CHC', 'CWS', 'CIN', 'CLE', 'COL', 'DET',
+    'HOU', 'KC', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY', 'OAK',
+    'PHI', 'PIT', 'SD', 'SF', 'SEA', 'STL', 'TB', 'TEX', 'TOR', 'WAS'
+  ];
+  
+  let totalPlayers = 0;
+  let totalSalary = 0;
+  let salaryStats = { created: 0, updated: 0, skipped: 0 };
+  
+  for (let i = 0; i < teams.length; i++) {
+    const team = teams[i];
+    console.log(`\n📊 Processing team ${i + 1}/${teams.length}: ${team}`);
+    
+    try {
+      const players = await scrapeTeamPayrollFromSpotrac(team, year);
+      let teamStored = 0;
+      
+      for (const player of players) {
+        const result = await storeSalaryData(player.name, team, year, player);
+        if (result.success) {
+          totalPlayers++;
+          totalSalary += player.salary;
+          teamStored++;
+          
+          // Track action statistics
+          if (result.action === 'create') salaryStats.created++;
+          else if (result.action === 'update') salaryStats.updated++;
+        } else if (result.action === 'skip') {
+          salaryStats.skipped++;
+        }
+      }
+      
+      console.log(`✅ ${team}: ${teamStored}/${players.length} players stored`);
+      
+      // Brief delay between teams to be respectful to the server
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+    } catch (error) {
+      console.error(`❌ Failed to process ${team}:`, error.message);
+    }
+  }
+  
+  console.log(`\n💰 Salary collection complete!`);
+  console.log(`📊 Players stored: ${totalPlayers}`);
+  console.log(`💲 Total salary: $${totalSalary.toLocaleString()}`);
+  console.log(`📈 Actions: ${salaryStats.created} created, ${salaryStats.updated} updated, ${salaryStats.skipped} skipped`);
+  
+  return { totalPlayers, totalSalary, salaryStats };
 }
 
 // ============================================================================
@@ -352,6 +684,7 @@ async function processGamesInParallel(games, batchSize = 16) {
   console.log(`🚀 REDIS POWERHOUSE: Processing ${games.length} games with ${maxConcurrency} parallel workers (Redis optimized)`);
   
   const results = [];
+  const failedGames = []; // Track games that fail to store for final reporting
   
   for (let i = 0; i < games.length; i += maxConcurrency) {
     const batch = games.slice(i, i + maxConcurrency);
@@ -361,12 +694,87 @@ async function processGamesInParallel(games, batchSize = 16) {
     const batchPromises = batch.map(game => processGame(game));
     const batchResults = await Promise.all(batchPromises);
     
+    // Debug: Show what games are being filtered out
+    const nullResults = batchResults.filter(result => !result);
+    if (nullResults.length > 0) {
+      console.log(`⚠️  Batch ${Math.floor(i/maxConcurrency) + 1}: ${nullResults.length} games returned null/falsy results and will be skipped`);
+    }
+    
     // 🚀 Store all games in parallel too - Redis pipelines make this blazing fast
     const storePromises = batchResults
       .filter(gameResult => gameResult)
       .map(gameResult => storeGameData(gameResult, gameResult.season || '2025'));
     
-    await Promise.all(storePromises);
+    console.log(`📦 Batch ${Math.floor(i/maxConcurrency) + 1}: Processing ${batchResults.length} games, storing ${storePromises.length}`);
+    
+    try {
+      // Enhanced batch storage with detailed tracking
+      const storageResults = await Promise.all(storePromises);
+      
+      // Analyze storage results
+      const successfulStores = storageResults.filter(result => result.success);
+      const failedStores = storageResults.filter(result => !result.success);
+      
+      const totalRecordsStored = successfulStores.reduce((sum, result) => sum + result.recordsStored, 0);
+      
+      console.log(`✅ Batch ${Math.floor(i/maxConcurrency) + 1}: ${successfulStores.length}/${storageResults.length} games stored successfully`);
+      console.log(`📊 Batch ${Math.floor(i/maxConcurrency) + 1}: ${totalRecordsStored} total records stored`);
+      
+      // 📊 Increment full game count only for successfully stored games
+      successfulStores.forEach(() => dynamicBaselines.incrementFullGameCount());
+      
+      if (failedStores.length > 0) {
+        console.error(`❌ Batch ${Math.floor(i/maxConcurrency) + 1}: ${failedStores.length} games failed to store`);
+        failedStores.forEach((result, idx) => {
+          const gameResult = batchResults.filter(g => g)[successfulStores.length + idx];
+          console.error(`  ❌ Game ${gameResult?.gameId || 'unknown'}: ${result.error}`);
+        });
+        
+        // Track failed games for final reporting
+        failedGames.push(...failedStores.map((result, idx) => {
+          const gameResult = batchResults.filter(g => g)[successfulStores.length + idx];
+          return {
+            gameId: gameResult?.gameId || 'unknown',
+            date: gameResult?.date || 'unknown',
+            error: result.error
+          };
+        }));
+      }
+      
+    } catch (error) {
+      console.error(`❌ Storage batch failed catastrophically:`, error.message);
+      console.log(`🔄 Attempting individual game storage as final fallback...`);
+      
+      // Ultimate fallback: Try storing games one by one
+      let successCount = 0;
+      const validGameResults = batchResults.filter(g => g);
+      
+      for (let j = 0; j < validGameResults.length; j++) {
+        try {
+          const result = await storeGameData(validGameResults[j], validGameResults[j].season || '2025');
+          if (result.success) {
+            successCount++;
+            console.log(`✅ Individual fallback: Stored game ${validGameResults[j].gameId} (${result.recordsStored} records)`);
+          } else {
+            console.error(`❌ Individual fallback failed: Game ${validGameResults[j].gameId} - ${result.error}`);
+            failedGames.push({
+              gameId: validGameResults[j].gameId,
+              date: validGameResults[j].date,
+              error: result.error
+            });
+          }
+        } catch (individualError) {
+          console.error(`❌ Individual fallback CRITICAL failure: Game ${validGameResults[j].gameId} - ${individualError.message}`);
+          failedGames.push({
+            gameId: validGameResults[j].gameId,
+            date: validGameResults[j].date,
+            error: individualError.message
+          });
+        }
+      }
+      
+      console.log(`⚠️  Ultimate fallback results: ${successCount}/${validGameResults.length} games stored`);
+    }
     
     // Store all valid results
     for (const gameResult of batchResults) {
@@ -379,6 +787,20 @@ async function processGamesInParallel(games, batchSize = 16) {
     if (i + maxConcurrency < games.length) {
       await new Promise(resolve => setTimeout(resolve, 200));
     }
+  }
+  
+  // 📊 Final Failed Games Report
+  if (failedGames.length > 0) {
+    console.error(`\n❌ STORAGE FAILURES SUMMARY:`);
+    console.error(`   Total failed games: ${failedGames.length}`);
+    console.error(`   This explains the missing games discrepancy!`);
+    console.error(`\n📋 Failed Games Details:`);
+    failedGames.forEach(failed => {
+      console.error(`   ❌ Game ${failed.gameId} (${failed.date}): ${failed.error}`);
+    });
+    console.error(`\n💡 Recommendation: Check Redis connection stability and memory limits`);
+  } else {
+    console.log(`\n✅ All games stored successfully - no storage failures detected!`);
   }
   
   return results;
@@ -760,33 +1182,51 @@ function estimatePlayerSalary(stats, war) {
 }
 
 /**
- * Calculate CVR (Cycle Value Rating)
+ * Calculate CVR (Cost-Value Ratio) with real salary data
+ * CVR = WAR-Adjusted Performance Value / Salary Cost (higher = better value)
  */
-function calculatePlayerCVR(stats, war) {
-  const valueScore = calculatePlayerValueScore(stats);
-  if (valueScore <= 0) return null;
+function calculatePlayerCVR(stats, war, realSalary = null) {
+  // Use real salary if available, otherwise estimate
+  let salary = realSalary;
+  if (!salary || salary <= 0) {
+    salary = estimatePlayerSalary(stats, war);
+    console.log(`💡 Using estimated salary for CVR: $${salary.toLocaleString()}`);
+  } else {
+    console.log(`💰 Using real salary for CVR: $${salary.toLocaleString()}`);
+  }
   
-  // Estimate salary for CVR calculation
-  const estimatedSalary = estimatePlayerSalary(stats, war);
-  const salaryTier = getSalaryTier(estimatedSalary);
+  // Base performance value from traditional stats (0-100)
+  const baseValueScore = calculatePlayerValueScore(stats);
+  if (baseValueScore <= 0) return null;
   
-  // Apply WAR multiplier
-  let warMultiplier = 1.0;
-  if (war >= 6) warMultiplier = 1.8;
-  else if (war >= 4) warMultiplier = 1.5;
-  else if (war >= 2.5) warMultiplier = 1.3;
-  else if (war >= 1.5) warMultiplier = 1.15;
-  else if (war >= 0.5) warMultiplier = 1.0;
-  else if (war >= -0.5) warMultiplier = 0.9;
-  else if (war >= -1.5) warMultiplier = 0.75;
-  else warMultiplier = 0.5;
+  // WAR is the primary driver of value - weight it heavily
+  let warValue = 0;
+  if (war >= 8) warValue = 200; // Legendary MVP season
+  else if (war >= 6) warValue = 160; // Elite MVP candidate
+  else if (war >= 4) warValue = 120; // All-Star level
+  else if (war >= 2) warValue = 80;  // Above average starter
+  else if (war >= 1) warValue = 50;  // Average starter
+  else if (war >= 0) warValue = 25;  // Below average
+  else if (war >= -1) warValue = 10; // Replacement level
+  else warValue = 5; // Negative value player
   
-  const adjustedValueScore = valueScore * warMultiplier;
+  // Combine base stats and WAR value (WAR weighted more heavily)
+  const totalValue = (baseValueScore * 0.3) + (warValue * 0.7);
   
-  // Calculate CVR (0-2 scale where 1.0 = average)
-  const normalizedValueScore = adjustedValueScore / 50;
-  const normalizedSalaryTier = salaryTier / 1.0;
-  const cvr = normalizedValueScore / normalizedSalaryTier;
+  // Normalize salary to millions for easier calculation
+  const salaryInMillions = salary / 1000000;
+  
+  // CVR formula: Value per million dollars spent
+  // Apply penalty for replacement-level players even at minimum salary
+  let adjustedValue = totalValue;
+  if (war < 0) {
+    // Negative WAR players get heavily penalized regardless of salary
+    adjustedValue = totalValue * Math.max(0.1, 1 + war); // Reduce value proportionally to negative WAR
+  }
+  
+  const cvr = adjustedValue / salaryInMillions;
+  
+  console.log(`📊 CVR calculation: baseValue=${baseValueScore}, warValue=${warValue}, totalValue=${totalValue.toFixed(1)}, adjustedValue=${adjustedValue.toFixed(1)}, salary=$${salary.toLocaleString()}, cvr=${cvr.toFixed(3)}`);
   
   return Math.round(cvr * 100) / 100; // Round to 2 decimal places
 }
@@ -1410,6 +1850,56 @@ function aggregateCountingStats(gamesStats, statType) {
 // ============================================================================
 
 /**
+ * Check if a key exists and handle data protection logic
+ * @param {string} key - Redis key to check
+ * @param {Object} newData - New data to potentially store
+ * @param {string} gameId - Game ID for logging
+ * @returns {Promise<{shouldStore: boolean, action: string, reason: string}>}
+ */
+async function checkKeyExistence(key, newData, gameId) {
+  try {
+    const exists = await redisClient.exists(key);
+    if (!exists) {
+      return { shouldStore: true, action: 'create', reason: 'Key does not exist' };
+    }
+    
+    // Key exists - check if this is a duplicate game or different data
+    const existingData = await redisClient.get(key);
+    if (!existingData) {
+      return { shouldStore: true, action: 'create', reason: 'Key exists but has no data' };
+    }
+    
+    try {
+      const existing = JSON.parse(existingData);
+      
+      // If it's the same game (same gameId in existing data), allow overwrite
+      if (existing.gameInfo && existing.gameInfo.gameId === gameId) {
+        return { shouldStore: true, action: 'update', reason: 'Same game - refreshing data' };
+      }
+      
+      // Different game data exists - this suggests a key collision or doubleheader issue
+      console.log(`⚠️  Key collision detected: ${key}`);
+      console.log(`   Existing game: ${existing.gameInfo?.gameId || 'unknown'}`);
+      console.log(`   New game: ${gameId}`);
+      
+      return { 
+        shouldStore: false, 
+        action: 'skip', 
+        reason: `Key collision: existing game ${existing.gameInfo?.gameId || 'unknown'} vs new game ${gameId}` 
+      };
+      
+    } catch (parseError) {
+      console.log(`⚠️  Key ${key} has invalid JSON data, will overwrite`);
+      return { shouldStore: true, action: 'fix', reason: 'Corrupted data - overwriting' };
+    }
+    
+  } catch (error) {
+    console.error(`❌ Error checking key existence for ${key}:`, error.message);
+    return { shouldStore: true, action: 'fallback', reason: 'Error checking existence - proceeding with store' };
+  }
+}
+
+/**
  * Process a single game and extract all player/team data
  */
 async function processGame(gameData) {
@@ -1529,6 +2019,7 @@ async function storeGameData(gameData, season) {
     // 🚀 REDIS POWERHOUSE: Use pipeline for ALL operations in this game
     const pipeline = redisClient.pipeline();
     const seasonUpdatePromises = [];
+    const gameStorageKeys = []; // Track what we're trying to store for fallback
     
     // Batch all player game data writes
     for (const player of players) {
@@ -1541,40 +2032,150 @@ async function storeGameData(gameData, season) {
         continue; // Skip players with no meaningful stats
       }
       
-      const playerGameKey = `player:${team}-${playerName}-${season}:${date}`;
+      // Create unique keys that include gamePk for doubleheader support
+      const playerGameKey = `player:${team}-${playerName}-${season}:${date}-${gameId}`;
       const playerSeasonKey = `player:${team}-${playerName}-${season}:season`;
       
-      // Add to pipeline instead of individual writes
-      pipeline.set(playerGameKey, JSON.stringify(stats));
+      // Check if key exists before storing
+      const existenceCheck = await checkKeyExistence(playerGameKey, stats, gameId);
       
-      // Queue season update (these need to be sequential due to aggregation logic)
-      seasonUpdatePromises.push(() => updatePlayerSeasonStats(playerSeasonKey, stats, team, playerName, season));
+      if (existenceCheck.shouldStore) {
+        // Add to pipeline with existence check result
+        pipeline.set(playerGameKey, JSON.stringify(stats));
+        gameStorageKeys.push({ 
+          key: playerGameKey, 
+          data: stats, 
+          type: 'player', 
+          team, 
+          player: playerName,
+          action: existenceCheck.action,
+          reason: existenceCheck.reason
+        });
+        
+        // Queue season update (these need to be sequential due to aggregation logic)
+        seasonUpdatePromises.push(() => updatePlayerSeasonStats(playerSeasonKey, stats, team, playerName, season));
+      } else {
+        console.log(`⏭️  Skipping player ${playerName} (${team}): ${existenceCheck.reason}`);
+      }
     }
 
     // Batch all team game data writes
     for (const [team, stats] of Object.entries(teamStats)) {
-      const teamGameKey = `team:${team}:${season}:${date}`;
+      // Create unique keys that include gamePk for doubleheader support
+      const teamGameKey = `team:${team}:${season}:${date}-${gameId}`;
       const teamSeasonKey = `team:${team}:${season}:season`;
       
-      // Add to pipeline instead of individual writes
-      pipeline.set(teamGameKey, JSON.stringify(stats));
+      // Check if key exists before storing
+      const existenceCheck = await checkKeyExistence(teamGameKey, stats, gameId);
       
-      // Queue team season update
-      seasonUpdatePromises.push(() => updateTeamSeasonStats(teamSeasonKey, stats, team));
+      if (existenceCheck.shouldStore) {
+        // Add to pipeline with existence check result
+        pipeline.set(teamGameKey, JSON.stringify(stats));
+        gameStorageKeys.push({ 
+          key: teamGameKey, 
+          data: stats, 
+          type: 'team', 
+          team,
+          action: existenceCheck.action,
+          reason: existenceCheck.reason
+        });
+        
+        // Queue team season update
+        seasonUpdatePromises.push(() => updateTeamSeasonStats(teamSeasonKey, stats, team));
+      } else {
+        console.log(`⏭️  Skipping team ${team}: ${existenceCheck.reason}`);
+      }
     }
 
-    // 🚀 Execute all game data writes in one atomic operation with retry logic
-    await executeRedisOperation(() => pipeline.exec());
+    console.log(`📦 Game ${gameId}: Attempting to store ${gameStorageKeys.length} records via pipeline...`);
     
-    // 🚀 Process season updates in parallel (they don't depend on each other within a game)
-    await Promise.all(seasonUpdatePromises.map(updateFn => updateFn()));
+    // Summary of actions taken
+    const actionSummary = gameStorageKeys.reduce((acc, key) => {
+      acc[key.action] = (acc[key.action] || 0) + 1;
+      return acc;
+    }, {});
+    console.log(`📋 Actions: ${Object.entries(actionSummary).map(([action, count]) => `${action}=${count}`).join(', ')}`);
 
-    // 📊 Increment full game count for baseline tracking (one complete MLB game processed)
-    dynamicBaselines.incrementFullGameCount();
+    // 🚀 Execute all game data writes in one atomic operation with enhanced error handling
+    let pipelineSuccess = false;
+    try {
+      const results = await executeRedisOperation(() => pipeline.exec());
+      
+      // Verify pipeline results
+      const failedOperations = results.filter(([err, result]) => err !== null);
+      if (failedOperations.length > 0) {
+        console.warn(`⚠️  Game ${gameId}: ${failedOperations.length} pipeline operations failed`);
+        throw new Error(`Pipeline partial failure: ${failedOperations.length} operations failed`);
+      }
+      
+      console.log(`✅ Game ${gameId}: Pipeline successful - ${gameStorageKeys.length} records stored`);
+      pipelineSuccess = true;
+      
+    } catch (pipelineError) {
+      console.error(`❌ Game ${gameId}: Pipeline failed - ${pipelineError.message}`);
+      console.log(`🔄 Game ${gameId}: Attempting individual fallback storage...`);
+      
+      // 🚨 FALLBACK: Store each record individually with retry logic
+      let fallbackSuccessCount = 0;
+      let fallbackFailureCount = 0;
+      
+      for (const item of gameStorageKeys) {
+        try {
+          await executeRedisOperation(
+            () => redisClient.set(item.key, JSON.stringify(item.data)),
+            5 // More retries for individual operations
+          );
+          fallbackSuccessCount++;
+          console.log(`✅ Fallback: Stored ${item.type} ${item.team}${item.player ? `-${item.player}` : ''}`);
+        } catch (individualError) {
+          fallbackFailureCount++;
+          console.error(`❌ Fallback FAILED: ${item.key} - ${individualError.message}`);
+          
+          // Log the failed record for manual recovery
+          const failedRecord = {
+            gameId,
+            date,
+            key: item.key,
+            type: item.type,
+            team: item.team,
+            player: item.player || null,
+            error: individualError.message,
+            timestamp: new Date().toISOString()
+          };
+          console.error(`💾 FAILED RECORD: ${JSON.stringify(failedRecord)}`);
+        }
+      }
+      
+      if (fallbackSuccessCount > 0) {
+        console.log(`🔄 Game ${gameId}: Fallback stored ${fallbackSuccessCount}/${gameStorageKeys.length} records`);
+        pipelineSuccess = fallbackSuccessCount === gameStorageKeys.length;
+      }
+      
+      if (fallbackFailureCount > 0) {
+        console.error(`❌ Game ${gameId}: ${fallbackFailureCount} records permanently failed to store`);
+      }
+    }
+    
+    // Only proceed with season updates if we successfully stored the game data
+    if (pipelineSuccess) {
+      // 🚀 Process season updates in parallel (they don't depend on each other within a game)
+      try {
+        await Promise.all(seasonUpdatePromises.map(updateFn => updateFn()));
+        console.log(`📊 Game ${gameId}: Season stats updated successfully`);
+      } catch (seasonError) {
+        console.error(`⚠️  Game ${gameId}: Season update failed but game data was stored - ${seasonError.message}`);
+        // Don't throw here - game data is safe even if season aggregation fails
+      }
+
+      return { success: true, recordsStored: gameStorageKeys.length };
+    } else {
+      console.error(`❌ Game ${gameId}: Critical storage failure - game will be missing from Redis`);
+      return { success: false, recordsStored: 0, error: 'Storage pipeline and fallback both failed' };
+    }
 
   } catch (error) {
-    console.error(`❌ Error storing game ${gameId}:`, error.message);
-    throw error;
+    console.error(`❌ Fatal error storing game ${gameId}:`, error.message);
+    return { success: false, recordsStored: 0, error: error.message };
   }
 }
 
@@ -1763,8 +2364,9 @@ async function updatePlayerSeasonStats(playerSeasonKey, gameStats, team, playerN
       console.log(`🔄 Two-way player ${playerName} - Pitcher: ${pitcherWAR}, Hitter: ${hitterWAR}, Combined: ${war}`);
     }
     
-    // Calculate CVR
-    const cvr = calculatePlayerCVR(seasonStats, war);
+    // Calculate CVR with real salary data if available
+    const realSalary = seasonStats.salary || null;
+    const cvr = calculatePlayerCVR(seasonStats, war, realSalary);
     
     // Add advanced metrics to season stats
     seasonStats.war = Math.round(war * 10) / 10; // Round to 1 decimal
@@ -1773,7 +2375,7 @@ async function updatePlayerSeasonStats(playerSeasonKey, gameStats, team, playerN
     // Add performance grades
     seasonStats.performance = {
       warGrade: war >= 6 ? 'Elite' : war >= 4 ? 'Star' : war >= 2.5 ? 'Very Good' : war >= 1.5 ? 'Above Average' : war >= 0.5 ? 'Average' : war >= 0 ? 'Below Average' : 'Poor',
-      cvrGrade: cvr >= 1.8 ? 'Elite Value' : cvr >= 1.5 ? 'Excellent Value' : cvr >= 1.2 ? 'Good Value' : cvr >= 0.8 ? 'Fair Value' : cvr >= 0.5 ? 'Below Average' : 'Poor Value',
+      cvrGrade: cvr >= 8 ? 'Elite Value' : cvr >= 5 ? 'Excellent Value' : cvr >= 3 ? 'Good Value' : cvr >= 2 ? 'Fair Value' : cvr >= 1 ? 'Below Average' : 'Poor Value',
       estimatedSalary: estimatePlayerSalary(seasonStats, war)
     };
     
@@ -2034,9 +2636,9 @@ async function aggregateSeasonStats(season) {
   console.log(`📊 Aggregating season statistics for ${season}...`);
 
   try {
-    // Get all player game keys
-    const playerGameKeys = await redisClient.keys(`player:*-${season}:????-??-??`);
-    const teamGameKeys = await redisClient.keys(`team:*:${season}:????-??-??`);
+    // Get all player game keys (now includes gamePk for doubleheader support)
+    const playerGameKeys = await redisClient.keys(`player:*-${season}:????-??-??-*`);
+    const teamGameKeys = await redisClient.keys(`team:*:${season}:????-??-??-*`);
 
     console.log(`📈 Found ${playerGameKeys.length} player games and ${teamGameKeys.length} team games`);
 
@@ -2239,6 +2841,18 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
   if (!redisHealthy) {
     throw new Error('Redis connection failed - cannot proceed with data processing');
   }
+
+  // 💰 COLLECT SALARY DATA FIRST for accurate CVR calculations
+  console.log(`\n🚀 Starting comprehensive MLB data processing for ${season}...`);
+  console.log('💰 Step 1: Collecting current salary data for enhanced CVR calculations...');
+  
+  try {
+    await collectAllSalaryData(season);
+    console.log('✅ Salary data collection complete - CVR calculations will use real salary data!');
+  } catch (error) {
+    console.warn('⚠️  Salary data collection failed, CVR will use estimated salaries:', error.message);
+    console.log('📊 Continuing with boxscore processing...');
+  }
   
   const MLB_API_BASE = 'https://statsapi.mlb.com/api/v1';
   
@@ -2270,6 +2884,22 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
     });
     
     console.log(`📊 Found ${allGames.length} total games, ${completedGames.length} completed regular season games to process`);
+    
+    // Debug: Check for doubleheaders (multiple games on same date)
+    const gamesByDate = {};
+    completedGames.forEach(game => {
+      const date = game.officialDate || game.gameDate?.split('T')[0] || 'unknown';
+      if (!gamesByDate[date]) gamesByDate[date] = [];
+      gamesByDate[date].push(game.gamePk);
+    });
+    
+    const doubleHeaders = Object.entries(gamesByDate).filter(([date, games]) => games.length > 1);
+    if (doubleHeaders.length > 0) {
+      console.log(`🔥 DOUBLEHEADERS DETECTED: ${doubleHeaders.length} dates with multiple games:`);
+      doubleHeaders.forEach(([date, games]) => {
+        console.log(`   📅 ${date}: Games ${games.join(', ')} (${games.length} games)`);
+      });
+    }
     
     // Debug: Show breakdown of game statuses and types
     const statusBreakdown = {};
@@ -2304,17 +2934,44 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 if (require.main === module) {
   const season = process.argv[2] || '2025';
   // Full MLB season: Opening Day (late March) through current date (or full season)
-  const startDate = process.argv[3] || '2025-03-27';  // Opening Day 2025
-  const endDate = process.argv[4] || '2025-04-08';    // Current date (adjust to completed games)
+  const startDate = process.argv[3] || '2025-03-17';  // Opening Day 2025
+  const endDate = process.argv[4] || '2025-08-18';    // Current date (adjust to completed games)
   
   console.log(`🏁 Starting MLB data pull for ${season} season`);
   console.log(`📅 Date range: ${startDate} to ${endDate}`);
   console.log(`🔧 This will pull the ENTIRE MLB regular season data (excluding spring training)...`);
   
   pullBoxscoresToRedis(season, startDate, endDate)
-    .then(() => {
-      console.log('\n� Successfully completed data processing!');
+    .then(async () => {
+      console.log('\n🎯 Successfully completed data processing!');
       console.log('📊 Enhanced WAR calculations with dynamic baselines are now available');
+      console.log('💰 Enhanced CVR calculations with real salary data are now available');
+      
+      // 🔍 VERIFICATION: Count what actually made it to Redis
+      console.log('\n🔍 Verifying stored data...');
+      const teamKeys = await redisClient.keys('team:*:2025:*');
+      const playerKeys = await redisClient.keys('player:*-2025:*');
+      const salaryKeys = await redisClient.keys('salary:*-2025');
+      const teamGames = teamKeys.filter(k => !k.endsWith(':season')).length;
+      const playerGames = playerKeys.filter(k => !k.endsWith(':season')).length;
+      
+      console.log(`📊 Final counts in Redis:`);
+      console.log(`   Team game records: ${teamGames}`);  
+      console.log(`   Player game records: ${playerGames}`);
+      console.log(`   Salary records: ${salaryKeys.length}`);
+      console.log(`   Expected team games: ${dynamicBaselines.fullGamesProcessed * 2} (2 teams per game)`);
+      
+      if (teamGames !== dynamicBaselines.fullGamesProcessed * 2) {
+        console.log(`⚠️  DISCREPANCY: Missing ${(dynamicBaselines.fullGamesProcessed * 2) - teamGames} team game records`);
+      } else {
+        console.log('✅ All team game records stored successfully!');
+      }
+      
+      if (salaryKeys.length > 0) {
+        console.log('✅ Salary data integrated - CVR calculations will use real salaries!');
+      } else {
+        console.log('⚠️  No salary data found - CVR calculations will use estimates');
+      }
       
       // Graceful Redis shutdown
       redisClient.disconnect();

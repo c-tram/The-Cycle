@@ -101,7 +101,7 @@ router.get('/players/:team/:name/:year/vs/:opponent/games', async (req, res) => 
     const { limit = 10 } = req.query;
     const formattedName = name.replace(/\s+/g, '_');
     
-    const pattern = `player-vs-team:${team.toUpperCase()}-${formattedName}-${year}:vs:${opponent.toUpperCase()}:????-??-??`;
+    const pattern = `player-vs-team:${team.toUpperCase()}-${formattedName}-${year}:vs:${opponent.toUpperCase()}:????-??-??-*`;
     const keys = await getKeysByPattern(pattern);
     
     // Sort by date (newest first) and limit
@@ -141,7 +141,7 @@ router.get('/teams/:team/vs/:opponent/games', async (req, res) => {
     const { team, opponent } = req.params;
     const { year = '2025', limit = 10 } = req.query;
     
-    const pattern = `team-vs-team:${team.toUpperCase()}:vs:${opponent.toUpperCase()}:????-??-??`;
+    const pattern = `team-vs-team:${team.toUpperCase()}:vs:${opponent.toUpperCase()}:????-??-??-*`;
     const keys = await getKeysByPattern(pattern);
     
     // Sort by date (newest first) and limit

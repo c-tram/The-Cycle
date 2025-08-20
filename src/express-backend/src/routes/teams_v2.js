@@ -303,7 +303,7 @@ router.get('/:teamId/schedule', async (req, res) => {
     const { teamId } = req.params;
     const { year = '2025', month, limit = 50 } = req.query;
     
-    let pattern = `team:${teamId.toUpperCase()}:${year}:????-??-??`;
+    let pattern = `team:${teamId.toUpperCase()}:${year}:????-??-??-*`;
     
     // If month specified, filter by month
     if (month) {
@@ -372,7 +372,7 @@ router.get('/:teamId/splits', async (req, res) => {
     const { year = '2025', splitType = 'all' } = req.query;
     
     // Get all team games
-    const gameKeys = await getKeysByPattern(`team:${teamId.toUpperCase()}:${year}:????-??-??`);
+    const gameKeys = await getKeysByPattern(`team:${teamId.toUpperCase()}:${year}:????-??-??-*`);
     const gameData = await getMultipleKeys(gameKeys);
     
     if (gameData.length === 0) {

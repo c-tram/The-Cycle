@@ -233,7 +233,7 @@ const TeamDetail = () => {
       try {
         const scheduleData = await teamsApi.getTeamSchedule(teamId, { 
           year: year || '2025', 
-          limit: 15 
+          limit: 200 // Show all games (162 regular season + playoffs/spring training)
         });
         console.log('Schedule response:', scheduleData);
         setGameLog(scheduleData.games || []);
@@ -381,7 +381,7 @@ const TeamDetail = () => {
             />
             <Tab
               icon={<Timeline />}
-              label="Recent Games"
+              label="Game Log"
               iconPosition="start"
             />
             <Tab
@@ -1110,10 +1110,10 @@ const GameLogTab = ({ gameLog, teamId }) => {
       <Card elevation={0}>
         <CardContent sx={{ p: 3, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary">
-            No recent games available
+            No games available
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            Game data will appear here once the season begins
+            Game data will appear here once games are played
           </Typography>
         </CardContent>
       </Card>
@@ -1124,7 +1124,7 @@ const GameLogTab = ({ gameLog, teamId }) => {
     <Card elevation={0}>
       <CardContent sx={{ p: 3 }}>
         <Typography variant="h6" fontWeight={700} sx={{ mb: 3 }}>
-          Recent Games ({gameLog.length})
+          Game Log ({gameLog.length})
         </Typography>
         
         <TableContainer>

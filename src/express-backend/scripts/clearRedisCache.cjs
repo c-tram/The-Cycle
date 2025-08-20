@@ -24,8 +24,21 @@ async function clearRedisCache() {
     redisClient.disconnect();
     return;
   }
-  await redisClient.del(...keys);
-  console.log(`Deleted ${keys.length} keys from Redis cache.`);
+  
+  console.log(`Found ${keys.length} keys to delete. Processing in batches...`);
+  
+  // Delete keys in batches to avoid call stack overflow
+  const batchSize = 1000;
+  let deletedCount = 0;
+  
+  for (let i = 0; i < keys.length; i += batchSize) {
+    const batch = keys.slice(i, i + batchSize);
+    await redisClient.del(batch);
+    deletedCount += batch.length;
+    console.log(`Deleted batch ${Math.floor(i/batchSize) + 1}: ${deletedCount}/${keys.length} keys`);
+  }
+  
+  console.log(`✅ Successfully deleted ${deletedCount} keys from Redis cache.`);
   redisClient.disconnect();
 }
 

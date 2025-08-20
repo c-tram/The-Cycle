@@ -97,9 +97,9 @@ router.get('/', async (req, res) => {
     
     let pattern;
     if (team) {
-      pattern = `player:${team.toUpperCase()}-*-${year}:${useCustomDateRange ? '????-??-??' : 'season'}`;
+      pattern = `player:${team.toUpperCase()}-*-${year}:${useCustomDateRange ? '????-??-??-*' : 'season'}`;
     } else {
-      pattern = `player:*-${year}:${useCustomDateRange ? '????-??-??' : 'season'}`;
+      pattern = `player:*-${year}:${useCustomDateRange ? '????-??-??-*' : 'season'}`;
     }
     
     const keys = await getKeysByPattern(pattern);
@@ -440,12 +440,13 @@ router.get('/:playerId', async (req, res) => {
     
     // Include game log if requested
     if (includeGameLog === 'true') {
-      const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??`);
+      const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??-*`);
       const gameData = await getMultipleKeys(gameKeys);
       
       response.gameLog = gameData
         .map(game => {
-          const date = game.key.split(':').pop();
+          const keyPart = game.key.split(':').pop();
+          const date = keyPart.split('-').slice(0, 3).join('-'); // Extract YYYY-MM-DD from YYYY-MM-DD-gameId
           return {
             date,
             stats: {
@@ -474,7 +475,7 @@ router.get('/:playerId/splits', async (req, res) => {
     const { year = '2025', splitType = 'all' } = req.query;
     
     // Get all games for the player
-    const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??`);
+    const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??-*`);
     const gameData = await getMultipleKeys(gameKeys);
     
     if (gameData.length === 0) {
@@ -508,19 +509,19 @@ router.get('/:playerId/trends', async (req, res) => {
     const { playerId } = req.params;
     const { year = '2025', period = '30' } = req.query;
     
-    const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??`);
+    const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??-*`);
     const gameData = await getMultipleKeys(gameKeys);
     
     if (gameData.length === 0) {
       return res.status(404).json({ error: 'No game data found for player' });
     }
     
-    // Sort games by date
+    // Sort games by date (extract date from new key format with gameId)
     const sortedGames = gameData
-      .filter(game => game.key.match(/\d{4}-\d{2}-\d{2}$/))
+      .filter(game => game.key.match(/\d{4}-\d{2}-\d{2}-\d+$/))
       .sort((a, b) => {
-        const dateA = a.key.split(':').pop();
-        const dateB = b.key.split(':').pop();
+        const dateA = a.key.split(':').pop().split('-').slice(0, 3).join('-');
+        const dateB = b.key.split(':').pop().split('-').slice(0, 3).join('-');
         return dateA.localeCompare(dateB);
       });
     
@@ -582,7 +583,7 @@ router.post('/compare', async (req, res) => {
         
         // Add advanced metrics if requested
         if (metrics === 'advanced') {
-          const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??`);
+          const gameKeys = await getKeysByPattern(`player:${playerId}:????-??-??-*`);
           const gameData = await getMultipleKeys(gameKeys);
           playerComparison.advanced = calculateAdvancedMetrics(seasonStats, gameData);
         }

@@ -35,8 +35,8 @@ router.get('/summary', async (req, res) => {
     ] = await Promise.all([
       getKeysByPattern(`player:*-${year}:season`),
       getKeysByPattern(`team:*:${year}:season`),
-      getKeysByPattern(`player:*-${year}:????-??-??`),
-      getKeysByPattern(`team:*:${year}:????-??-??`)
+      getKeysByPattern(`player:*-${year}:????-??-??-*`),
+      getKeysByPattern(`team:*:${year}:????-??-??-*`)
     ]);
     
     // Calculate unique dates and actual games
@@ -220,7 +220,7 @@ router.get('/advanced/:playerId', async (req, res) => {
     }
     
     // Get game-by-game data for trends
-    const gameKeys = await getKeysByPattern(`player:${playerId}-${year}:????-??-??`);
+    const gameKeys = await getKeysByPattern(`player:${playerId}-${year}:????-??-??-*`);
     const gameData = await getMultipleKeys(gameKeys);
     
     // Calculate advanced metrics
@@ -248,7 +248,7 @@ router.get('/splits/:playerId', async (req, res) => {
     const { year = '2025', splitType = 'all' } = req.query;
     
     // Get all games for the player
-    const gameKeys = await getKeysByPattern(`player:${playerId}-${year}:????-??-??`);
+    const gameKeys = await getKeysByPattern(`player:${playerId}-${year}:????-??-??-*`);
     const gameData = await getMultipleKeys(gameKeys);
     
     if (gameData.length === 0) {
@@ -289,7 +289,7 @@ router.post('/compare/advanced', async (req, res) => {
       
       if (seasonStats) {
         // Get game data for advanced calculations
-        const gameKeys = await getKeysByPattern(`player:${playerId}-${year}:????-??-??`);
+        const gameKeys = await getKeysByPattern(`player:${playerId}-${year}:????-??-??-*`);
         const gameData = await getMultipleKeys(gameKeys);
         
         comparisons.push({
