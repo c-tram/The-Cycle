@@ -83,13 +83,59 @@ class SplitTracker {
         walks: 0, strikeouts: 0, hitByPitch: 0,
         sacrificeFlies: 0, sacrificeHits: 0, stolenBases: 0,
         groundedIntoDoublePlay: 0,
-        avg: 0, obp: 0, slg: 0, ops: 0
+        avg: 0, obp: 0, slg: 0, ops: 0,
+        
+        // COUNT-BASED ANALYTICS
+        countSituations: {
+          '0-0': { pa: 0, hits: 0, avg: 0 },
+          '1-0': { pa: 0, hits: 0, avg: 0 },
+          '0-1': { pa: 0, hits: 0, avg: 0 },
+          '1-1': { pa: 0, hits: 0, avg: 0 },
+          '2-0': { pa: 0, hits: 0, avg: 0 },
+          '0-2': { pa: 0, hits: 0, avg: 0 },
+          '2-1': { pa: 0, hits: 0, avg: 0 },
+          '1-2': { pa: 0, hits: 0, avg: 0 },
+          '3-0': { pa: 0, hits: 0, avg: 0 },
+          '2-2': { pa: 0, hits: 0, avg: 0 },
+          '3-1': { pa: 0, hits: 0, avg: 0 },
+          '3-2': { pa: 0, hits: 0, avg: 0 }
+        },
+        twoStrikeSituations: { pa: 0, hits: 0, avg: 0, strikeouts: 0 },
+        hittersCountSituations: { pa: 0, hits: 0, avg: 0 }, // 1-0, 2-0, 2-1, 3-0, 3-1
+        pitchersCountSituations: { pa: 0, hits: 0, avg: 0 }, // 0-1, 0-2, 1-2
+        fullCountSituations: { pa: 0, hits: 0, avg: 0 },
+        firstPitchResults: { swings: 0, takes: 0, strikes: 0, balls: 0, hits: 0 }
       },
       pitching: {
         inningsPitched: 0, hits: 0, runs: 0, earnedRuns: 0,
         walks: 0, strikeouts: 0, homeRuns: 0, 
         battersFaced: 0, hitBatsmen: 0, outs: 0,
-        era: 0, whip: 0, strikeoutRate: 0, walkRate: 0
+        era: 0, whip: 0, strikeoutRate: 0, walkRate: 0,
+        
+        // PITCH-LEVEL ANALYTICS
+        pitchData: {
+          totalPitches: 0,
+          strikes: 0,
+          balls: 0,
+          strikePercentage: 0,
+          ballPercentage: 0,
+          firstPitchStrikes: 0,
+          firstPitchStrikePercentage: 0,
+          swingAndMiss: 0,
+          swingAndMissPercentage: 0,
+          foulBalls: 0,
+          foulBallPercentage: 0,
+          contactRate: 0
+        },
+        
+        // COUNT-BASED PITCHING
+        countResults: {
+          aheadInCount: { batters: 0, strikeouts: 0, walks: 0 }, // 0-1, 0-2, 1-2
+          behindInCount: { batters: 0, strikeouts: 0, walks: 0 }, // 1-0, 2-0, 2-1, 3-0, 3-1
+          evenCount: { batters: 0, strikeouts: 0, walks: 0 }, // 0-0, 1-1, 2-2
+          fullCount: { batters: 0, strikeouts: 0, walks: 0 },
+          twoStrikeCount: { batters: 0, strikeouts: 0, hits: 0 }
+        }
       }
     };
   }
@@ -98,17 +144,24 @@ class SplitTracker {
     // Core statistical engine - converts play-by-play outcomes to baseball statistics
     if (!outcome || !playData) return;
 
-    const { result, about, matchup } = playData;
+    const { result, about, matchup, count, playEvents } = playData;
     const { event, eventType, rbi = 0, awayScore = 0, homeScore = 0 } = result;
     
-    // Determine if this is a batting or pitching context based on the split type
-    // For now, we'll update both batting and pitching stats as applicable
+    // Extract count information and pitch sequence data
+    const finalCount = count || { balls: 0, strikes: 0 };
+    const pitchSequence = playEvents || [];
     
     // BATTING STATISTICS UPDATES
-    this.updateBattingStats(stats.batting, result, about, matchup);
+    this.updateBattingStats(stats.batting, result, about, matchup, finalCount, pitchSequence);
     
     // PITCHING STATISTICS UPDATES  
-    this.updatePitchingStats(stats.pitching, result, about, matchup);
+    this.updatePitchingStats(stats.pitching, result, about, matchup, finalCount, pitchSequence);
+    
+    // COUNT-BASED UPDATES
+    this.updateCountBasedStats(stats, result, finalCount, pitchSequence, matchup);
+    
+    // PITCH-LEVEL UPDATES
+    this.updatePitchLevelStats(stats, pitchSequence, result);
     
     // Calculate derived statistics
     this.calculateDerivedStats(stats);
@@ -117,7 +170,7 @@ class SplitTracker {
   /**
    * Update batting statistics based on play outcome
    */
-  updateBattingStats(batting, result, about, matchup) {
+  updateBattingStats(batting, result, about, matchup, finalCount, pitchSequence) {
     const { event, eventType, rbi = 0 } = result;
     
     // Plate appearance tracking
@@ -200,7 +253,7 @@ class SplitTracker {
   /**
    * Update pitching statistics based on play outcome
    */
-  updatePitchingStats(pitching, result, about, matchup) {
+  updatePitchingStats(pitching, result, about, matchup, finalCount, pitchSequence) {
     const { event, eventType, rbi = 0 } = result;
     
     // Batter faced tracking
@@ -269,6 +322,11 @@ class SplitTracker {
       batting.ops = parseFloat((batting.obp + batting.slg).toFixed(3));
     }
     
+    // Calculate count-based batting averages
+    this.calculateCountAverages(batting.countSituations);
+    this.calculateCountAverages([batting.twoStrikeSituations, batting.hittersCountSituations, 
+                                batting.pitchersCountSituations, batting.fullCountSituations]);
+    
     // Pitching rates  
     if (pitching.inningsPitched > 0) {
       pitching.era = parseFloat(((pitching.earnedRuns * 9) / pitching.inningsPitched).toFixed(2));
@@ -278,6 +336,186 @@ class SplitTracker {
     if (pitching.battersFaced > 0) {
       pitching.strikeoutRate = parseFloat((pitching.strikeouts / pitching.battersFaced).toFixed(3));
       pitching.walkRate = parseFloat((pitching.walks / pitching.battersFaced).toFixed(3));
+    }
+    
+    // Calculate pitch-level percentages
+    this.calculatePitchPercentages(pitching.pitchData);
+  }
+
+  /**
+   * Calculate averages for count situations
+   */
+  calculateCountAverages(countData) {
+    if (Array.isArray(countData)) {
+      // Handle array of count objects
+      countData.forEach(situation => {
+        if (situation.pa > 0) {
+          situation.avg = parseFloat((situation.hits / situation.pa).toFixed(3));
+        }
+      });
+    } else {
+      // Handle count situations object
+      Object.values(countData).forEach(situation => {
+        if (situation.pa > 0) {
+          situation.avg = parseFloat((situation.hits / situation.pa).toFixed(3));
+        }
+      });
+    }
+  }
+
+  /**
+   * Calculate pitch-level percentages
+   */
+  calculatePitchPercentages(pitchData) {
+    if (pitchData.totalPitches > 0) {
+      pitchData.strikePercentage = parseFloat((pitchData.strikes / pitchData.totalPitches * 100).toFixed(1));
+      pitchData.ballPercentage = parseFloat((pitchData.balls / pitchData.totalPitches * 100).toFixed(1));
+      
+      if (pitchData.foulBalls > 0) {
+        pitchData.foulBallPercentage = parseFloat((pitchData.foulBalls / pitchData.totalPitches * 100).toFixed(1));
+      }
+      
+      if (pitchData.swingAndMiss > 0) {
+        pitchData.swingAndMissPercentage = parseFloat((pitchData.swingAndMiss / pitchData.totalPitches * 100).toFixed(1));
+      }
+    }
+    
+    // First pitch strike percentage
+    const firstPitchAttempts = pitchData.firstPitchStrikes + (pitchData.totalPitches > 0 ? 1 : 0);
+    if (firstPitchAttempts > 0) {
+      pitchData.firstPitchStrikePercentage = parseFloat((pitchData.firstPitchStrikes / firstPitchAttempts * 100).toFixed(1));
+    }
+  }
+
+  /**
+   * Update count-based statistics for both batting and pitching
+   */
+  updateCountBasedStats(stats, result, finalCount, pitchSequence, matchup) {
+    const { batting, pitching } = stats;
+    const { event } = result;
+    const countKey = `${finalCount.balls}-${finalCount.strikes}`;
+    
+    // BATTING COUNT UPDATES
+    if (batting.countSituations[countKey]) {
+      batting.countSituations[countKey].pa++;
+      if (this.isHit(event)) {
+        batting.countSituations[countKey].hits++;
+      }
+    }
+    
+    // Two-strike situations
+    if (finalCount.strikes >= 2) {
+      batting.twoStrikeSituations.pa++;
+      if (this.isHit(event)) batting.twoStrikeSituations.hits++;
+      if (this.isStrikeout(event)) batting.twoStrikeSituations.strikeouts++;
+    }
+    
+    // Hitter's count vs Pitcher's count
+    if (this.isHittersCount(finalCount)) {
+      batting.hittersCountSituations.pa++;
+      if (this.isHit(event)) batting.hittersCountSituations.hits++;
+    } else if (this.isPitchersCount(finalCount)) {
+      batting.pitchersCountSituations.pa++;
+      if (this.isHit(event)) batting.pitchersCountSituations.hits++;
+    }
+    
+    // Full count
+    if (finalCount.balls === 3 && finalCount.strikes === 2) {
+      batting.fullCountSituations.pa++;
+      if (this.isHit(event)) batting.fullCountSituations.hits++;
+    }
+    
+    // PITCHING COUNT UPDATES
+    if (this.isAheadInCount(finalCount)) {
+      pitching.countResults.aheadInCount.batters++;
+      if (this.isStrikeout(event)) pitching.countResults.aheadInCount.strikeouts++;
+      if (this.isWalk(event)) pitching.countResults.aheadInCount.walks++;
+    } else if (this.isBehindInCount(finalCount)) {
+      pitching.countResults.behindInCount.batters++;
+      if (this.isStrikeout(event)) pitching.countResults.behindInCount.strikeouts++;
+      if (this.isWalk(event)) pitching.countResults.behindInCount.walks++;
+    } else {
+      pitching.countResults.evenCount.batters++;
+      if (this.isStrikeout(event)) pitching.countResults.evenCount.strikeouts++;
+      if (this.isWalk(event)) pitching.countResults.evenCount.walks++;
+    }
+  }
+
+  /**
+   * Update pitch-level statistics from pitch sequence
+   */
+  updatePitchLevelStats(stats, pitchSequence, result) {
+    const { pitching } = stats;
+    const { batting } = stats;
+    
+    if (!pitchSequence || pitchSequence.length === 0) return;
+    
+    let pitchCount = 0;
+    let strikes = 0;
+    let balls = 0;
+    let foulBalls = 0;
+    let swingAndMiss = 0;
+    let firstPitchStrike = false;
+    
+    pitchSequence.forEach((pitch, index) => {
+      if (pitch.details && pitch.details.type) {
+        pitchCount++;
+        
+        const pitchType = pitch.details.type.code;
+        const pitchResult = pitch.details.description || '';
+        
+        // First pitch tracking
+        if (index === 0) {
+          if (pitchResult.toLowerCase().includes('strike') || 
+              pitchResult.toLowerCase().includes('called strike') ||
+              pitchResult.toLowerCase().includes('swinging strike')) {
+            firstPitchStrike = true;
+            batting.firstPitchResults.strikes++;
+          } else if (pitchResult.toLowerCase().includes('ball')) {
+            batting.firstPitchResults.balls++;
+          }
+          
+          if (pitchResult.toLowerCase().includes('swing')) {
+            batting.firstPitchResults.swings++;
+          } else {
+            batting.firstPitchResults.takes++;
+          }
+          
+          if (this.isHit(result.event) && index === pitchSequence.length - 1) {
+            batting.firstPitchResults.hits++;
+          }
+        }
+        
+        // Strike/Ball classification
+        if (pitchResult.toLowerCase().includes('strike') || 
+            pitchResult.toLowerCase().includes('foul') ||
+            this.isHit(result.event)) {
+          strikes++;
+        } else if (pitchResult.toLowerCase().includes('ball')) {
+          balls++;
+        }
+        
+        // Foul balls
+        if (pitchResult.toLowerCase().includes('foul')) {
+          foulBalls++;
+        }
+        
+        // Swinging strikes/misses
+        if (pitchResult.toLowerCase().includes('swinging strike')) {
+          swingAndMiss++;
+        }
+      }
+    });
+    
+    // Update pitching data
+    pitching.pitchData.totalPitches += pitchCount;
+    pitching.pitchData.strikes += strikes;
+    pitching.pitchData.balls += balls;
+    pitching.pitchData.foulBalls += foulBalls;
+    pitching.pitchData.swingAndMiss += swingAndMiss;
+    
+    if (firstPitchStrike) {
+      pitching.pitchData.firstPitchStrikes++;
     }
   }
 
@@ -353,6 +591,47 @@ class SplitTracker {
     // For now, assume home runs result in batter scoring
     return result.event.toLowerCase().includes('home run');
   }
+
+  // ============================================================================
+  // COUNT ANALYSIS HELPERS
+  // ============================================================================
+
+  /**
+   * Determine if count favors the hitter
+   */
+  isHittersCount(count) {
+    const { balls, strikes } = count;
+    // Hitter's counts: 1-0, 2-0, 2-1, 3-0, 3-1
+    return (balls > strikes) || 
+           (balls === 2 && strikes === 1) || 
+           (balls === 3 && strikes <= 1);
+  }
+
+  /**
+   * Determine if count favors the pitcher  
+   */
+  isPitchersCount(count) {
+    const { balls, strikes } = count;
+    // Pitcher's counts: 0-1, 0-2, 1-2
+    return (strikes > balls) || 
+           (balls === 1 && strikes === 2);
+  }
+
+  /**
+   * Determine if pitcher is ahead in count
+   */
+  isAheadInCount(count) {
+    const { balls, strikes } = count;
+    return strikes > balls;
+  }
+
+  /**
+   * Determine if pitcher is behind in count
+   */
+  isBehindInCount(count) {
+    const { balls, strikes } = count;
+    return balls > strikes;
+  }
 }
 
 // ============================================================================
@@ -407,7 +686,7 @@ async function processGameSplits(gameId, playByPlayData, gameDate, homeTeam, awa
  * Process a single play to extract all possible splits
  */
 async function processIndividualPlay(splitTracker, gameId, play, gameDate, homeTeam, awayTeam) {
-  const { result, about, matchup, playEvents } = play;
+  const { result, about, matchup, count, playEvents } = play;
   
   if (!matchup || !matchup.batter || !matchup.pitcher) {
     return; // Skip plays without complete matchup data
@@ -424,6 +703,10 @@ async function processIndividualPlay(splitTracker, gameId, play, gameDate, homeT
   // Determine handedness
   const batterHand = matchup.batSide?.code || 'U'; // Unknown if not provided
   const pitcherHand = matchup.pitchHand?.code || 'U';
+  
+  // Count information
+  const finalCount = count || { balls: 0, strikes: 0 };
+  const countString = `${finalCount.balls}-${finalCount.strikes}`;
 
   // 1. HOME/AWAY SPLITS
   const homeAwayContext = battingTeam === homeTeam ? 'home' : 'away';
