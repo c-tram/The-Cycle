@@ -18,7 +18,7 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Fix: Normalize game dates to America/Chicago (CST/CDT) in ingestion; add startLocal/officialDate fields and update frontend rendering to avoid UTC off-by-one. - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Major: Fix CVR calculations with WAR-weighted system, add doubleheader game support with unique Redis keys, restore player detail pages with updated API routes, implement comprehensive data integrity checks - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."
