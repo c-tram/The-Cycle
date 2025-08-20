@@ -51,6 +51,7 @@ const Navigation = ({
       '/teams': 'Teams',
       '/standings': 'Standings',
       '/leaders': 'Statistical Leaders',
+      '/splits': 'Statistical Splits',
       '/analytics': 'Advanced Analytics',
       '/compare': 'Compare',
       '/settings': 'Settings'

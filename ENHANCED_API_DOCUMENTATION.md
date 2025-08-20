@@ -2,11 +2,378 @@
 ## Professional Baseball Statistics API
 
 ### Overview
-The enhanced v2 API provides comprehensive baseball statistics with professional-grade calculations, advanced metrics, and detailed analytics. All endpoints support the complete statistical structure implemented in `pullBoxscoresToRedis_v2.cjs`.
+The enhanced v2 API provides comprehensive baseball statistics with professional-grade calculations, advanced metrics, detailed analytics, and **exhaustive situational splits analysis**. All endpoints support the complete statistical structure implemented in `pullBoxscoresToRedis_v2.cjs` and the new `pullPlayByPlaySplits.cjs` for comprehensive splits data.
+
+**Mission**: Testing every possible baseball statistic that is imaginable with complete linkage between boxscores and situational performance.
 
 ### Base URL Structure
 - **v1 (Legacy)**: `/api/{endpoint}` - Basic statistics with limited calculations
 - **v2 (Enhanced)**: `/api/v2/{endpoint}` - Professional-grade statistics with advanced metrics
+- **v2 Splits**: `/api/v2/splits/{category}` - **NEW** Situational analytics with play-by-play granularity
+
+---
+
+## 🆕 SPLITS ANALYSIS API (/api/v2/splits)
+
+### Comprehensive Split Categories
+The splits system extracts 7+ major categories of situational performance from MLB play-by-play data:
+
+#### **1. Home/Away Performance** - `/api/v2/splits/home-away`
+Player performance based on home vs away games
+```
+Redis Key Pattern: split:home-away:TEAM-PLAYER_NAME-YEAR:home|away
+Example: split:home-away:HOU-Jose_Altuve-2025:home
+```
+
+#### **2. Venue-Specific Performance** - `/api/v2/splits/venue`
+Player performance at specific ballparks with home/away context
+```
+Redis Key Pattern: split:venue:TEAM-PLAYER_NAME-YEAR:vs:VENUE_NAME:home|away
+Example: split:venue:NYY-Aaron_Judge-2025:vs:Yankee_Stadium:home
+```
+
+#### **3. Player vs Team Matchups** - `/api/v2/splits/player-team`
+Player performance against specific opposing teams
+```
+Redis Key Pattern: split:player-team:TEAM-PLAYER_NAME-YEAR:vs:OPPONENT:home|away
+Example: split:player-team:LAD-Mookie_Betts-2025:vs:SF:away
+```
+
+#### **4. Batter vs Pitcher Matchups** - `/api/v2/splits/batter-pitcher`
+Individual head-to-head performance with complete game linkage
+```
+Redis Key Pattern: split:batter-pitcher:BATTER_TEAM-BATTER_NAME-YEAR:vs:PITCHER_TEAM-PITCHER_NAME:home|away
+Example: split:batter-pitcher:NYY-Aaron_Judge-2025:vs:HOU-Justin_Verlander:away
+```
+
+#### **5. Handedness Splits (Batting)** - `/api/v2/splits/batter-handedness`
+Batter performance vs left/right-handed pitching
+```
+Redis Key Pattern: split:batter-hand:TEAM-PLAYER_NAME-YEAR:vs:L|R:home|away
+Example: split:batter-hand:BOS-Rafael_Devers-2025:vs:L:home
+```
+
+#### **6. Handedness Splits (Pitching)** - `/api/v2/splits/pitcher-handedness`
+Pitcher performance vs left/right-handed batters
+```
+Redis Key Pattern: split:pitcher-hand:TEAM-PLAYER_NAME-YEAR:vs:L|R:home|away
+Example: split:pitcher-hand:NYY-Gerrit_Cole-2025:vs:R:home
+```
+
+#### **7. Team vs Team Matchups** - `/api/v2/splits/team-matchup`
+Organizational performance in head-to-head series
+```
+Redis Key Pattern: split:team-matchup:TEAM_A:vs:TEAM_B:YEAR:home|away
+Example: split:team-matchup:NYY:vs:BOS:2025:home
+```
+
+#### **8. Game-Specific Linkage** - `/api/v2/splits/game-specific`
+Direct connections between splits and individual game boxscores
+```
+Redis Key Pattern: split-game:GAMEID-DATE:batter-pitcher:BATTER_NAME:vs:PITCHER_NAME
+Example: split-game:776685-2025-08-19:batter-pitcher:Jose_Altuve:vs:Tarik_Skubal
+```
+
+### Splits Data Structure
+Each split contains comprehensive statistical data with game linkage:
+```json
+{
+  "stats": {
+    "batting": {
+      "plateAppearances": 125,
+      "atBats": 112,
+      "hits": 32,
+      "runs": 18,
+      "rbi": 22,
+      "homeRuns": 8,
+      "doubles": 6,
+      "triples": 1,
+      "singles": 17,
+      "walks": 11,
+      "strikeouts": 28,
+      "hitByPitch": 2,
+      "sacrificeFlies": 1,
+      "sacrificeHits": 0,
+      "stolenBases": 4,
+      "groundedIntoDoublePlay": 3,
+      "avg": 0.286,
+      "obp": 0.344,
+      "slg": 0.518,
+      "ops": 0.862
+    },
+    "pitching": {
+      "inningsPitched": 45.2,
+      "hits": 38,
+      "runs": 16,
+      "earnedRuns": 14,
+      "walks": 12,
+      "strikeouts": 52,
+      "homeRuns": 4,
+      "battersFaced": 189,
+      "hitBatsmen": 2,
+      "outs": 137,
+      "era": 2.76,
+      "whip": 1.10,
+      "strikeoutRate": 0.275,
+      "walkRate": 0.063
+    }
+  },
+  "games": [776685, 776123, 775892],
+  "lastUpdated": "2025-08-20T14:04:02.921Z",
+  "playCount": 125
+}
+```
+
+### Game Linkage System
+**Bidirectional Relationship**: Every split links to specific games, every game links to all splits
+```json
+{
+  "gameId": 776685,
+  "splitTypes": [
+    "split:home-away:HOU-Jose_Altuve-2025:away",
+    "split:venue:HOU-Jose_Altuve-2025:vs:Comerica_Park:away", 
+    "split:batter-pitcher:HOU-Jose_Altuve-2025:vs:DET-Tarik_Skubal:away",
+    "split:batter-hand:HOU-Jose_Altuve-2025:vs:L:away"
+  ],
+  "processed": "2025-08-20T14:04:02.923Z"
+}
+```
+
+---
+
+## 🏗️ COMPLETE REDIS ARCHITECTURE
+
+### Key Patterns Overview
+The Cycle uses a comprehensive Redis key architecture supporting traditional boxscores, advanced statistics, and exhaustive splits analysis:
+
+#### **Boxscore Keys (Existing)**
+```bash
+# Player Performance
+player:TEAM-PLAYER_NAME-YEAR:DATE-GAMEID     # Individual game stats with doubleheader support
+player:TEAM-PLAYER_NAME-YEAR:season          # Season aggregations with 40+ statistical categories
+
+# Team Performance  
+team:TEAM:YEAR:DATE-GAMEID                   # Team game stats with doubleheader support
+team:TEAM:YEAR:season                        # Team season aggregations
+
+# Salary Data
+salary:TEAM-PLAYER_NAME-YEAR                 # Player salary information (1,740+ records)
+
+# Legacy Matchups
+player-vs-team:TEAM-PLAYER_NAME-YEAR:vs:OPPONENT:average  # Basic matchup averages
+```
+
+#### **Splits Keys (NEW - Comprehensive Situational Analysis)**
+```bash
+# HOME/AWAY PERFORMANCE
+split:home-away:TEAM-PLAYER_NAME-YEAR:home
+split:home-away:TEAM-PLAYER_NAME-YEAR:away
+
+# VENUE-SPECIFIC PERFORMANCE  
+split:venue:TEAM-PLAYER_NAME-YEAR:vs:VENUE_NAME:home
+split:venue:TEAM-PLAYER_NAME-YEAR:vs:VENUE_NAME:away
+split:venue:TEAM-PLAYER_NAME-YEAR:vs:VENUE_NAME:total
+
+# PLAYER vs TEAM MATCHUPS (Enhanced)
+split:player-team:TEAM-PLAYER_NAME-YEAR:vs:OPPONENT:home  
+split:player-team:TEAM-PLAYER_NAME-YEAR:vs:OPPONENT:away
+split:player-team:TEAM-PLAYER_NAME-YEAR:vs:OPPONENT:total
+
+# BATTER vs PITCHER HEAD-TO-HEAD
+split:batter-pitcher:BATTER_TEAM-BATTER_NAME-YEAR:vs:PITCHER_TEAM-PITCHER_NAME:home
+split:batter-pitcher:BATTER_TEAM-BATTER_NAME-YEAR:vs:PITCHER_TEAM-PITCHER_NAME:away  
+split:batter-pitcher:BATTER_TEAM-BATTER_NAME-YEAR:vs:PITCHER_TEAM-PITCHER_NAME:total
+
+# HANDEDNESS SPLITS
+split:batter-hand:TEAM-PLAYER_NAME-YEAR:vs:L:home        # vs Left-handed pitching  
+split:batter-hand:TEAM-PLAYER_NAME-YEAR:vs:R:away        # vs Right-handed pitching
+split:pitcher-hand:TEAM-PLAYER_NAME-YEAR:vs:L:home       # vs Left-handed batters
+split:pitcher-hand:TEAM-PLAYER_NAME-YEAR:vs:R:away       # vs Right-handed batters
+
+# TEAM vs TEAM ORGANIZATIONAL MATCHUPS
+split:team-matchup:TEAM_A:vs:TEAM_B:YEAR:home
+split:team-matchup:TEAM_A:vs:TEAM_B:YEAR:away
+split:team-matchup:TEAM_A:vs:TEAM_B:YEAR:total
+
+# GAME-SPECIFIC LINKAGE (Boxscore Integration)
+split-game:GAMEID-DATE:batter-pitcher:BATTER_NAME:vs:PITCHER_NAME
+split-game:GAMEID-DATE:player-team:PLAYER_NAME:vs:OPPONENT:home
+split-game:GAMEID-DATE:handedness:PLAYER_NAME:vs:L:away
+```
+
+#### **Indexing Keys (Cross-Reference System)**
+```bash
+# Game to Splits Mapping
+game-splits-index:GAMEID                    # All splits for a specific game
+
+# Player to Splits Mapping  
+player-splits-index:TEAM-PLAYER_NAME-YEAR:GAMEID:available:[split-types]
+
+# Reverse Lookup Support
+boxscore-splits-linkage:TEAM-PLAYER_NAME-YEAR:GAMEID:[linked-splits]
+```
+
+### Key Architecture Benefits
+- **📊 Complete Traceability**: Every split links to specific games and boxscore performance
+- **🔍 Bidirectional Queries**: Find splits from games OR games from splits  
+- **⚡ Efficient Retrieval**: Pattern-based Redis queries for complex analytics
+- **🎯 Exhaustive Coverage**: 200+ split records per game for comprehensive analysis
+- **🔗 Cross-Reference**: Direct connections between situational performance and overall statistics
+
+---
+
+## 🚀 PLANNED SPLITS API ENDPOINTS
+
+### GET /api/v2/splits/home-away/:player
+Get player's home vs away performance splits
+```
+Path Parameters:
+- player (string): Team-Player format (e.g., "HOU-Jose_Altuve")
+
+Query Parameters:
+- year (string, default: "2025"): Season year
+- context (string, default: "both"): "home", "away", or "both"
+- format (string, default: "summary"): "summary", "detailed", or "games"
+
+Response:
+{
+  "player": "Jose Altuve",
+  "team": "HOU", 
+  "year": "2025",
+  "splits": {
+    "home": {
+      "stats": { /* batting/pitching stats */ },
+      "games": [776685, 776123],
+      "gameCount": 62
+    },
+    "away": {
+      "stats": { /* batting/pitching stats */ },
+      "games": [775892, 775654], 
+      "gameCount": 59
+    },
+    "comparison": {
+      "homeAdvantage": 0.045,
+      "significantDifference": true
+    }
+  }
+}
+```
+
+### GET /api/v2/splits/batter-pitcher/:batter/:pitcher
+Get head-to-head batter vs pitcher matchup with complete game history
+```
+Path Parameters:
+- batter (string): Team-Batter format (e.g., "NYY-Aaron_Judge")
+- pitcher (string): Team-Pitcher format (e.g., "HOU-Justin_Verlander")
+
+Query Parameters:
+- year (string, default: "2025"): Season year
+- context (string, default: "all"): "home", "away", or "all"
+- includeGames (boolean, default: false): Include individual game breakdowns
+
+Response:
+{
+  "matchup": {
+    "batter": {"name": "Aaron Judge", "team": "NYY"},
+    "pitcher": {"name": "Justin Verlander", "team": "HOU"}
+  },
+  "year": "2025",
+  "splits": {
+    "overall": {
+      "stats": { /* comprehensive stats */ },
+      "games": [776685, 776123, 775892],
+      "plateAppearances": 27
+    },
+    "home": {
+      "stats": { /* home stats */ },
+      "games": [776685, 776123]
+    },
+    "away": {
+      "stats": { /* away stats */ },
+      "games": [775892]
+    }
+  },
+  "gameDetails": [
+    {
+      "gameId": 776685,
+      "date": "2025-08-19", 
+      "venue": "Yankee Stadium",
+      "atBats": [
+        {"inning": 1, "result": "Single", "rbi": 0},
+        {"inning": 4, "result": "Strikeout", "rbi": 0},
+        {"inning": 7, "result": "Home Run", "rbi": 2}
+      ]
+    }
+  ]
+}
+```
+
+### GET /api/v2/splits/handedness/:player
+Get player's performance vs left/right-handed opponents
+```
+Path Parameters:
+- player (string): Team-Player format
+
+Query Parameters:
+- year (string, default: "2025"): Season year  
+- type (string, default: "batter"): "batter" or "pitcher"
+- context (string, default: "all"): "home", "away", or "all"
+
+Response:
+{
+  "player": "Rafael Devers",
+  "team": "BOS",
+  "type": "batter",
+  "year": "2025", 
+  "splits": {
+    "vsLefty": {
+      "stats": { /* stats vs LHP */ },
+      "gameCount": 45,
+      "plateAppearances": 178
+    },
+    "vsRighty": {
+      "stats": { /* stats vs RHP */ },
+      "gameCount": 119,
+      "plateAppearances": 512
+    },
+    "platoonAdvantage": {
+      "opsVsLefty": 0.892,
+      "opsVsRighty": 0.745,
+      "advantage": 0.147,
+      "significant": true
+    }
+  }
+}
+```
+
+### GET /api/v2/splits/venue/:player/:venue
+Get player's performance at a specific ballpark
+```
+Path Parameters:
+- player (string): Team-Player format
+- venue (string): Stadium/Team name (e.g., "Yankee_Stadium" or "NYY")
+
+Response:
+{
+  "player": "Mookie Betts",
+  "team": "LAD",
+  "venue": "Yankee Stadium",
+  "year": "2025",
+  "splits": {
+    "atVenue": {
+      "stats": { /* performance at this venue */ },
+      "games": [776685, 775892],
+      "gamesPlayed": 6
+    },
+    "comparison": {
+      "venueOPS": 0.987,
+      "careerOPS": 0.845,
+      "venueDifferential": 0.142,
+      "favoriteVenue": true
+    }
+  }
+}
+```
 
 ---
 

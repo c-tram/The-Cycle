@@ -76,6 +76,13 @@ const Sidebar = ({ open, onClose, variant = 'temporary' }) => {
           badge: 'Popular'
         },
         {
+          text: 'Splits',
+          icon: <Analytics />,
+          path: '/splits',
+          description: 'Situational & matchup stats',
+          badge: 'New'
+        },
+        {
           text: 'Advanced Analytics',
           icon: <Analytics />,
           path: '/analytics',

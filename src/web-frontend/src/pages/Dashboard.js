@@ -335,10 +335,10 @@ const Dashboard = () => {
               
               <Grid item xs={12} sm={6} md={3}>
                 <ActionCard
-                  title="Statistical Leaders"
-                  description="TBD"
+                  title="Statistical Splits"
+                  description="Home/Away, Player vs Player, Matchups"
                   icon={<Star />}
-                  onClick={() => navigate('/leaders')}
+                  onClick={() => navigate('/splits')}
                   color={theme.palette.warning.main}
                 />
               </Grid>
@@ -452,11 +452,11 @@ const Dashboard = () => {
                       
                       <Button 
                         endIcon={<ArrowForward />}
-                        onClick={() => navigate('/leaders')}
+                        onClick={() => navigate('/splits')}
                         size="small"
                         variant="outlined"
                       >
-                        View All Leaders
+                        View All Splits
                       </Button>
                     </Box>
                   </Box>

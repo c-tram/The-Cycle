@@ -18,7 +18,7 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Enhance: Add intelligent salary data management - clearRedisCache preserves salary keys, pullBoxscores checks existing salary data before collection, prevents unnecessary API calls and protects valuable salary dataset - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Major: Perfect team abbreviation consistency for MLB Splits system - Dynamic team mapping from boxscore API ensures split keys match existing data format exactly. Enhanced pullPlayByPlaySplits.cjs with clearSplitCache.cjs utility. Ready for API route development. - $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."
