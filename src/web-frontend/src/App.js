@@ -21,7 +21,7 @@ import Teams from './pages/Teams';
 import TeamDetail from './pages/TeamDetail';
 import Standings from './pages/Standings';
 import Leaders from './pages/Leaders';
-import Splits from './pages/Splits';
+import SplitsExplorer from './pages/SplitsExplorer';
 import Analytics from './pages/Analytics';
 import Compare from './pages/Compare';
 import Settings from './pages/Settings';
@@ -157,7 +157,7 @@ function App() {
                     <Route path="/leaders" element={<Leaders />} />
 
                     {/* Statistical splits */}
-                    <Route path="/splits" element={<Splits />} />
+                    <Route path="/splits" element={<SplitsExplorer />} />
 
                     {/* Advanced analytics */}
                     <Route path="/analytics" element={<Analytics />} />

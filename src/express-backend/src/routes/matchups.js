@@ -9,13 +9,13 @@ router.get('/players', async (req, res) => {
     
     let pattern;
     if (team && opponent) {
-      pattern = `player-vs-team:${team.toUpperCase()}-*-${year}:vs:${opponent.toUpperCase()}:average`;
+      pattern = `split:player-team:${team.toUpperCase()}-*-${year}:vs:${opponent.toUpperCase()}:*`;
     } else if (team) {
-      pattern = `player-vs-team:${team.toUpperCase()}-*-${year}:vs:*:average`;
+      pattern = `split:player-team:${team.toUpperCase()}-*-${year}:vs:*`;
     } else if (opponent) {
-      pattern = `player-vs-team:*-${year}:vs:${opponent.toUpperCase()}:average`;
+      pattern = `split:player-team:*-${year}:vs:${opponent.toUpperCase()}:*`;
     } else {
-      pattern = `player-vs-team:*-${year}:vs:*:average`;
+      pattern = `split:player-team:*-${year}:vs:*`;
     }
     
     const keys = await getKeysByPattern(pattern);
@@ -24,10 +24,11 @@ router.get('/players', async (req, res) => {
     
     const formattedMatchups = matchups.map(matchup => {
       const keyParts = matchup.key.split(':');
-      const playerTeamInfo = keyParts[1].split('-');
+      const playerTeamInfo = keyParts[2].split('-'); // Changed from keyParts[1] to keyParts[2]
       const team = playerTeamInfo[0];
       const name = playerTeamInfo.slice(1, -1).join(' ').replace(/_/g, ' ');
-      const opponent = keyParts[3];
+      const opponent = keyParts[4]; // Changed from keyParts[3] to keyParts[4]
+      const homeAway = keyParts[5]; // Added home/away context
       
       return {
         player: {
@@ -36,6 +37,7 @@ router.get('/players', async (req, res) => {
           year: playerTeamInfo[playerTeamInfo.length - 1]
         },
         opponent,
+        homeAway,
         stats: matchup.data
       };
     });
@@ -58,13 +60,13 @@ router.get('/teams', async (req, res) => {
     
     let pattern;
     if (team && opponent) {
-      pattern = `team-vs-team:${team.toUpperCase()}:vs:${opponent.toUpperCase()}:average`;
+      pattern = `split:team-matchup:${team.toUpperCase()}:vs:${opponent.toUpperCase()}:*`;
     } else if (team) {
-      pattern = `team-vs-team:${team.toUpperCase()}:vs:*:average`;
+      pattern = `split:team-matchup:${team.toUpperCase()}:vs:*`;
     } else if (opponent) {
-      pattern = `team-vs-team:*:vs:${opponent.toUpperCase()}:average`;
+      pattern = `split:team-matchup:*:vs:${opponent.toUpperCase()}:*`;
     } else {
-      pattern = `team-vs-team:*:vs:*:average`;
+      pattern = `split:team-matchup:*:vs:*`;
     }
     
     const keys = await getKeysByPattern(pattern);
@@ -75,10 +77,14 @@ router.get('/teams', async (req, res) => {
       const keyParts = matchup.key.split(':');
       const team = keyParts[1];
       const opponent = keyParts[3];
+      const season = keyParts[4];
+      const homeAway = keyParts[5];
       
       return {
         team,
         opponent,
+        season,
+        homeAway,
         stats: matchup.data
       };
     });
@@ -101,7 +107,7 @@ router.get('/players/:team/:name/:year/vs/:opponent/games', async (req, res) => 
     const { limit = 10 } = req.query;
     const formattedName = name.replace(/\s+/g, '_');
     
-    const pattern = `player-vs-team:${team.toUpperCase()}-${formattedName}-${year}:vs:${opponent.toUpperCase()}:????-??-??-*`;
+    const pattern = `split:player-team:${team.toUpperCase()}-${formattedName}-${year}:vs:${opponent.toUpperCase()}:*`;
     const keys = await getKeysByPattern(pattern);
     
     // Sort by date (newest first) and limit
@@ -141,7 +147,7 @@ router.get('/teams/:team/vs/:opponent/games', async (req, res) => {
     const { team, opponent } = req.params;
     const { year = '2025', limit = 10 } = req.query;
     
-    const pattern = `team-vs-team:${team.toUpperCase()}:vs:${opponent.toUpperCase()}:????-??-??-*`;
+    const pattern = `split:team-matchup:${team.toUpperCase()}:vs:${opponent.toUpperCase()}:${year}:*`;
     const keys = await getKeysByPattern(pattern);
     
     // Sort by date (newest first) and limit

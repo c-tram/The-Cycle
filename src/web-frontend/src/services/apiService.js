@@ -362,6 +362,116 @@ export const legacyApi = {
 };
 
 // ============================================================================
+// SPLITS API (v2)
+// ============================================================================
+
+export const splitsApi = {
+  // Search for available splits for a player
+  searchPlayerSplits: async (team, player, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/search/${team}/${playerName}/${season}`);
+    return response.data;
+  },
+
+  // Get home/away splits
+  getHomeAwaySplits: async (team, player, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/home-away/${team}/${playerName}/${season}`);
+    return response.data;
+  },
+
+  // Get vs-teams splits
+  getVsTeamsSplits: async (team, player, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/vs-teams/${team}/${playerName}/${season}`);
+    return response.data;
+  },
+
+  // Get venue splits
+  getVenueSplits: async (team, player, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/venue/${team}/${playerName}/${season}`);
+    return response.data;
+  },
+
+  // Get handedness splits
+  getHandednessSplits: async (team, player, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/handedness/${team}/${playerName}/${season}`);
+    return response.data;
+  },
+
+  // Get count situation splits
+  getCountSplits: async (team, player, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/counts/${team}/${playerName}/${season}`);
+    return response.data;
+  },
+
+  // Get compound count-vs-team splits
+  getCountsVsTeamSplits: async (team, player, opponent, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/counts-vs-team/${team}/${playerName}/${season}/${opponent}`);
+    return response.data;
+  },
+
+  // Get compound count-vs-venue splits
+  getCountsVsVenueSplits: async (team, player, venue, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/counts-vs-venue/${team}/${playerName}/${season}/${venue}`);
+    return response.data;
+  },
+
+  // Get compound count-vs-handedness splits
+  getCountsVsHandednessSplits: async (team, player, handedness, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/counts-vs-handedness/${team}/${playerName}/${season}/${handedness}`);
+    return response.data;
+  },
+
+  // Get compound handedness-vs-team splits
+  getHandednessVsTeamSplits: async (team, player, opponent, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/handedness-vs-team/${team}/${playerName}/${season}/${opponent}`);
+    return response.data;
+  },
+
+  // Get vs-pitcher splits
+  getVsPitcherSplits: async (team, player, opponent, pitcher, season = '2025') => {
+    const playerName = player.replace(/\s+/g, '-');
+    const response = await apiClient.get(`/v2/splits/vs-pitcher/${team}/${playerName}/${season}/${opponent}/${pitcher}`);
+    return response.data;
+  },
+
+  // Get pitcher-vs-batter splits (for pitcher perspective)
+  getPitcherVsBatterSplits: async (team, pitcher, opponent, batter, season = '2025') => {
+    const response = await apiClient.get(`/v2/splits/pitcher-vs-batter/${team}/${pitcher}/${season}/${opponent}/${batter}`);
+    return response.data;
+  },
+
+  // Get unique players for autocomplete from actual split data
+  getAvailablePlayers: async (season = '2025') => {
+    // Use Redis keys to find actual players with split data
+    const response = await apiClient.get(`/v2/splits/players/available-players?season=${season}`);
+    return response.data;
+  },
+
+  // Search all splits for a player
+  searchPlayerSplits: async (team, playerName, season = '2025') => {
+    const response = await apiClient.get(`/v2/splits/search/${team}/${playerName}/${season}`);
+    return response.data;
+  },
+
+  // Get team abbreviations
+  getTeamAbbreviations: async () => {
+    const teams = ['HOU', 'LAD', 'NYY', 'ATL', 'TB', 'CLE', 'SEA', 'TEX', 'MIN', 'KC', 
+                   'CWS', 'DET', 'OAK', 'LAA', 'TOR', 'BAL', 'BOS', 'PHI', 'NYM', 'MIA',
+                   'WSH', 'STL', 'MIL', 'CHC', 'CIN', 'PIT', 'AZ', 'SD', 'SF', 'COL'];
+    return teams;
+  }
+};
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
@@ -482,6 +592,7 @@ export default {
   statsApi,
   playersApi,
   teamsApi,
+  splitsApi,
   legacyApi,
   apiUtils,
   healthCheck

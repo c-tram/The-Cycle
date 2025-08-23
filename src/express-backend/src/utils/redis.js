@@ -1,5 +1,8 @@
 const Redis = require('ioredis');
 
+// Load environment variables
+require('dotenv').config();
+
 // Redis client singleton
 let redisClient = null;
 
@@ -19,10 +22,18 @@ function createRedisClient() {
       host: process.env.REDIS_HOST || '127.0.0.1',
       port: parseInt(process.env.REDIS_PORT) || 6380,
       password: process.env.REDIS_PASSWORD,
-      tls: process.env.REDIS_TLS === 'true' || process.env.NODE_ENV === 'production',
-      retryDelayOnFailover: 100,
-      maxRetriesPerRequest: 3,
-      lazyConnect: true
+      tls: process.env.REDIS_TLS === 'true' ? {
+        servername: process.env.REDIS_HOST,
+        checkServerIdentity: () => undefined // Bypass certificate hostname validation for Azure
+      } : undefined,
+      db: 0,
+      maxRetriesPerRequest: 5,
+      retryDelayOnFailover: 1000,
+      enableReadyCheck: true,
+      connectTimeout: 30000,
+      lazyConnect: true,
+      keepAlive: true,
+      family: 4 // Force IPv4
     };
 
     console.log('🔧 Redis configuration:', {
@@ -35,12 +46,20 @@ function createRedisClient() {
 
     redisClient = new Redis(redisConfig);
 
-    redisClient.on('connect', () => {
-      console.log('✅ Redis connected');
+    // Add comprehensive error handling for Redis connection
+    redisClient.on('error', (error) => {
+      console.error('🔴 Redis connection error:', error.message);
+      if (error.code === 'ECONNRESET' || error.code === 'EPIPE') {
+        console.log('🔄 Connection reset detected, Redis will auto-reconnect...');
+      }
     });
 
-    redisClient.on('error', (err) => {
-      console.error('❌ Redis connection error:', err);
+    redisClient.on('connect', () => {
+      console.log('🟢 Redis connected successfully');
+    });
+
+    redisClient.on('reconnecting', (ms) => {
+      console.log(`🟡 Redis reconnecting in ${ms}ms...`);
     });
   }
   return redisClient;

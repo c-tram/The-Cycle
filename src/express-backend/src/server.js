@@ -35,10 +35,30 @@ app.get('/api/redis-health', async (req, res) => {
   }
 });
 
+// Debug endpoint to check Redis keys
+app.get('/api/redis-debug', async (req, res) => {
+  try {
+    const redisClient = getRedisClient();
+    const summaryKeys = await redisClient.keys('summary:*');
+    const dashboardKey = await redisClient.get('summary:dashboard:2025');
+    
+    res.json({ 
+      summaryKeys,
+      dashboardKeyExists: !!dashboardKey,
+      dashboardKeyData: dashboardKey ? JSON.parse(dashboardKey) : null
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 // Import v2 routes (improved versions)
 const playerRoutesV2 = require('./routes/players_v2');
 const teamRoutesV2 = require('./routes/teams_v2');
 const statsRoutesV2 = require('./routes/stats_v2');
+const splitsRoutesV2 = require('./routes/splits_v2');
+const splitsDiscover = require('./routes/splits_discover');
+const splitsPlayers = require('./routes/splits_players');
 const matchupRoutes = require('./routes/matchups');
 const standingsRoutes = require('./routes/standings');
 
@@ -46,6 +66,9 @@ const standingsRoutes = require('./routes/standings');
 app.use('/api/v2/players', playerRoutesV2);
 app.use('/api/v2/teams', teamRoutesV2);
 app.use('/api/v2/stats', statsRoutesV2);
+app.use('/api/v2/splits', splitsRoutesV2);
+app.use('/api/v2/splits', splitsDiscover);
+app.use('/api/v2/splits/players', splitsPlayers);
 
 // Legacy v1 endpoints redirected to v2 for backward compatibility
 app.use('/api/players', playerRoutesV2);

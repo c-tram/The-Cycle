@@ -22,59 +22,30 @@ function normalizePlayerName(name) {
 // Professional-grade baseball statistics with comprehensive data coverage
 // ============================================================================
 
-// GET /api/stats/summary - Enhanced database summary with detailed metrics
+const { getCachedSummary } = require('../utils/summaryCache');
+
+// GET /api/stats/summary - Enhanced database summary using cached data
 router.get('/summary', async (req, res) => {
   try {
     const { year = '2025' } = req.query;
     
-    const [
-      playerSeasonKeys,
-      teamSeasonKeys,
-      playerGameKeys,
-      teamGameKeys
-    ] = await Promise.all([
-      getKeysByPattern(`player:*-${year}:season`),
-      getKeysByPattern(`team:*:${year}:season`),
-      getKeysByPattern(`player:*-${year}:????-??-??-*`),
-      getKeysByPattern(`team:*:${year}:????-??-??-*`)
-    ]);
+    // Get Redis client
+    const redisClient = getRedisClient();
     
-    // Calculate unique dates and actual games
-    const uniqueDates = new Set();
-    const uniqueGameIds = new Set();
+    // Use cached summary instead of expensive pattern scanning
+    const summary = await getCachedSummary(redisClient, year);
     
-    playerGameKeys.forEach(key => {
-      const date = key.split(':').pop();
-      if (date.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        uniqueDates.add(date);
+    res.json(summary);
+  } catch (err) {
+    console.error('Error fetching cached stats summary:', err);
+    const { year = '2025' } = req.query;
+    res.status(500).json({ 
+      error: 'Failed to fetch stats summary',
+      fallback: {
+        year,
+        summary: { message: 'Data temporarily unavailable' }
       }
     });
-    
-    // Calculate actual games by counting team games (each MLB game has 2 teams)
-    const actualGames = Math.round(teamGameKeys.length / 2);
-    
-    res.json({
-      year,
-      summary: {
-        totalPlayers: playerSeasonKeys.length,
-        totalTeams: teamSeasonKeys.length,
-        totalPlayerGames: playerGameKeys.length,
-        totalTeamGames: teamGameKeys.length,
-        totalGameDates: uniqueDates.size,
-        totalGames: actualGames,
-        averagePlayersPerGame: actualGames > 0 ? Math.round(playerGameKeys.length / actualGames) : 0,
-        averageGamesPerDay: uniqueDates.size > 0 ? Math.round(actualGames / uniqueDates.size) : 0
-      },
-      dataStructure: {
-        playerSeasonStats: playerSeasonKeys.length,
-        teamSeasonStats: teamSeasonKeys.length,
-        gameByGameStats: playerGameKeys.length + teamGameKeys.length
-      },
-      lastUpdated: new Date().toISOString()
-    });
-  } catch (err) {
-    console.error('Error fetching stats summary:', err);
-    res.status(500).json({ error: 'Failed to fetch stats summary' });
   }
 });
 

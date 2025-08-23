@@ -38,6 +38,7 @@ const SPLIT_CATEGORIES = {
   HANDEDNESS_BATTER: 'batter-hand',
   HANDEDNESS_PITCHER: 'pitcher-hand',
   TEAM_MATCHUP: 'team-matchup',
+  COUNT: 'count',
   SITUATIONAL: 'situational' // Bases loaded, late innings, etc.
 };
 
@@ -710,33 +711,94 @@ async function processIndividualPlay(splitTracker, gameId, play, gameDate, homeT
 
   // 1. HOME/AWAY SPLITS
   const homeAwayContext = battingTeam === homeTeam ? 'home' : 'away';
-  const homeAwaySplitKey = `split:home-away:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:${homeAwayContext}`;
+  const homeAwaySplitKey = `split:home-away:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:${homeAwayContext}:${gameId}`;
   splitTracker.addSplitObservation(homeAwaySplitKey, gameId, play, result);
 
   // 2. VENUE SPLITS  
-  const venueSplitKey = `split:venue:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${venue}:${homeAwayContext}`;
+  const venueSplitKey = `split:venue:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${venue}:${homeAwayContext}:${gameId}`;
   splitTracker.addSplitObservation(venueSplitKey, gameId, play, result);
 
+  // 2b. PITCHER VENUE SPLITS (How pitchers perform at different ballparks)
+  const pitcherVenueSplitKey = `split:pitcher-venue:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${venue}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(pitcherVenueSplitKey, gameId, play, result);
+
   // 3. PLAYER vs TEAM SPLITS
-  const playerTeamSplitKey = `split:player-team:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}:${homeAwayContext}`;
+  const playerTeamSplitKey = `split:player-team:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}:${homeAwayContext}:${gameId}`;
   splitTracker.addSplitObservation(playerTeamSplitKey, gameId, play, result);
 
   // 4. BATTER vs PITCHER SPLITS (The key matchup!)
-  const batterPitcherSplitKey = `split:batter-pitcher:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}:${homeAwayContext}`;
+  const batterPitcherSplitKey = `split:batter-pitcher:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}:${homeAwayContext}:${gameId}`;
   splitTracker.addSplitObservation(batterPitcherSplitKey, gameId, play, result);
 
-  // 5. HANDEDNESS SPLITS
-  const batterHandSplitKey = `split:batter-hand:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${pitcherHand}:${homeAwayContext}`;
+  // 4b. PITCHER vs BATTER SPLITS (Reverse perspective!)
+  const pitcherBatterSplitKey = `split:pitcher-batter:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(pitcherBatterSplitKey, gameId, play, result);
+
+  // 5. HANDEDNESS SPLITS (Cumulative across all teams)
+  const batterHandSplitKey = `split:batter-hand:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${pitcherHand}:${homeAwayContext}:${gameId}`;
   splitTracker.addSplitObservation(batterHandSplitKey, gameId, play, result);
 
-  const pitcherHandSplitKey = `split:pitcher-hand:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${batterHand}:${homeAwayContext}`;
+  const pitcherHandSplitKey = `split:pitcher-hand:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${batterHand}:${homeAwayContext}:${gameId}`;
   splitTracker.addSplitObservation(pitcherHandSplitKey, gameId, play, result);
 
+  // 5b. TEAM-SPECIFIC HANDEDNESS SPLITS (New!)
+  // Batter vs specific team's left/right pitching
+  const batterHandVsTeamKey = `split:batter-hand-vs-team:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}:${pitcherHand}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(batterHandVsTeamKey, gameId, play, result);
+
+  // Pitcher vs specific team's left/right batters
+  const pitcherHandVsTeamKey = `split:pitcher-hand-vs-team:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${battingTeam}:${batterHand}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(pitcherHandVsTeamKey, gameId, play, result);
+
   // 6. TEAM MATCHUP SPLITS
-  const teamMatchupSplitKey = `split:team-matchup:${battingTeam}:vs:${fieldingTeam}:2025:${homeAwayContext}`;
+  const teamMatchupSplitKey = `split:team-matchup:${battingTeam}:vs:${fieldingTeam}:2025:${homeAwayContext}:${gameId}`;
   splitTracker.addSplitObservation(teamMatchupSplitKey, gameId, play, result);
 
-  // 7. GAME-SPECIFIC SPLIT TRACKING (For boxscore linkage)
+  // 7. COUNT SITUATION SPLITS (Basic)
+  const countSplitKey = `split:count:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${countString}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(countSplitKey, gameId, play, result);
+
+  // 7b. PITCHER COUNT SITUATION SPLITS (How pitchers perform in different counts)
+  const pitcherCountSplitKey = `split:pitcher-count:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${countString}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(pitcherCountSplitKey, gameId, play, result);
+
+  // 7c. COMPOUND COUNT SPLITS - The Ultimate Granularity!
+  
+  // Count + Team: How does batter perform in specific counts vs specific teams?
+  const countVsTeamKey = `split:count-vs-team:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}:${countString}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(countVsTeamKey, gameId, play, result);
+  
+  // Count + Venue: How does batter perform in specific counts at specific venues?
+  const countVsVenueKey = `split:count-vs-venue:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${venue}:${countString}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(countVsVenueKey, gameId, play, result);
+  
+  // Count + Handedness: How does batter perform in specific counts vs L/R pitchers?
+  const countVsHandKey = `split:count-vs-hand:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${pitcherHand}:${countString}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(countVsHandKey, gameId, play, result);
+  
+  // Count + Specific Pitcher: How does batter perform in specific counts vs specific pitchers?
+  const countVsPitcherKey = `split:count-vs-pitcher:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}:${countString}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(countVsPitcherKey, gameId, play, result);
+  
+  // PITCHER PERSPECTIVE COMPOUND COUNT SPLITS
+  
+  // Pitcher Count + Team: How does pitcher perform in specific counts vs specific teams?
+  const pitcherCountVsTeamKey = `split:pitcher-count-vs-team:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${battingTeam}:${countString}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(pitcherCountVsTeamKey, gameId, play, result);
+  
+  // Pitcher Count + Venue: How does pitcher perform in specific counts at specific venues?
+  const pitcherCountVsVenueKey = `split:pitcher-count-vs-venue:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${venue}:${countString}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(pitcherCountVsVenueKey, gameId, play, result);
+  
+  // Pitcher Count + Handedness: How does pitcher perform in specific counts vs L/R batters?
+  const pitcherCountVsHandKey = `split:pitcher-count-vs-hand:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${batterHand}:${countString}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(pitcherCountVsHandKey, gameId, play, result);
+  
+  // Pitcher Count + Specific Batter: How does pitcher perform in specific counts vs specific batters?
+  const pitcherCountVsBatterKey = `split:pitcher-count-vs-batter:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}:${countString}:${homeAwayContext}:${gameId}`;
+  splitTracker.addSplitObservation(pitcherCountVsBatterKey, gameId, play, result);
+
+  // 8. GAME-SPECIFIC SPLIT TRACKING (For boxscore linkage)
   const gameSpecificKey = `split-game:${gameId}-${gameDate}:batter-pitcher:${batter.fullName.replace(/\s+/g, '_')}:vs:${pitcher.fullName.replace(/\s+/g, '_')}`;
   splitTracker.addSplitObservation(gameSpecificKey, gameId, play, result);
 }
@@ -792,14 +854,14 @@ async function storeSplitsInRedis(splitTracker, gameId) {
  * Extract actual team abbreviations from boxscore API data
  * This ensures perfect consistency with existing boxscore keys
  */
-async function buildTeamAbbreviationMapping() {
+async function buildTeamAbbreviationMapping(season, startDate, endDate) {
   console.log('🔍 Building team abbreviation mapping from actual boxscore data...');
   
   const teamMapping = {};
   
   try {
-    // Get a recent game to find all team IDs and their actual abbreviations
-    const scheduleUrl = `https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameType=R&season=2025&startDate=2025-08-01&endDate=2025-08-01`;
+    // Get games from the actual date range to find all team IDs and their abbreviations
+    const scheduleUrl = `https://statsapi.mlb.com/api/v1/schedule?sportId=1&gameType=R&season=${season}&startDate=${startDate}&endDate=${endDate}`;
     const scheduleResp = await fetch(scheduleUrl);
     const scheduleData = await scheduleResp.json();
     
@@ -808,8 +870,13 @@ async function buildTeamAbbreviationMapping() {
       games.push(...(dateObj.games || []));
     }
     
-    // Process a few games to get team abbreviations from boxscore data
-    for (const game of games.slice(0, 5)) {
+    // Process enough games to get team abbreviations from boxscore data
+    // Need to check more games to ensure all 30 MLB teams are captured
+    const gamesToCheck = Math.min(60, games.length); // Check up to 60 games to ensure all 30 teams are captured
+    console.log(`📊 Checking ${gamesToCheck} games to build comprehensive team mapping...`);
+    
+    for (let i = 0; i < gamesToCheck; i++) {
+      const game = games[i];
       const gameId = game.gamePk;
       
       try {
@@ -843,6 +910,21 @@ async function buildTeamAbbreviationMapping() {
     Object.entries(teamMapping)
       .sort(([,a], [,b]) => a.localeCompare(b))
       .forEach(([id, abbr]) => console.log(`  ${id}: '${abbr}'`));
+    
+    // Verification: Check if we have all 30 MLB teams
+    if (Object.keys(teamMapping).length < 30) {
+      console.log(`⚠️ WARNING: Only ${Object.keys(teamMapping).length} teams found. Adding missing teams from fallback mapping...`);
+      
+      // Add any missing teams from fallback
+      Object.entries(FALLBACK_TEAM_MAPPING).forEach(([id, abbr]) => {
+        if (!teamMapping[id]) {
+          teamMapping[id] = abbr;
+          console.log(`  Added missing team: ${id} → ${abbr}`);
+        }
+      });
+      
+      console.log(`✅ Final team mapping: ${Object.keys(teamMapping).length} teams`);
+    }
     
     return teamMapping;
     
@@ -896,7 +978,7 @@ async function pullPlayByPlaySplits(season, startDate, endDate) {
   try {
     // STEP 1: Build accurate team abbreviation mapping from boxscore data
     console.log('🔧 Step 1: Building team abbreviation mapping...');
-    DYNAMIC_TEAM_MAPPING = await buildTeamAbbreviationMapping();
+    DYNAMIC_TEAM_MAPPING = await buildTeamAbbreviationMapping(season, startDate, endDate);
     console.log('✅ Team mapping complete\n');
 
     // STEP 2: Get the schedule to find games to process
@@ -918,32 +1000,74 @@ async function pullPlayByPlaySplits(season, startDate, endDate) {
 
     // STEP 3: Process each game for splits
     console.log('🎯 Step 3: Processing games for split data...');
+    console.log(`⚡ Using parallel processing with batches for optimal performance\n`);
+    
+    // Process games in parallel batches to optimize performance while respecting API limits
+    const BATCH_SIZE = 10; // Process 10 games simultaneously
+    const BATCH_DELAY = 2000; // 2 second delay between batches
+    
     let processedCount = 0;
-    for (const game of completedGames.slice(0, 5)) { // Start with 5 games for testing
-      const gameId = game.gamePk;
-      const gameDate = game.officialDate || game.gameDate?.split('T')[0];
-      const homeTeam = getTeamAbbreviation(game.teams?.home?.team?.id);
-      const awayTeam = getTeamAbbreviation(game.teams?.away?.team?.id);
-
-      console.log(`\n🎮 Processing Game ${gameId}: ${awayTeam} @ ${homeTeam} (${gameDate})`);
-
-      // Fetch play-by-play data
-      const playByPlayData = await fetchPlayByPlayData(gameId);
+    const totalGames = completedGames.length;
+    
+    for (let i = 0; i < totalGames; i += BATCH_SIZE) {
+      const batch = completedGames.slice(i, i + BATCH_SIZE);
+      const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(totalGames / BATCH_SIZE);
       
-      if (playByPlayData) {
-        // Process splits
-        const splitTracker = await processGameSplits(gameId, playByPlayData, gameDate, homeTeam, awayTeam);
-        
-        // Store in Redis
-        await storeSplitsInRedis(splitTracker, gameId);
-        
-        processedCount++;
-        console.log(`✅ Game ${gameId} processed successfully (${processedCount}/${Math.min(5, completedGames.length)})`);
-        
-        // Brief delay to be respectful to MLB API
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } else {
-        console.log(`⚠️ Skipping game ${gameId} - no play-by-play data available`);
+      console.log(`\n🔥 Processing Batch ${batchNumber}/${totalBatches} (${batch.length} games)`);
+      
+      // Process batch in parallel
+      const batchPromises = batch.map(async (game) => {
+        const gameId = game.gamePk;
+        const gameDate = game.officialDate || game.gameDate?.split('T')[0];
+        const homeTeam = getTeamAbbreviation(game.teams?.home?.team?.id);
+        const awayTeam = getTeamAbbreviation(game.teams?.away?.team?.id);
+
+        try {
+          // Fetch play-by-play data
+          const playByPlayData = await fetchPlayByPlayData(gameId);
+          
+          if (playByPlayData) {
+            // Process splits
+            const splitTracker = await processGameSplits(gameId, playByPlayData, gameDate, homeTeam, awayTeam);
+            
+            // Store in Redis
+            await storeSplitsInRedis(splitTracker, gameId);
+            
+            return { success: true, gameId, awayTeam, homeTeam, gameDate };
+          } else {
+            console.log(`⚠️ Skipping game ${gameId} - no play-by-play data available`);
+            return { success: false, gameId, reason: 'no_data' };
+          }
+        } catch (error) {
+          console.error(`❌ Error processing game ${gameId}:`, error.message);
+          return { success: false, gameId, reason: 'error', error: error.message };
+        }
+      });
+      
+      // Wait for all games in this batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      
+      // Count successful processing
+      const successCount = batchResults.filter(r => r.success).length;
+      processedCount += successCount;
+      
+      // Show batch results
+      console.log(`✅ Batch ${batchNumber} completed: ${successCount}/${batch.length} games processed successfully`);
+      batchResults.forEach(result => {
+        if (result.success) {
+          console.log(`   🎮 ${result.awayTeam} @ ${result.homeTeam} (${result.gameDate}) ✅`);
+        } else {
+          console.log(`   ❌ Game ${result.gameId}: ${result.reason}`);
+        }
+      });
+      
+      console.log(`📊 Progress: ${processedCount}/${totalGames} games processed (${((processedCount/totalGames)*100).toFixed(1)}%)`);
+      
+      // Delay between batches to be respectful to MLB API
+      if (i + BATCH_SIZE < totalGames) {
+        console.log(`⏳ Waiting ${BATCH_DELAY/1000}s before next batch...\n`);
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY));
       }
     }
 
@@ -951,6 +1075,7 @@ async function pullPlayByPlaySplits(season, startDate, endDate) {
     console.log(`📈 Processed ${processedCount} games with comprehensive split data`);
     console.log(`🔗 All splits linked to existing boxscore data for complete analytics`);
     console.log(`🏷️ Team abbreviations perfectly matched to boxscore format`);
+    console.log(`⚡ Parallel processing reduced execution time significantly!`);
 
   } catch (error) {
     console.error('❌ Error in splits collection:', error.message);
@@ -965,12 +1090,23 @@ async function pullPlayByPlaySplits(season, startDate, endDate) {
 if (require.main === module) {
   const args = process.argv.slice(2);
   const season = args[0] || '2025';
-  const startDate = args[1] || '2025-08-01'; 
-  const endDate = args[2] || '2025-08-20';
+  const startDate = args[1] || '2025-03-17'; 
+  const endDate = args[2] || '2025-08-21';
   
   pullPlayByPlaySplits(season, startDate, endDate)
-    .then(() => {
+    .then(async () => {
       console.log('\n✅ Play-by-Play Splits collection completed successfully!');
+      
+      // 🚀 REFRESH DASHBOARD SUMMARY CACHE after splits update
+      console.log('\n🔄 Refreshing dashboard summary cache with new splits data...');
+      try {
+        const { generateAndCacheSummary } = require('../src/utils/summaryCache');
+        await generateAndCacheSummary(redisClient, season);
+        console.log('✅ Dashboard summary cache refreshed with splits analytics!');
+      } catch (summaryError) {
+        console.error('⚠️  Failed to refresh summary cache:', summaryError.message);
+      }
+      
       process.exit(0);
     })
     .catch(err => {

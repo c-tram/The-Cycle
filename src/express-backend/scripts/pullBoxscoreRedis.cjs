@@ -307,25 +307,28 @@ async function storeSalaryData(playerName, team, year, salaryData) {
     const playerKey = `${team}-${playerName.replace(/\s+/g, '_')}-${year}`;
     const salaryKey = `salary:${playerKey}`;
 
-    // Check if salary key already exists
-    const existingResult = await checkKeyExistence(salaryKey, null, {
-      playerName,
-      team,
-      year,
-      salary: salaryData.salary
-    });
-
+    // For salary data, we use simple existence check since it's season-level, not game-level
+    const exists = await redisClient.exists(salaryKey);
+    
     let salaryStored = false;
-    if (existingResult.action === 'create') {
+    if (!exists) {
       await redisClient.set(salaryKey, JSON.stringify(salaryData));
       salaryStored = true;
       console.log(`💰 Created salary record for ${playerName} (${team}): $${salaryData.salary?.toLocaleString() || 'N/A'}`);
-    } else if (existingResult.action === 'update') {
-      await redisClient.set(salaryKey, JSON.stringify(salaryData));
-      salaryStored = true;
-      console.log(`💰 Updated salary record for ${playerName} (${team}): $${salaryData.salary?.toLocaleString() || 'N/A'}`);
     } else {
-      console.log(`💰 Skipped salary for ${playerName} (${team}): ${existingResult.reason}`);
+      // Check if we should update (maybe salary data changed)
+      const existing = await redisClient.get(salaryKey);
+      if (existing) {
+        const existingData = JSON.parse(existing);
+        if (existingData.salary !== salaryData.salary) {
+          await redisClient.set(salaryKey, JSON.stringify(salaryData));
+          salaryStored = true;
+          console.log(`💰 Updated salary record for ${playerName} (${team}): $${salaryData.salary?.toLocaleString() || 'N/A'} (was: $${existingData.salary?.toLocaleString() || 'N/A'})`);
+        } else {
+          console.log(`💰 Salary already exists for ${playerName} (${team}): $${salaryData.salary?.toLocaleString() || 'N/A'}`);
+          return { success: false, action: 'skip', reason: 'Salary already exists and is unchanged' };
+        }
+      }
     }
 
     // Update player season key with salary
@@ -365,7 +368,7 @@ async function storeSalaryData(playerName, team, year, salaryData) {
       }
     }
 
-    return { success: salaryStored, action: existingResult.action, reason: existingResult.reason };
+    return { success: salaryStored, action: salaryStored ? 'stored' : 'skipped', reason: 'Salary processing completed' };
   } catch (error) {
     console.error(`❌ Error storing salary for ${playerName}:`, error.message);
     return { success: false, action: 'error', reason: error.message };
@@ -414,14 +417,30 @@ async function collectAllSalaryData(year) {
     'HOU', 'KC', 'LAA', 'LAD', 'MIA', 'MIL', 'MIN', 'NYM', 'NYY', 'OAK',
     'PHI', 'PIT', 'SD', 'SF', 'SEA', 'STL', 'TB', 'TEX', 'TOR', 'WAS'
   ];
+
+  // First, identify which teams actually need salary data collection
+  const teamsNeedingSalaryData = [];
+  for (const team of teams) {
+    const salaryKeys = await redisClient.keys(`salary:${team}-*-${year}`);
+    if (salaryKeys.length === 0) {
+      teamsNeedingSalaryData.push(team);
+    }
+  }
+
+  if (teamsNeedingSalaryData.length === 0) {
+    console.log('✅ All teams already have salary data - skipping collection');
+    return;
+  }
+
+  console.log(`🎯 Collecting salary data for ${teamsNeedingSalaryData.length} teams that need it: ${teamsNeedingSalaryData.join(', ')}`);
   
   let totalPlayers = 0;
   let totalSalary = 0;
   let salaryStats = { created: 0, updated: 0, skipped: 0 };
   
-  for (let i = 0; i < teams.length; i++) {
-    const team = teams[i];
-    console.log(`\n📊 Processing team ${i + 1}/${teams.length}: ${team}`);
+  for (let i = 0; i < teamsNeedingSalaryData.length; i++) {
+    const team = teamsNeedingSalaryData[i];
+    console.log(`\n📊 Processing team ${i + 1}/${teamsNeedingSalaryData.length}: ${team}`);
     
     try {
       const players = await scrapeTeamPayrollFromSpotrac(team, year);
@@ -1214,7 +1233,8 @@ function estimatePlayerSalary(stats, war) {
 
 /**
  * Calculate CVR (Cost-Value Ratio) with real salary data
- * CVR = WAR-Adjusted Performance Value / Salary Cost (higher = better value)
+ * CVR = (Performance Score / 50) / (Salary Tier / 1.0)
+ * Using the OLD PROVEN METHOD: 0-2 scale where 1.0 = average value
  */
 function calculatePlayerCVR(stats, war, realSalary = null) {
   // Use real salary if available, otherwise estimate
@@ -1228,36 +1248,48 @@ function calculatePlayerCVR(stats, war, realSalary = null) {
   
   // Base performance value from traditional stats (0-100)
   const baseValueScore = calculatePlayerValueScore(stats);
-  if (baseValueScore <= 0) return null;
+  if (baseValueScore <= 0) return 0; // Return 0 instead of null for consistency
   
-  // WAR is the primary driver of value - weight it heavily
-  let warValue = 0;
-  if (war >= 8) warValue = 200; // Legendary MVP season
-  else if (war >= 6) warValue = 160; // Elite MVP candidate
-  else if (war >= 4) warValue = 120; // All-Star level
-  else if (war >= 2) warValue = 80;  // Above average starter
-  else if (war >= 1) warValue = 50;  // Average starter
-  else if (war >= 0) warValue = 25;  // Below average
-  else if (war >= -1) warValue = 10; // Replacement level
-  else warValue = 5; // Negative value player
+  // Apply WAR multiplier to enhance the base score (OLD METHOD)
+  let warMultiplier = 1.0; // Default multiplier
   
-  // Combine base stats and WAR value (WAR weighted more heavily)
-  const totalValue = (baseValueScore * 0.3) + (warValue * 0.7);
-  
-  // Normalize salary to millions for easier calculation
-  const salaryInMillions = salary / 1000000;
-  
-  // CVR formula: Value per million dollars spent
-  // Apply penalty for replacement-level players even at minimum salary
-  let adjustedValue = totalValue;
-  if (war < 0) {
-    // Negative WAR players get heavily penalized regardless of salary
-    adjustedValue = totalValue * Math.max(0.1, 1 + war); // Reduce value proportionally to negative WAR
+  if (war >= 6) {
+    warMultiplier = 1.4; // Elite WAR - significant bonus
+  } else if (war >= 4) {
+    warMultiplier = 1.3; // Excellent WAR
+  } else if (war >= 2) {
+    warMultiplier = 1.2; // Good WAR
+  } else if (war >= 1) {
+    warMultiplier = 1.1; // Above average WAR
+  } else if (war >= 0.5) {
+    warMultiplier = 1.0; // Average WAR
+  } else if (war >= 0) {
+    warMultiplier = 0.9; // Slightly below average
+  } else if (war >= -1.5) {
+    warMultiplier = 0.75; // Poor WAR - big penalty
+  } else {
+    warMultiplier = 0.5; // Terrible WAR - massive penalty
   }
   
-  const cvr = adjustedValue / salaryInMillions;
+  const valueScore = Math.round(baseValueScore * warMultiplier);
   
-  console.log(`📊 CVR calculation: baseValue=${baseValueScore}, warValue=${warValue}, totalValue=${totalValue.toFixed(1)}, adjustedValue=${adjustedValue.toFixed(1)}, salary=$${salary.toLocaleString()}, cvr=${cvr.toFixed(3)}`);
+  // Get salary tier expectations (OLD METHOD)
+  let salaryTier = 1.0; // Default (league average)
+  if (salary >= 35000000) salaryTier = 1.4; // Ultra-mega contracts
+  else if (salary >= 25000000) salaryTier = 1.3; // Superstar contracts
+  else if (salary >= 15000000) salaryTier = 1.2; // Star contracts
+  else if (salary >= 8000000) salaryTier = 1.1;  // Above average
+  else if (salary >= 3000000) salaryTier = 1.0;  // Average MLB salary
+  else if (salary >= 1000000) salaryTier = 0.95; // Below average
+  else salaryTier = 0.9; // Minimum/rookie contracts
+  
+  // Calculate CVR using OLD METHOD normalized 0-2 scale where 1.0 = average value
+  // CVR = (Value Score / 50) / (Salary Tier / 1.0) 
+  const normalizedValueScore = valueScore / 50; // Convert 0-100 scale to 0-2 scale (50 = average performance)
+  const normalizedSalaryTier = salaryTier / 1.0; // Salary tier already around 1.0 average
+  const cvr = normalizedValueScore / normalizedSalaryTier;
+  
+  console.log(`📊 CVR calculation (OLD METHOD): baseValue=${baseValueScore}, warMultiplier=${warMultiplier}, valueScore=${valueScore}, salaryTier=${salaryTier}, normalizedValue=${normalizedValueScore.toFixed(3)}, normalizedSalary=${normalizedSalaryTier.toFixed(3)}, salary=$${salary.toLocaleString()}, war=${war}, cvr=${cvr.toFixed(3)}`);
   
   return Math.round(cvr * 100) / 100; // Round to 2 decimal places
 }
@@ -2973,8 +3005,8 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 if (require.main === module) {
   const season = process.argv[2] || '2025';
   // Full MLB season: Opening Day (late March) through current date (or full season)
-  const startDate = process.argv[3] || '2025-03-17';  // Opening Day 2025
-  const endDate = process.argv[4] || '2025-08-18';    // Current date (adjust to completed games)
+  const startDate = process.argv[3] || '2025-03-16';  // Opening Day 2025 is 3-17
+  const endDate = process.argv[4] || '2025-03-16';    // Current date (adjust to completed games)
   
   console.log(`🏁 Starting MLB data pull for ${season} season`);
   console.log(`📅 Date range: ${startDate} to ${endDate}`);
@@ -2986,12 +3018,68 @@ if (require.main === module) {
       console.log('📊 Enhanced WAR calculations with dynamic baselines are now available');
       console.log('💰 Enhanced CVR calculations with real salary data are now available');
       
-      // 🔍 VERIFICATION: Count what actually made it to Redis
+      // � GENERATE DASHBOARD SUMMARY CACHE
+      console.log('\n🔄 Generating dashboard summary cache...');
+      try {
+        // Force a fresh connection for post-processing
+        console.log('🔄 Establishing fresh Redis connection for summary cache...');
+        await redisClient.disconnect();
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Brief pause
+        await redisClient.connect();
+        console.log('✅ Fresh Redis connection established');
+        
+        const { generateAndCacheSummary } = require('../src/utils/summaryCache');
+        await generateAndCacheSummary(redisClient, '2025');
+        console.log('✅ Dashboard summary cache generated successfully!');
+        
+        // VERIFY: Test if we can immediately retrieve what we just stored
+        const testKey = 'summary:dashboard:2025';
+        const testRetrieve = await redisClient.get(testKey);
+        if (testRetrieve) {
+          console.log(`🔍 VERIFICATION: Cache key found immediately after generation`);
+        } else {
+          console.log(`❌ VERIFICATION: Cache key NOT found - Redis connection issue!`);
+        }
+      } catch (summaryError) {
+        console.error('⚠️  Failed to generate summary cache:', summaryError.message);
+        console.log('🔄 Retrying summary cache with new connection...');
+        
+        // One more attempt with completely fresh connection
+        try {
+          await redisClient.disconnect();
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Longer pause
+          await redisClient.connect();
+          
+          const { generateAndCacheSummary } = require('../src/utils/summaryCache');
+          await generateAndCacheSummary(redisClient, '2025');
+          console.log('✅ Dashboard summary cache generated on retry!');
+        } catch (retryError) {
+          console.error('❌ Summary cache failed even on retry:', retryError.message);
+          console.log('📱 Dashboard will fall back to real-time calculations');
+        }
+      }
+      
+      // �🔍 VERIFICATION: Count what actually made it to Redis
       console.log('\n🔍 Verifying stored data...');
-      const teamKeys = await redisClient.keys('team:*:2025:*');
-      const playerKeys = await redisClient.keys('player:*-2025:*');
-      const salaryKeys = await redisClient.keys('salary:*-2025');
-      const teamGames = teamKeys.filter(k => !k.endsWith(':season')).length;
+      
+      try {
+        // Check connection again for data verification
+        if (redisClient.status !== 'ready') {
+          console.log('🔄 Reconnecting Redis for data verification...');
+          try {
+            await redisClient.disconnect();
+            await redisClient.connect();
+            console.log('✅ Redis reconnected for verification');
+          } catch (reconnectError) {
+            console.log('⚠️  Redis reconnection failed, skipping verification');
+            throw new Error('Redis reconnection failed for verification');
+          }
+        }
+        
+        const teamKeys = await redisClient.keys('team:*:2025:*');
+        const playerKeys = await redisClient.keys('player:*-2025:*');
+        const salaryKeys = await redisClient.keys('salary:*-2025');
+        const teamGames = teamKeys.filter(k => !k.endsWith(':season')).length;
       const playerGames = playerKeys.filter(k => !k.endsWith(':season')).length;
       
       console.log(`📊 Final counts in Redis:`);
@@ -3010,6 +3098,11 @@ if (require.main === module) {
         console.log('✅ Salary data integrated - CVR calculations will use real salaries!');
       } else {
         console.log('⚠️  No salary data found - CVR calculations will use estimates');
+      }
+      
+      } catch (verificationError) {
+        console.error('⚠️  Data verification failed:', verificationError.message);
+        console.log('📊 Continuing with shutdown...');
       }
       
       // Graceful Redis shutdown
