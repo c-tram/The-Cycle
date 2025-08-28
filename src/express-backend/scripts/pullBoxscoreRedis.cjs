@@ -310,10 +310,14 @@ async function storeSalaryData(playerName, team, year, salaryData) {
     // For salary data, we use simple existence check since it's season-level, not game-level
     const exists = await redisClient.exists(salaryKey);
     
+    // We'll return a more precise action: 'create' | 'update' | 'skip' | 'error'
     let salaryStored = false;
+    let action = 'skip';
+
     if (!exists) {
       await redisClient.set(salaryKey, JSON.stringify(salaryData));
       salaryStored = true;
+      action = 'create';
       console.log(`💰 Created salary record for ${playerName} (${team}): $${salaryData.salary?.toLocaleString() || 'N/A'}`);
     } else {
       // Check if we should update (maybe salary data changed)
@@ -323,11 +327,18 @@ async function storeSalaryData(playerName, team, year, salaryData) {
         if (existingData.salary !== salaryData.salary) {
           await redisClient.set(salaryKey, JSON.stringify(salaryData));
           salaryStored = true;
+          action = 'update';
           console.log(`💰 Updated salary record for ${playerName} (${team}): $${salaryData.salary?.toLocaleString() || 'N/A'} (was: $${existingData.salary?.toLocaleString() || 'N/A'})`);
         } else {
           console.log(`💰 Salary already exists for ${playerName} (${team}): $${salaryData.salary?.toLocaleString() || 'N/A'}`);
           return { success: false, action: 'skip', reason: 'Salary already exists and is unchanged' };
         }
+      } else {
+        // If key existed but returned null for some reason, overwrite
+        await redisClient.set(salaryKey, JSON.stringify(salaryData));
+        salaryStored = true;
+        action = 'create';
+        console.log(`💰 Created salary record for ${playerName} (${team}) after missing data: $${salaryData.salary?.toLocaleString() || 'N/A'}`);
       }
     }
 
@@ -371,7 +382,7 @@ async function storeSalaryData(playerName, team, year, salaryData) {
     return { success: salaryStored, action: salaryStored ? 'stored' : 'skipped', reason: 'Salary processing completed' };
   } catch (error) {
     console.error(`❌ Error storing salary for ${playerName}:`, error.message);
-    return { success: false, action: 'error', reason: error.message };
+  return { success: false, action: 'error', reason: error.message };
   }
 }
 
@@ -438,38 +449,64 @@ async function collectAllSalaryData(year) {
   let totalSalary = 0;
   let salaryStats = { created: 0, updated: 0, skipped: 0 };
   
-  for (let i = 0; i < teamsNeedingSalaryData.length; i++) {
-    const team = teamsNeedingSalaryData[i];
-    console.log(`\n📊 Processing team ${i + 1}/${teamsNeedingSalaryData.length}: ${team}`);
-    
+  // Helper: simple promise pool to limit concurrency
+  async function promisePool(tasks, concurrency = 4) {
+    const results = [];
+    const executing = [];
+
+    for (const task of tasks) {
+      const p = Promise.resolve().then(() => task());
+      results.push(p);
+
+      const e = p.then(() => executing.splice(executing.indexOf(e), 1)).catch(() => executing.splice(executing.indexOf(e), 1));
+      executing.push(e);
+
+      if (executing.length >= concurrency) {
+        await Promise.race(executing);
+      }
+    }
+
+    return Promise.all(results);
+  }
+
+  // Build tasks for each team and run with limited concurrency
+  const teamTasks = teamsNeedingSalaryData.map((team, index) => async () => {
+    console.log(`\n📊 Processing team ${index + 1}/${teamsNeedingSalaryData.length}: ${team}`);
     try {
       const players = await scrapeTeamPayrollFromSpotrac(team, year);
       let teamStored = 0;
-      
-      for (const player of players) {
+
+      // Store players in parallel but with small per-team concurrency
+      const perPlayerTasks = players.map(player => async () => {
         const result = await storeSalaryData(player.name, team, year, player);
         if (result.success) {
           totalPlayers++;
-          totalSalary += player.salary;
+          totalSalary += player.salary || 0;
           teamStored++;
-          
-          // Track action statistics
+
           if (result.action === 'create') salaryStats.created++;
           else if (result.action === 'update') salaryStats.updated++;
         } else if (result.action === 'skip') {
           salaryStats.skipped++;
         }
-      }
-      
+      });
+
+      // Use small concurrency for players to avoid hammering Spotrac
+      await promisePool(perPlayerTasks, 6);
+
       console.log(`✅ ${team}: ${teamStored}/${players.length} players stored`);
-      
-      // Brief delay between teams to be respectful to the server
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
+      // Small pause between teams
+      await new Promise(resolve => setTimeout(resolve, 250));
     } catch (error) {
       console.error(`❌ Failed to process ${team}:`, error.message);
     }
-  }
+  });
+
+  // Run team tasks with a concurrency tuned to CPU/network (use min of cpu*2 and 6)
+  const cpuConcurrency = Math.max(2, Math.floor(os.cpus().length * 1.5));
+  const concurrency = Math.min(cpuConcurrency, 8);
+  await promisePool(teamTasks, concurrency);
   
   console.log(`\n💰 Salary collection complete!`);
   console.log(`📊 Players stored: ${totalPlayers}`);
@@ -3005,8 +3042,8 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 if (require.main === module) {
   const season = process.argv[2] || '2025';
   // Full MLB season: Opening Day (late March) through current date (or full season)
-  const startDate = process.argv[3] || '2025-03-16';  // Opening Day 2025 is 3-17
-  const endDate = process.argv[4] || '2025-03-16';    // Current date (adjust to completed games)
+  const startDate = process.argv[3] || '2025-03-17';  // Opening Day 2025 is 3-17
+  const endDate = process.argv[4] || '2025-08-26';    // Current date (adjust to completed games)
   
   console.log(`🏁 Starting MLB data pull for ${season} season`);
   console.log(`📅 Date range: ${startDate} to ${endDate}`);

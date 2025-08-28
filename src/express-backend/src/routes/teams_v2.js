@@ -304,11 +304,12 @@ router.get('/:teamId/schedule', async (req, res) => {
     const { year = '2025', month, limit = 50 } = req.query;
     
     let pattern = `team:${teamId.toUpperCase()}:${year}:????-??-??-*`;
-    
-    // If month specified, filter by month
+
+    // If month specified, filter by month (include trailing wildcard to match gameId)
     if (month) {
       const monthPad = month.padStart(2, '0');
-      pattern = `team:${teamId.toUpperCase()}:${year}:${year}-${monthPad}-??`;
+      // Note: stored keys include a suffix "-<gameId>", so we must keep a trailing wildcard to match doubleheaders
+      pattern = `team:${teamId.toUpperCase()}:${year}:${year}-${monthPad}-??-*`;
     }
     
     const gameKeys = await getKeysByPattern(pattern);
@@ -320,14 +321,18 @@ router.get('/:teamId/schedule', async (req, res) => {
     
     const games = gameData
       .map(game => {
-        const date = game.key.split(':').pop();
+        // Stored keys use the format team:TEAM:YEAR:YYYY-MM-DD-<gameId>
+        const raw = game.key.split(':').pop(); // e.g. "2025-08-01-663048"
+        const parts = raw.split('-');
+        const date = parts.slice(0, 3).join('-'); // YYYY-MM-DD
+        const storedGameId = parts.slice(3).join('-') || null;
         const gameInfo = game.data.gameInfo || {};
         const batting = game.data.batting || {};
         const pitching = game.data.pitching || {};
-        
+
         return {
           date,
-          gameId: gameInfo.gameId || 'Unknown',
+          gameId: storedGameId || gameInfo.gameId || 'Unknown',
           opponent: gameInfo.opponent || 'Unknown',
           homeAway: gameInfo.homeAway || 'Unknown', 
           result: gameInfo.result || 'Unknown',
