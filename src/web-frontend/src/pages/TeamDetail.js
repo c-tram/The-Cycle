@@ -250,6 +250,19 @@ const TeamDetail = () => {
     }
   }, [teamId, year]);
 
+  // Calculate actual record from game log for accuracy
+  const actualRecord = useMemo(() => {
+    if (!gameLog || gameLog.length === 0) {
+      return { wins: 0, losses: 0, games: 0 };
+    }
+    
+    const wins = gameLog.filter(game => game.result === 'W').length;
+    const losses = gameLog.filter(game => game.result === 'L').length;
+    const games = gameLog.length;
+    
+    return { wins, losses, games };
+  }, [gameLog]);
+
   useEffect(() => {
     loadTeamData();
   }, [loadTeamData]);
@@ -399,7 +412,7 @@ const TeamDetail = () => {
 
         {/* Tab Content */}
         {activeTab === 0 && (
-          <TeamStatsTab team={team} teamStats={teamStats} />
+          <TeamStatsTab team={team} teamStats={teamStats} actualRecord={actualRecord} />
         )}
         
         {activeTab === 1 && (
@@ -419,11 +432,11 @@ const TeamDetail = () => {
 };
 
 // Team Stats Tab
-const TeamStatsTab = ({ team, teamStats }) => {
+const TeamStatsTab = ({ team, teamStats, actualRecord }) => {
   const theme = useTheme();
   
-  // Extract stats from multiple possible locations
-  const record = team?.record || { wins: 0, losses: 0 };
+  // Use actual record from game log instead of API record (which may be stale)
+  const record = actualRecord.games > 0 ? actualRecord : (team?.record || { wins: 0, losses: 0 });
   const standings = team?.standings || {};
   const analytics = team?.analytics || {};
   const batting = teamStats?.batting || {};

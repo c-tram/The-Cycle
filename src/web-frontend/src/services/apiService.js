@@ -323,7 +323,7 @@ export const teamsApi = {
       ...(division && { division })
     });
 
-    const response = await apiClient.get(`/v2/teams/standings?${queryParams}`);
+    const response = await apiClient.get(`/standings?${queryParams}`);
     return response.data;
   },
 

@@ -18,20 +18,7 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "✅ Major Wins Today:
-
-Fixed the dashboard summary Redis issue (was expiring after 24 hours, now permanent)
-Validated our comprehensive 21+ splits system is working perfectly
-Enhanced SplitsExplorer UI with compound analytics tab
-Added proper Azure Redis configuration to API utils
-All splits endpoints validated and working (home-away, vs-teams, counts, handedness, compound analytics)
-🎯 Tomorrow's Mission: Fix the play-by-play splits data issue - investigate why we're not seeing all games in the splits data. This could be:
-
-Frontend not displaying all available data
-Backend filtering/pagination issues
-Play-by-play data processing missing games
-Query logic excluding certain game types
-The foundation is solid - comprehensive splits system is operational, Redis is connected properly, and the enhanced UI is ready. Tomorrow we'll ensure we're capturing and displaying the complete dataset! $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Fixed Standings on Team/TeamDetails $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."

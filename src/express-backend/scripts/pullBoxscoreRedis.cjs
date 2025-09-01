@@ -2812,13 +2812,36 @@ async function aggregateSeasonStats(season) {
       const pitchingTotals = aggregateCountingStats(games, 'pitching');
       const fieldingTotals = aggregateCountingStats(games, 'fielding');
 
+      // Extract team code from teamKey (format: "TEAMCODE:YEAR")
+      const [teamCode, year] = teamKey.split(':');
+      
+      // Debug team batting totals if avg is 0
+      console.log(`📊 Team ${teamCode} batting totals:`, {
+        games: games.length,
+        hits: battingTotals.hits || 0,
+        atBats: battingTotals.atBats || 0,
+        avg: battingTotals.atBats > 0 ? (battingTotals.hits || 0) / battingTotals.atBats : 0
+      });
+
       // Calculate wins/losses from game results
       const wins = games.filter(game => game.gameInfo.result === 'W').length;
       const losses = games.filter(game => game.gameInfo.result === 'L').length;
       
-      // Extract team code from teamKey (format: "TEAMCODE:YEAR")
-      const [teamCode, year] = teamKey.split(':');
-
+      // Debug: Check for unexpected result values
+      const allResults = games.map(g => g.gameInfo.result).filter(r => r);
+      const uniqueResults = [...new Set(allResults)];
+      if (uniqueResults.some(r => !['W', 'L', 'T'].includes(r))) {
+        console.log(`⚠️  Team ${teamCode}: Unexpected game results found:`, uniqueResults);
+      }
+      
+      // Debug: Check if games don't add up
+      const totalWL = wins + losses;
+      if (totalWL !== games.length) {
+        const unknownResults = games.filter(g => !['W', 'L', 'T'].includes(g.gameInfo.result));
+        console.log(`⚠️  Team ${teamCode}: Games mismatch - Total: ${games.length}, W+L: ${totalWL}, Unknown results:`, 
+          unknownResults.map(g => ({ gameId: g.gameInfo.gameId, result: g.gameInfo.result })));
+      }
+      
       const teamSeasonStats = {
         ...calculateBattingStats(battingTotals),
         ...calculatePitchingStats(pitchingTotals),
@@ -3042,8 +3065,8 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 if (require.main === module) {
   const season = process.argv[2] || '2025';
   // Full MLB season: Opening Day (late March) through current date (or full season)
-  const startDate = process.argv[3] || '2025-03-17';  // Opening Day 2025 is 3-17
-  const endDate = process.argv[4] || '2025-08-26';    // Current date (adjust to completed games)
+  const startDate = process.argv[3] || '2025-08-27';  // Opening Day 2025 is 3-17
+  const endDate = process.argv[4] || '2025-08-30';    // Current date (adjust to completed games)
   
   console.log(`🏁 Starting MLB data pull for ${season} season`);
   console.log(`📅 Date range: ${startDate} to ${endDate}`);
