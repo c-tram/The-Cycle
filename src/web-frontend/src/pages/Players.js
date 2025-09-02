@@ -82,7 +82,7 @@ const getNestedValue = (obj, path) => {
   return path.split('.').reduce((current, key) => current?.[key], obj);
 };
 
-const Players = () => {
+const Players = ({ category }) => {
   // Games/IP filter state
   const [minGames, setMinGames] = useState(0);
   const [minInnings, setMinInnings] = useState(10);
@@ -101,7 +101,7 @@ const Players = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTeams, setSelectedTeams] = useState([]);
   const [selectedPosition, setSelectedPosition] = useState('all'); // Position filter
-  const [activeCategory, setActiveCategory] = useState('batting');
+  const [activeCategory, setActiveCategory] = useState(category || 'batting');
   const [sortBy, setSortBy] = useState('stats.batting.avg');
   const [sortOrder, setSortOrder] = useState('desc');
   const [dateRange, setDateRange] = useState('all'); // 'all', 'custom', or predefined ranges
@@ -116,7 +116,7 @@ const Players = () => {
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [selectedStatGroup, setSelectedStatGroup] = useState('primary'); // Stat group selection state
+  const [selectedStatGroup, setSelectedStatGroup] = useState('all'); // Stat group selection state - changed default to 'all'
 
   // Available teams and positions
   const [teams, setTeams] = useState([]);
@@ -426,10 +426,17 @@ const Players = () => {
     }
   }, [activeCategory, sortBy]);
   
-  // Reset stat group to primary when category changes (separate useEffect)
+  // Reset stat group to 'all' when category changes (separate useEffect)
   useEffect(() => {
-    setSelectedStatGroup('primary');
+    setSelectedStatGroup('all');
   }, [activeCategory]);
+
+  // Sync activeCategory with URL-based category prop
+  useEffect(() => {
+    if (category && category !== activeCategory) {
+      setActiveCategory(category);
+    }
+  }, [category, activeCategory]);
 
   // Filter players based on their relevant stats for the active category
   const categoryFilteredPlayers = useMemo(() => {
@@ -623,7 +630,14 @@ const Players = () => {
             <Tabs
               value={activeCategory}
               onChange={(_, newValue) => {
-                setActiveCategory(newValue);
+                // Navigate to the appropriate route instead of just setting state
+                if (newValue === 'batting') {
+                  navigate('/players/batting');
+                } else if (newValue === 'pitching') {
+                  navigate('/players/pitching');
+                } else {
+                  navigate('/players');
+                }
                 setPage(0); // Reset to first page when changing category
               }}
               sx={{

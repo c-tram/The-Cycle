@@ -142,6 +142,8 @@ function App() {
 
                     {/* Players section */}
                     <Route path="/players" element={<Players />} />
+                    <Route path="/players/batting" element={<Players category="batting" />} />
+                    <Route path="/players/pitching" element={<Players category="pitching" />} />
                     <Route path="/players/:team/:playerName/:year" element={<PlayerDetail />} />
                     <Route path="/players/:playerId" element={<PlayerProfile />} />
 
