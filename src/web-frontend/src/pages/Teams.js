@@ -83,7 +83,7 @@ const getNestedValue = (obj, path) => {
   return path.split('.').reduce((current, key) => current?.[key], obj);
 };
 
-const Teams = () => {
+const Teams = ({ category }) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const searchInputRef = useRef(null);
@@ -96,7 +96,7 @@ const Teams = () => {
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedDivisions, setSelectedDivisions] = useState([]);
-  const [activeCategory, setActiveCategory] = useState('primary'); // Changed to 'primary'
+  const [activeCategory, setActiveCategory] = useState(category || 'all'); // Default to 'all' or use category prop
   const [sortBy, setSortBy] = useState('record.wins');
   const [sortOrder, setSortOrder] = useState('desc');
   const [dateRange, setDateRange] = useState('all');
@@ -394,8 +394,8 @@ const Teams = () => {
 
   // Stat configurations for the three categories
   const statConfigs = {
-    primary: [
-      // Primary: Wins, Losses, Last 10, Total WAR, Total CVR, Pythagorean %
+    all: [
+      // All Stats: Wins, Losses, Last 10, Total WAR, Total CVR, Pythagorean %
       { key: 'record.wins', label: 'W', format: (val) => val || 0 },
       { key: 'record.losses', label: 'L', format: (val) => val || 0 },
       { key: 'standings.winPercentage', label: 'PCT', format: (val) => val?.toFixed(3) || '---' },
@@ -685,6 +685,15 @@ const Teams = () => {
           onChange={(_, newValue) => {
             setActiveCategory(newValue);
             setPage(0);
+            // Navigate to the new route
+            if (newValue === 'batting') {
+              navigate('/teams/batting');
+            } else if (newValue === 'pitching') {
+              navigate('/teams/pitching');
+            } else {
+              // For 'all' or any other value, go to base teams route
+              navigate('/teams');
+            }
           }}
           variant="fullWidth"
           sx={{
@@ -699,10 +708,10 @@ const Teams = () => {
             label={
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Analytics />
-                Primary
+                All Stats
               </Box>
             } 
-            value="primary" 
+            value="all" 
           />
           <Tab 
             label={

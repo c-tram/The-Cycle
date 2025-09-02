@@ -18,7 +18,7 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Fixed Standings on Team/TeamDetails $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Small changes to teams frontend routes $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."
