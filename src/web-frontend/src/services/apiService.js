@@ -139,6 +139,51 @@ export const statsApi = {
 };
 
 // ============================================================================
+// GAMES API (v2) - Live Scores and Schedules
+// ============================================================================
+
+export const gamesApi = {
+  // Get recent games for scoreboard
+  getRecentGames: async (params = {}) => {
+    const { date, limit = 15 } = params;
+    const queryParams = new URLSearchParams();
+    
+    if (date) queryParams.append('date', date);
+    if (limit) queryParams.append('limit', limit.toString());
+    
+    const response = await apiClient.get(`/v2/games/recent?${queryParams}`);
+    return response.data;
+  },
+
+  // Get currently live games
+  getLiveGames: async () => {
+    const response = await apiClient.get(`/v2/games/live`);
+    return response.data;
+  },
+
+  // Get games for specific date
+  getSchedule: async (date, limit = 50) => {
+    const queryParams = new URLSearchParams();
+    if (limit) queryParams.append('limit', limit.toString());
+    
+    const response = await apiClient.get(`/v2/games/schedule/${date}?${queryParams}`);
+    return response.data;
+  },
+
+  // Get games for date range
+  getGamesRange: async (startDate, endDate, limit = 50) => {
+    const queryParams = new URLSearchParams({
+      startDate,
+      endDate,
+      limit: limit.toString()
+    });
+    
+    const response = await apiClient.get(`/v2/games/range?${queryParams}`);
+    return response.data;
+  }
+};
+
+// ============================================================================
 // ENHANCED PLAYERS API (v2)
 // ============================================================================
 

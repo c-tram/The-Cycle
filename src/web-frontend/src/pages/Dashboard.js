@@ -45,9 +45,9 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
 // API and utils
-
 import { statsApi, playersApi, teamsApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
+import LiveScoreboard from '../components/LiveScoreboard';
 
 // Utility: Get MLB team logo URL by team code (3-letter abbreviation)
 const getTeamLogoUrl = (teamCode) => {
@@ -456,6 +456,13 @@ const Dashboard = () => {
               />
             </Grid>
           </Grid>
+        </motion.div>
+
+        {/* Live Scoreboard */}
+        <motion.div variants={itemVariants}>
+          <Box sx={{ mb: 4 }}>
+            <LiveScoreboard />
+          </Box>
         </motion.div>
 
         {/* Main Content Grid */}

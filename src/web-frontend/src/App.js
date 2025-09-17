@@ -25,6 +25,7 @@ import SplitsExplorer from './pages/SplitsExplorer';
 import Analytics from './pages/Analytics';
 import Compare from './pages/Compare';
 import Settings from './pages/Settings';
+import BoxscorePage from './pages/BoxscorePage';
 
 // Hooks and utilities
 import { healthCheck } from './services/apiService';
@@ -173,6 +174,9 @@ function App() {
 
                     {/* Settings */}
                     <Route path="/settings" element={<Settings />} />
+
+                    {/* Boxscore */}
+                    <Route path="/boxscore/:gameId/:date" element={<BoxscorePage />} />
 
                     {/* 404 fallback */}
                     <Route path="*" element={

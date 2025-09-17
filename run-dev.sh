@@ -18,7 +18,36 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Changes to Dashboard look and feel. columns -> tabs for stat leaders. $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "feat: Complete live boxscore system with real-time updates, comprehensive stats, and animated play-by-play
+
+✨ Major Features Added:
+- Full boxscore component with 4 tabs (Overview, Batting, Pitching, Play-by-Play)
+- Live score updates with auto-refresh every 15s for active games
+- Real-time play-by-play with 10s refresh and notification animations
+- Comprehensive batting/pitching statistics via enhanced MLB API integration
+- Dedicated boxscore pages accessible via /boxscore/:gameId/:date routes
+
+🔧 Technical Improvements:
+- Enhanced MLB API proxy with detailed player statistics extraction
+- Framer Motion animations for new play notifications and live indicators
+- Status-based game sorting (Live → Final → Warmup) as default
+- Timezone-aware date handling to fix UTC conversion issues
+- React Hooks compliance with proper null safety and error handling
+
+🐛 Critical Fixes:
+- Fixed timezone bug causing wrong date fetches (UTC vs local time)
+- Resolved React Hooks ordering violations with conditional returns
+- Added comprehensive null checks for game data and MLB API responses
+- Fixed variable declaration conflicts and missing imports
+
+🎯 User Experience:
+- Multi-access boxscore system (modal from LiveScoreboard + dedicated pages)
+- Professional baseball analytics interface with team colors and logos
+- Live updating scores with pulsing indicators for active games
+- Sortable play-by-play with chronological/recent view options
+- Auto-refresh controls with visual feedback for new plays
+
+Ready for automated data collection system implementation. $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."
