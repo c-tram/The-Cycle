@@ -26,17 +26,9 @@ router.get('/schedule/:date', async (req, res) => {
     if (data.dates && data.dates.length > 0) {
       const games = data.dates[0].games.map(game => ({
         id: game.gamePk,
-        gameDate: game.gameDate,
-        gameTime: new Date(game.gameDate).toLocaleTimeString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit',
-          hour12: true 
-        }),
-        scheduledTime: new Date(game.gameDate).toLocaleTimeString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit',
-          hour12: true 
-        }),
+        gameDate: game.gameDate, // Keep raw ISO timestamp for frontend timezone conversion
+        gameTime: game.gameDate,  // Send raw timestamp, let frontend handle local conversion
+        scheduledTime: game.gameDate, // Send raw timestamp, let frontend handle local conversion
         status: game.status.detailedState,
         statusCode: game.status.statusCode,
         inning: game.linescore && game.linescore.currentInning ? 

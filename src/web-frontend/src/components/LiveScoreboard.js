@@ -97,6 +97,23 @@ const MLB_TEAMS = [
   { code: 'WSH', name: 'Washington Nationals' }
 ];
 
+// Utility function to format game time in user's local timezone
+const formatGameTime = (gameTime) => {
+  if (!gameTime) return 'TBD';
+  try {
+    const date = new Date(gameTime);
+    return date.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone // Use user's local timezone
+    });
+  } catch (error) {
+    console.error('Error formatting game time:', error);
+    return 'TBD';
+  }
+};
+
 const LiveScoreboard = () => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -289,9 +306,9 @@ const LiveScoreboard = () => {
     filteredGames.sort((a, b) => {
       switch (sortBy) {
         case 'time':
-          const timeA = a.scheduledTime || a.gameTime || '00:00';
-          const timeB = b.scheduledTime || b.gameTime || '00:00';
-          return timeA.localeCompare(timeB);
+          const timeA = new Date(a.scheduledTime || a.gameTime || 0);
+          const timeB = new Date(b.scheduledTime || b.gameTime || 0);
+          return timeA - timeB; // Earlier games first
         
         case 'score_diff':
           const diffA = Math.abs((a.homeScore || 0) - (a.awayScore || 0));
@@ -475,7 +492,7 @@ const LiveScoreboard = () => {
               <Typography variant="caption" color="text.secondary" fontSize="0.7rem" noWrap>
                 {dateFilter !== 'today' && game.gameDate ? 
                   new Date(game.gameDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) :
-                  (game.gameTime || game.scheduledTime || 'TBD')
+                  formatGameTime(game.gameTime || game.scheduledTime)
                 }
               </Typography>
               {game.inning && (
