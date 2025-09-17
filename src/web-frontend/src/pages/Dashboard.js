@@ -22,7 +22,9 @@ import {
   FormControl,
   Select,
   MenuItem,
-  InputLabel
+  InputLabel,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   TrendingUp,
@@ -81,13 +83,14 @@ const Dashboard = () => {
   const [standings, setStandings] = useState([]);
   const [error, setError] = useState(null);
   const [selectedStatCategory, setSelectedStatCategory] = useState('cvr');
+  const [activeLeaderTab, setActiveLeaderTab] = useState(0);
 
   // Define stat categories with proper API calls
   const statCategories = {
     cvr: {
       label: 'CVR (Cycle Value Rating)',
       description: 'Our proprietary comprehensive value metric',
-      columns: [
+      tabs: [
         { key: 'cvrBatters', title: 'CVR - Batters', stat: 'cvr', category: 'batting', minGames: 50, icon: SportsBaseball },
         { key: 'cvrPitchers', title: 'CVR - Pitchers', stat: 'cvr', category: 'pitching', minInnings: 30, icon: Speed },
         { key: 'cvrTeams', title: 'CVR - Teams', stat: 'cvr', category: 'team', icon: EmojiEvents },
@@ -98,7 +101,7 @@ const Dashboard = () => {
     traditional: {
       label: 'Traditional Stats',
       description: 'Classic baseball statistics',
-      columns: [
+      tabs: [
         { key: 'battingAvg', title: 'Batting Average', stat: 'avg', category: 'batting', minAtBats: 50, icon: SportsBaseball },
         { key: 'era', title: 'ERA Leaders', stat: 'era', category: 'pitching', minInnings: 20, icon: Speed },
         { key: 'winPct', title: 'Win Percentage', stat: 'winPercentage', category: 'team', icon: EmojiEvents },
@@ -109,6 +112,7 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
+    setActiveLeaderTab(0); // Reset to first tab when category changes
     loadDashboardData();
   }, [selectedStatCategory]);
 
@@ -118,37 +122,106 @@ const Dashboard = () => {
       setError(null);
 
       const currentCategory = statCategories[selectedStatCategory];
-      const columns = currentCategory.columns;
+      const tabs = currentCategory.tabs;
 
       // Load summary first
       const summaryData = await statsApi.getSummary().catch(() => null);
       setSummary(summaryData);
 
-      // Load data for each column based on selected category
-      const columnPromises = columns.map(async (column) => {
-        if (column.category === 'team') {
-          if (column.stat === 'winPercentage') {
-            return teamsApi.getStandings().then(data => ({ 
-              key: column.key, 
-              data: data?.standings || [] 
-            }));
-          } else {
-            // For CVR/WAR team stats, get all teams and sort by the specific stat
-            return teamsApi.getTeams({ limit: 50 }).then(data => {
+      // Load data for each tab based on selected category
+      const tabPromises = tabs.map(async (tab) => {
+        if (tab.category === 'team') {
+          if (tab.stat === 'winPercentage') {
+            // Fix standings by using schedule API (same approach as Teams.js)
+            return teamsApi.getTeams({ limit: 50 }).then(async data => {
               const teams = data?.teams || [];
               
+              // Calculate actual records from schedule API
+              const teamsWithCorrectRecords = await Promise.all(teams.map(async (team) => {
+                try {
+                  const scheduleData = await teamsApi.getTeamSchedule(team.id, { 
+                    year: '2025', 
+                    limit: 200 
+                  });
+                  const games = scheduleData.games || [];
+                  
+                  if (games.length > 0) {
+                    const wins = games.filter(game => game.result === 'W').length;
+                    const losses = games.filter(game => game.result === 'L').length;
+                    const ties = games.filter(game => game.result === 'T').length;
+                    
+                    return {
+                      ...team,
+                      record: { wins, losses, ties: ties || 0 },
+                      winPercentage: games.length > 0 ? wins / games.length : 0,
+                      gameCount: games.length
+                    };
+                  }
+                } catch (scheduleErr) {
+                  console.log(`Could not fetch schedule for ${team.id}:`, scheduleErr);
+                }
+                return team;
+              }));
+              
+              // Sort by win percentage
+              const sortedStandings = teamsWithCorrectRecords
+                .filter(team => team.winPercentage > 0)
+                .sort((a, b) => b.winPercentage - a.winPercentage);
+              
+              return { 
+                key: tab.key, 
+                data: sortedStandings 
+              };
+            });
+          } else {
+            // For CVR/WAR team stats, get all teams and fix records using schedule API (same as Teams.js)
+            return teamsApi.getTeams({ limit: 50 }).then(async data => {
+              const teams = data?.teams || [];
+              
+              // Fix team records by calculating actual wins/losses from schedule API (same approach as Teams.js)
+              const teamsWithCorrectRecords = await Promise.all(teams.map(async (team) => {
+                try {
+                  // Fetch team schedule to calculate actual record
+                  const scheduleData = await teamsApi.getTeamSchedule(team.id, { 
+                    year: '2025', 
+                    limit: 200 
+                  });
+                  const games = scheduleData.games || [];
+                  
+                  if (games.length > 0) {
+                    const wins = games.filter(game => game.result === 'W').length;
+                    const losses = games.filter(game => game.result === 'L').length;
+                    const ties = games.filter(game => game.result === 'T').length;
+                    
+                    // Update record with actual calculated values
+                    return {
+                      ...team,
+                      record: { wins, losses, ties: ties || 0 },
+                      gameCount: games.length,
+                      standings: {
+                        ...team.standings,
+                        winPercentage: games.length > 0 ? wins / games.length : 0
+                      }
+                    };
+                  }
+                } catch (scheduleErr) {
+                  console.log(`Could not fetch schedule for ${team.id}:`, scheduleErr);
+                }
+                return team; // Return original team if schedule fetch fails
+              }));
+              
               // Sort teams by the specific stat in descending order
-              const sortedTeams = teams
+              const sortedTeams = teamsWithCorrectRecords
                 .map(team => ({
                   ...team,
-                  statValue: getTeamStatValue(team, column.stat)
+                  statValue: getTeamStatValue(team, tab.stat)
                 }))
                 .filter(team => team.statValue > 0) // Filter out teams with no/zero stat
                 .sort((a, b) => b.statValue - a.statValue) // Descending order
-                .slice(0, 5); // Take top 5
+                .slice(0, 10); // Take top 10 for tabs
               
               return { 
-                key: column.key, 
+                key: tab.key, 
                 data: sortedTeams 
               };
             });
@@ -156,35 +229,35 @@ const Dashboard = () => {
         } else {
           // Player stats
           return statsApi.getLeaders({
-            category: column.category,
-            stat: column.stat,
-            limit: 5,
-            minGames: column.minGames || 15,
-            minAtBats: column.minAtBats || undefined,
-            minInnings: column.minInnings || undefined
+            category: tab.category,
+            stat: tab.stat,
+            limit: 10, // Increased limit for tabs
+            minGames: tab.minGames || 15,
+            minAtBats: tab.minAtBats || undefined,
+            minInnings: tab.minInnings || undefined
           }).then(data => ({ 
-            key: column.key, 
+            key: tab.key, 
             data: data?.leaders || [] 
           }));
         }
       });
 
-      const results = await Promise.all(columnPromises);
+      const results = await Promise.all(tabPromises);
       
       // Parse and format data for the professional grid
       const newLeaders = {};
       
       results.forEach((result, index) => {
-        const column = columns[index];
+        const tab = tabs[index];
         const rawData = result.data;
         
-        if (column.category === 'team') {
+        if (tab.category === 'team') {
           // Team data formatting
-          newLeaders[result.key] = rawData.slice(0, 5).map(t => ({
+          newLeaders[result.key] = rawData.slice(0, 10).map(t => ({
             id: t.id || t.name || 'UNK',
             name: t.name || t.id || 'Unknown Team',
-            value: getTeamStatValue(t, column.stat),
-            statLabel: column.stat.toUpperCase(),
+            value: getTeamStatValue(t, tab.stat),
+            statLabel: tab.stat.toUpperCase(),
             record: t.record || { wins: t.wins || 0, losses: t.losses || 0 },
             subtitle: `${(t.record?.wins || t.wins || 0)}-${(t.record?.losses || t.losses || 0)}`
           }));
@@ -195,8 +268,8 @@ const Dashboard = () => {
             team: p.player?.team || 'UNK',
             games: p.games || 0,
             value: typeof p.value === 'number' ? p.value : parseFloat(p.value) || 0,  // Ensure number
-            statLabel: column.stat.toUpperCase(),
-            subtitle: getPlayerSubtitle(p, column)
+            statLabel: tab.stat.toUpperCase(),
+            subtitle: getPlayerSubtitle(p, tab)
           }));
         }
       });
@@ -242,28 +315,16 @@ const Dashboard = () => {
     return typeof value === 'number' ? value : parseFloat(value) || 0;
   };
 
-  const getPlayerSubtitle = (player, column) => {
+  const getPlayerSubtitle = (player, tab) => {
     const games = player.games || 0;
-    if (column.category === 'batting') {
+    if (tab.category === 'batting') {
       const atBats = player.qualifyingStats?.atBats || 0;
       return `${games}G • ${atBats} AB`;
-    } else if (column.category === 'pitching') {
+    } else if (tab.category === 'pitching') {
       const ip = player.qualifyingStats?.inningsPitched || 0;
       return `${games}G • ${ip} IP`;
     }
     return `${games}G`;
-  };
-
-  // Get colors for columns
-  const getColumnColor = (index) => {
-    const colors = [
-      theme.palette.success.main,    // Green
-      theme.palette.info.main,       // Blue  
-      theme.palette.warning.main,    // Orange
-      theme.palette.error.main,      // Red
-      theme.palette.primary.main     // Purple
-    ];
-    return colors[index % colors.length];
   };
 
   if (loading) {
@@ -365,8 +426,6 @@ const Dashboard = () => {
                 value={summary?.summary?.totalPlayers || 0}
                 icon={<People />}
                 color={theme.palette.primary.main}
-                subtitle={`${summary?.summary?.totalTeams || 0} teams`}
-                trend={{ value: 5.2, positive: true }}
               />
             </Grid>
             
@@ -376,8 +435,6 @@ const Dashboard = () => {
                 value={summary?.summary?.totalGames || 0}
                 icon={<SportsBaseball />}
                 color={theme.palette.success.main}
-                subtitle={`${summary?.summary?.totalGameDates || 0} days`}
-                trend={{ value: 2.1, positive: true }}
               />
             </Grid>
             
@@ -387,19 +444,15 @@ const Dashboard = () => {
                 value={summary?.summary?.totalPlayerGames || 0}
                 icon={<Assessment />}
                 color={theme.palette.warning.main}
-                subtitle="Total performances"
-                trend={{ value: 8.7, positive: true }}
               />
             </Grid>
             
             <Grid item xs={12} sm={6} md={3}>
               <SummaryCard
                 title="Avg Players/Game"
-                value={summary?.summary?.averagePlayersPerGame || 0}
+                value={Math.round(summary?.summary?.averagePlayersPerGame || 0)}
                 icon={<Timeline />}
                 color={theme.palette.info.main}
-                subtitle={`${summary?.summary?.averageGamesPerDay || 0} games/day`}
-                trend={{ value: 12.4, positive: true }}
               />
             </Grid>
           </Grid>
@@ -407,7 +460,7 @@ const Dashboard = () => {
 
         {/* Main Content Grid */}
         <Grid container spacing={3}>
-          {/* 5-column Statistical Leaders grid */}
+          {/* Tabbed Statistical Leaders */}
           <Grid item xs={12}>
             <motion.div variants={itemVariants}>
               <Card elevation={0} sx={{ height: '100%' }}>
@@ -461,19 +514,50 @@ const Dashboard = () => {
                     </Box>
                   </Box>
                   
-                  <Grid container spacing={2}>
-                    {statCategories[selectedStatCategory].columns.map((column, index) => (
-                      <Grid item xs={12} sm={6} md={2.4} key={column.key}>
-                        <StatColumn
-                          title={column.title}
-                          icon={<column.icon />}
-                          color={getColumnColor(index)}
-                          data={leaders[column.key] || []}
-                          emptyMessage={`No qualifying ${column.category === 'team' ? 'teams' : 'players'}`}
-                          isTeamStat={column.category === 'team'}
-                          statType={column.stat}
+                  {/* Tab Navigation */}
+                  <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+                    <Tabs 
+                      value={activeLeaderTab} 
+                      onChange={(e, newValue) => setActiveLeaderTab(newValue)}
+                      variant="scrollable"
+                      scrollButtons="auto"
+                      sx={{
+                        '& .MuiTab-root': {
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          fontSize: '0.95rem'
+                        }
+                      }}
+                    >
+                      {statCategories[selectedStatCategory].tabs.map((tab, index) => (
+                        <Tab
+                          key={tab.key}
+                          label={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <tab.icon sx={{ fontSize: 20 }} />
+                              {tab.title}
+                            </Box>
+                          }
+                          value={index}
+                        />
+                      ))}
+                    </Tabs>
+                  </Box>
+                  
+                  {/* Tab Content */}
+                  <Box sx={{ minHeight: 400 }}>
+                    {statCategories[selectedStatCategory].tabs.map((tab, index) => (
+                      <Box
+                        key={tab.key}
+                        sx={{ 
+                          display: activeLeaderTab === index ? 'block' : 'none'
+                        }}
+                      >
+                        <LeaderboardTab
+                          tab={tab}
+                          data={leaders[tab.key] || []}
                           onItemClick={(item) => {
-                            if (column.category === 'team') {
+                            if (tab.category === 'team') {
                               // Navigate to team detail page
                               navigate(`/teams/${item.id || item.name}/2025`);
                             } else {
@@ -483,9 +567,9 @@ const Dashboard = () => {
                             }
                           }}
                         />
-                      </Grid>
+                      </Box>
                     ))}
-                  </Grid>
+                  </Box>
                 </CardContent>
               </Card>
             </motion.div>
@@ -496,8 +580,8 @@ const Dashboard = () => {
   );
 };
 
-// Professional Statistical Column Component
-const StatColumn = ({ title, icon, color, data, emptyMessage, isTeamStat, statType, onItemClick }) => {
+// Leaderboard Tab Component
+const LeaderboardTab = ({ tab, data, onItemClick }) => {
   const theme = useTheme();
   
   const formatValue = (item) => {
@@ -508,165 +592,209 @@ const StatColumn = ({ title, icon, color, data, emptyMessage, isTeamStat, statTy
       return '---';
     }
     
-    if (statType === 'winPercentage') {
+    if (tab.stat === 'winPercentage') {
       return (value * 100).toFixed(1) + '%';
     }
-    if (statType === 'era') {
+    if (tab.stat === 'era') {
       return value.toFixed(2);
     }
-    if (statType === 'cvr' || statType === 'war') {
+    if (tab.stat === 'cvr' || tab.stat === 'war') {
       return value.toFixed(1);
     }
-    if (statType === 'avg') {
+    if (tab.stat === 'avg') {
       return value.toFixed(3);
     }
-    if (statType === 'homeRuns' || statType === 'strikeouts') {
+    if (tab.stat === 'homeRuns' || tab.stat === 'strikeouts') {
       return Math.round(value).toString();
     }
-    if (isTeamStat && statType !== 'cvr' && statType !== 'war') {
+    if (tab.category === 'team' && tab.stat !== 'cvr' && tab.stat !== 'war') {
       return (value * 100).toFixed(1) + '%';
     }
     return value.toFixed(3);
   };
 
-  const getChipColor = (index) => {
+  const getRankColor = (index) => {
     switch (index) {
       case 0: return theme.palette.warning.main; // Gold
       case 1: return alpha(theme.palette.grey[400], 0.8); // Silver
       case 2: return alpha(theme.palette.error.main, 0.6); // Bronze
-      default: return alpha(color, 0.6);
+      default: return theme.palette.text.secondary;
     }
   };
 
+  if (!data || data.length === 0) {
+    return (
+      <Box sx={{ 
+        textAlign: 'center', 
+        py: 8,
+        color: 'text.secondary'
+      }}>
+        <tab.icon sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+        <Typography variant="h6" sx={{ mb: 1 }}>
+          No Data Available
+        </Typography>
+        <Typography variant="body2">
+          No qualifying {tab.category === 'team' ? 'teams' : 'players'} found for {tab.title}
+        </Typography>
+      </Box>
+    );
+  }
+
   return (
-    <Box sx={{ 
-      height: '100%',
-      border: `1px solid ${alpha(color, 0.1)}`,
-      borderRadius: 2,
-      overflow: 'hidden',
-      backgroundColor: alpha(color, 0.02)
-    }}>
+    <Box sx={{ width: '100%' }}>
       {/* Header */}
       <Box sx={{ 
-        p: 2, 
-        backgroundColor: alpha(color, 0.08),
-        borderBottom: `1px solid ${alpha(color, 0.1)}`
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: 2, 
+        mb: 3,
+        pb: 2,
+        borderBottom: `1px solid ${theme.palette.divider}`
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-          <Box sx={{ color: color }}>{icon}</Box>
-          <Typography variant="subtitle2" fontWeight={700} color={color}>
-            {title}
-          </Typography>
-        </Box>
+        <tab.icon sx={{ color: theme.palette.primary.main }} />
+        <Typography variant="h6" fontWeight={600}>
+          {tab.title} Leaders
+        </Typography>
+        <Chip 
+          label={`${data.length} ${tab.category === 'team' ? 'teams' : 'players'}`}
+          size="small"
+          variant="outlined"
+        />
       </Box>
 
-      {/* Data */}
-      <Box sx={{ p: 1.5 }}>
-        {data?.length > 0 ? (
-          <List dense sx={{ p: 0 }}>
-            {data.map((item, idx) => (
-              <ListItem 
-                key={idx} 
-                sx={{ 
-                  px: 0, 
-                  py: 0.5,
-                  borderRadius: 1,
-                  cursor: onItemClick ? 'pointer' : 'default',
-                  '&:hover': {
-                    backgroundColor: alpha(color, 0.05)
-                  }
-                }}
-                onClick={() => onItemClick && onItemClick(item)}
-              >
+      {/* Table */}
+      <Box sx={{ 
+        border: `1px solid ${theme.palette.divider}`,
+        borderRadius: 2,
+        overflow: 'hidden'
+      }}>
+        {/* Table Header */}
+        <Box sx={{ 
+          display: 'grid',
+          gridTemplateColumns: '60px 80px 1fr 120px 100px',
+          bgcolor: alpha(theme.palette.primary.main, 0.05),
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          p: 2
+        }}>
+          <Typography variant="subtitle2" fontWeight={700} color="text.secondary">
+            Rank
+          </Typography>
+          <Typography variant="subtitle2" fontWeight={700} color="text.secondary">
+            Team
+          </Typography>
+          <Typography variant="subtitle2" fontWeight={700} color="text.secondary">
+            {tab.category === 'team' ? 'Team Name' : 'Player Name'}
+          </Typography>
+          <Typography variant="subtitle2" fontWeight={700} color="text.secondary">
+            {tab.stat.toUpperCase()}
+          </Typography>
+          <Typography variant="subtitle2" fontWeight={700} color="text.secondary">
+            Details
+          </Typography>
+        </Box>
 
-                <ListItemAvatar>
-                  {(() => {
-                    const teamCode = item.team || item.id || 'UNK';
-                    const logoUrl = getTeamLogoUrl(teamCode);
-                    return (
-                      <Avatar
-                        src={logoUrl}
-                        alt={teamCode}
-                        sx={{
-                          width: 32,
-                          height: 32,
-                          backgroundColor: themeUtils.getTeamColor(teamCode),
-                          fontSize: '0.65rem',
-                          fontWeight: 800,
-                          border: `2px solid ${idx < 3 ? getChipColor(idx) : 'transparent'}`
-                        }}
-                        imgProps={{
-                          style: { objectFit: 'contain', background: 'white' }
-                        }}
-                      >
-                        {/* Fallback to abbreviation if logo fails to load */}
-                        {teamCode.substring(0, 3)}
-                      </Avatar>
-                    );
-                  })()}
-                </ListItemAvatar>
-                
-                <ListItemText
-                  primary={
-                    <Typography variant="body2" fontWeight={600} sx={{ fontSize: '0.85rem' }}>
-                      {item.name || 'Unknown'}
-                    </Typography>
-                  }
-                  secondary={
-                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
-                      {item.subtitle || `${item.statLabel || 'STAT'}`}
-                    </Typography>
-                  }
+        {/* Table Rows */}
+        {data.map((item, index) => (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.03 }}
+          >
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: '60px 80px 1fr 120px 100px',
+                p: 2,
+                cursor: onItemClick ? 'pointer' : 'default',
+                borderBottom: index < data.length - 1 ? `1px solid ${alpha(theme.palette.divider, 0.5)}` : 'none',
+                '&:hover': {
+                  backgroundColor: alpha(theme.palette.primary.main, 0.03),
+                  transition: 'background-color 0.2s ease'
+                }
+              }}
+              onClick={() => onItemClick && onItemClick(item)}
+            >
+              {/* Rank */}
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Chip
+                  label={index + 1}
+                  size="small"
+                  sx={{
+                    backgroundColor: index < 3 ? getRankColor(index) : alpha(theme.palette.grey[400], 0.2),
+                    color: index < 3 ? 'white' : theme.palette.text.secondary,
+                    fontWeight: 700,
+                    fontSize: '0.75rem',
+                    minWidth: 28,
+                    height: 24
+                  }}
                 />
-                
-                <Box sx={{ textAlign: 'right', minWidth: 60 }}>
-                  <Chip
-                    label={formatValue(item)}
-                    size="small"
-                    sx={{
-                      backgroundColor: alpha(getChipColor(idx), 0.1),
-                      color: getChipColor(idx),
-                      fontWeight: 800,
-                      fontSize: '0.7rem',
-                      height: 24,
-                      '& .MuiChip-label': {
-                        px: 1
-                      }
-                    }}
-                  />
-                  {idx < 3 && (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', mt: 0.5 }}>
-                      <Chip
-                        label={`#${idx + 1}`}
-                        size="small"
-                        sx={{
-                          backgroundColor: getChipColor(idx),
-                          color: 'white',
-                          fontWeight: 700,
-                          fontSize: '0.6rem',
-                          height: 16,
-                          '& .MuiChip-label': {
-                            px: 0.5
-                          }
-                        }}
-                      />
-                    </Box>
+              </Box>
+
+              {/* Team Logo */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {(() => {
+                  const teamCode = item.team || item.id || 'UNK';
+                  const logoUrl = getTeamLogoUrl(teamCode);
+                  return (
+                    <Avatar
+                      src={logoUrl}
+                      alt={teamCode}
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        backgroundColor: themeUtils.getTeamColor(teamCode),
+                        fontSize: '0.7rem',
+                        fontWeight: 700,
+                        border: index < 3 ? `2px solid ${getRankColor(index)}` : 'none'
+                      }}
+                      imgProps={{
+                        style: { objectFit: 'contain', background: 'white' }
+                      }}
+                    >
+                      {teamCode.substring(0, 3)}
+                    </Avatar>
+                  );
+                })()}
+              </Box>
+
+              {/* Name */}
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Box>
+                  <Typography variant="body2" fontWeight={600}>
+                    {item.name || 'Unknown'}
+                  </Typography>
+                  {tab.category !== 'team' && (
+                    <Typography variant="caption" color="text.secondary">
+                      {item.team || 'UNK'}
+                    </Typography>
                   )}
                 </Box>
-              </ListItem>
-            ))}
-          </List>
-        ) : (
-          <Box sx={{ 
-            textAlign: 'center', 
-            py: 3,
-            color: 'text.secondary'
-          }}>
-            <Typography variant="caption" sx={{ fontSize: '0.75rem' }}>
-              {emptyMessage}
-            </Typography>
-          </Box>
-        )}
+              </Box>
+
+              {/* Stat Value */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Typography 
+                  variant="h6" 
+                  fontWeight={700}
+                  sx={{ 
+                    color: index < 3 ? getRankColor(index) : theme.palette.text.primary,
+                    fontSize: '1rem'
+                  }}
+                >
+                  {formatValue(item)}
+                </Typography>
+              </Box>
+
+              {/* Details */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+                  {item.subtitle || `${item.statLabel || 'STAT'}`}
+                </Typography>
+              </Box>
+            </Box>
+          </motion.div>
+        ))}
       </Box>
     </Box>
   );
