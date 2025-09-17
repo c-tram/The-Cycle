@@ -18,15 +18,31 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "fix: Game times now display in user's local timezone instead of UTC
+git commit -m "feat: Add floating Baseball AI chat widget for future RAG integration
 
-🕐 Fixed timezone display issue:
-- Backend now sends raw ISO timestamps instead of pre-converted times
-- Frontend converts timestamps to user's local timezone using Intl API
-- Added formatGameTime() utility for consistent time formatting
-- Updated time-based sorting to handle ISO timestamps properly
+🤖 New Floating Chat Widget:
+- Sleek floating button with baseball icon in bottom-right corner
+- Professional chat interface with Material-UI styling
+- Smooth animations (slide-up, hover effects, typing indicators)
+- Global accessibility across all pages of the app
+- Message history with timestamps and user/bot styling
+- Quick question suggestions for new users
+- Multi-line input with Enter/Shift+Enter functionality
 
-✅ Game times now correctly show in user's local time zone instead of UTC. $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+🎯 Prepared for Azure AI Integration:
+- Mock conversation system ready for backend connection
+- Designed for RAG (Retrieval-Augmented Generation) architecture
+- Baseball-themed UI matching existing app design
+- Foundation for 2025 MLB season analytics chatbot
+
+✨ User Experience:
+- Non-intrusive floating design until activated
+- Responsive 400x600px chat window
+- Auto-scroll to newest messages
+- Easy close/open functionality
+- Baseball branding throughout interface
+
+Ready for Azure OpenAI Service integration! $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."

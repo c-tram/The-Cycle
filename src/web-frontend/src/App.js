@@ -11,6 +11,7 @@ import Navigation from './components/layout/Navigation';
 import Sidebar from './components/layout/Sidebar';
 import LoadingScreen from './components/common/LoadingScreen';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import FloatingChatWidget from './components/FloatingChatWidget';
 
 // Page components
 import Dashboard from './pages/Dashboard';
@@ -205,6 +206,9 @@ function App() {
               </AnimatePresence>
             </Box>
           </Box>
+          
+          {/* Floating Chat Widget - Available on all pages */}
+          <FloatingChatWidget />
         </Router>
       </ThemeProvider>
     </ErrorBoundary>
