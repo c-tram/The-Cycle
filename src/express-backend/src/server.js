@@ -103,10 +103,7 @@ app.post('/api/automation/refresh', async (req, res) => {
 const playerRoutesV2 = require('./routes/players_v2');
 const teamRoutesV2 = require('./routes/teams_v2');
 const statsRoutesV2 = require('./routes/stats_v2');
-const splitsRoutesV2 = require('./routes/splits_v2');
-const splitsDiscover = require('./routes/splits_discover');
-const splitsPlayers = require('./routes/splits_players');
-const matchupRoutes = require('./routes/matchups');
+const splitsMacroRoutesV2 = require('./routes/splits_macro_v2');
 const standingsRoutes = require('./routes/standings');
 const gamesRoutes = require('./routes/games');
 const mlbLiveRoutes = require('./routes/mlb-live');
@@ -115,9 +112,7 @@ const mlbLiveRoutes = require('./routes/mlb-live');
 app.use('/api/v2/players', playerRoutesV2);
 app.use('/api/v2/teams', teamRoutesV2);
 app.use('/api/v2/stats', statsRoutesV2);
-app.use('/api/v2/splits', splitsRoutesV2);
-app.use('/api/v2/splits', splitsDiscover);
-app.use('/api/v2/splits/players', splitsPlayers);
+app.use('/api/v2/splits', splitsMacroRoutesV2);
 app.use('/api/v2/games', gamesRoutes);
 app.use('/api/v2/mlb-live', mlbLiveRoutes);
 
@@ -127,7 +122,6 @@ app.use('/api/teams', teamRoutesV2);
 app.use('/api/stats', statsRoutesV2);
 
 // Additional routes
-app.use('/api/matchups', matchupRoutes);
 app.use('/api/standings', standingsRoutes);
 
 // Error handling middleware

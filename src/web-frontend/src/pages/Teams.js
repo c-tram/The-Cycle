@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { getTeamLogoUrl as getSharedTeamLogoUrl } from '../utils/teamLogos';
 import {
   Box,
   Grid,
@@ -62,21 +63,7 @@ import { themeUtils } from '../theme/theme';
 import { getCVRDisplay } from '../utils/cvrCalculations';
 
 // Team logo utility
-const getTeamLogoUrl = (teamCode) => {
-  if (!teamCode) return null;
-  const code = teamCode.toUpperCase();
-  const codeMap = {
-    AZ: 'ARI',
-    CWS: 'CHW',
-    KC: 'KCR',
-    SD: 'SDP',
-    SF: 'SFG',
-    TB: 'TBR',
-    WSH: 'WSN',
-  };
-  const logoCode = codeMap[code] || code;
-  return `https://a.espncdn.com/i/teamlogos/mlb/500/${logoCode}.png`;
-};
+const getTeamLogoUrl = (teamCode) => getSharedTeamLogoUrl(teamCode, 500);
 
 // Helper function to safely get nested object values
 const getNestedValue = (obj, path) => {

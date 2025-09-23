@@ -8,7 +8,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 // Create axios instance with default config
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000, // Reduced from 30000 to 10000ms
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -517,6 +517,28 @@ export const splitsApi = {
 };
 
 // ============================================================================
+// MACRO SPLITS API (v2 canonical)
+// ============================================================================
+
+export const macroSplitsApi = {
+  // Get full player macro splits object, or a subtree via ?path=
+  getPlayerMacro: async (team, player, season = '2025', path) => {
+    const safePlayer = encodeURIComponent(player.replace(/\s+/g, '-'));
+    const qs = path ? `?path=${encodeURIComponent(path)}` : '';
+  const response = await apiClient.get(`/v2/splits/macro/player/${team}/${safePlayer}/${season}${qs}`);
+  // When path is provided, backend wraps the subtree under { data }
+  return path ? (response.data?.data ?? null) : response.data;
+  },
+
+  // Get full team macro splits object, or a subtree via ?path=
+  getTeamMacro: async (team, season = '2025', path) => {
+    const qs = path ? `?path=${encodeURIComponent(path)}` : '';
+  const response = await apiClient.get(`/v2/splits/macro/team/${team}/${season}${qs}`);
+  return path ? (response.data?.data ?? null) : response.data;
+  }
+};
+
+// ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
 
@@ -638,6 +660,7 @@ export default {
   playersApi,
   teamsApi,
   splitsApi,
+  macroSplitsApi,
   legacyApi,
   apiUtils,
   healthCheck

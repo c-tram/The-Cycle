@@ -92,7 +92,7 @@ import {
   Filler
 } from 'chart.js';
 
-import { splitsApi } from '../services/apiService';
+import { macroSplitsApi, splitsApi } from '../services/apiService';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 // Register Chart.js components
@@ -425,6 +425,8 @@ const Splits = () => {
   const [selectedTeam, setSelectedTeam] = useState('');
   const [selectedSeason, setSelectedSeason] = useState('2025');
   const [availablePlayers, setAvailablePlayers] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchText, setSearchText] = useState('');
   const [splitsData, setSplitsData] = useState({});
   const [activeFilters, setActiveFilters] = useState(new Set());
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -466,18 +468,29 @@ const Splits = () => {
   // DATA FETCHING
   // ============================================================================
 
-  const fetchAvailablePlayers = useCallback(async () => {
+  // Live search players via macro search endpoint with debounce
+  const fetchAvailablePlayers = useCallback(async (query = '', team = '', season = selectedSeason) => {
     try {
-      setLoading(true);
-      const data = await splitsApi.getAvailablePlayers();
-      setAvailablePlayers(data.players || []);
+      setSearchLoading(true);
+      const params = new URLSearchParams();
+      if (query) params.set('q', query);
+      if (team) params.set('team', team);
+      if (season) params.set('season', season);
+      params.set('limit', '25');
+      const res = await fetch(`/api/v2/splits/players/search?${params.toString()}`);
+      if (res.ok) {
+        const data = await res.json();
+        setAvailablePlayers(data.players || []);
+      } else {
+        setAvailablePlayers([]);
+      }
     } catch (err) {
-      setError('Failed to load available players');
       console.error('Error fetching players:', err);
+      setAvailablePlayers([]);
     } finally {
-      setLoading(false);
+      setSearchLoading(false);
     }
-  }, []);
+  }, [selectedSeason]);
 
   // Load quick stats overview (Home/Away/vs RHP/LHP)
   const loadQuickStats = useCallback(async (playerData) => {
@@ -485,115 +498,110 @@ const Splits = () => {
     
     try {
       const { team, name, season } = playerData;
-      const playerName = name.replace(/\s+/g, '-');
-
-      // Fetch home/away and handedness splits for quick overview
-      const [homeAwayData, handednessData] = await Promise.allSettled([
-        splitsApi.getHomeAwaySplits(team, playerName, season),
-        splitsApi.getHandednessSplits(team, playerName, season)
-      ]);
-
+      const macro = await macroSplitsApi.getPlayerMacro(team, name, season);
+      const splits = macro?.splits || {};
+      const homeNode = splits.by_location?.home?.stats?.batting;
+      const awayNode = splits.by_location?.away?.stats?.batting;
+      const vsRNode = (splits.by_handedness?.R || splits.by_handedness?.right)?.stats?.batting;
+      const vsLNode = (splits.by_handedness?.L || splits.by_handedness?.left)?.stats?.batting;
       const stats = { homeAvg: '.---', awayAvg: '.---', vsRhp: '.---', vsLhp: '.---' };
-
-      // Parse Home/Away data
-      if (homeAwayData.status === 'fulfilled' && homeAwayData.value?.data) {
-        const homeData = homeAwayData.value.data.home?.stats?.batting;
-        const awayData = homeAwayData.value.data.away?.stats?.batting;
-        
-        if (homeData?.avg) stats.homeAvg = homeData.avg.toFixed(3);
-        if (awayData?.avg) stats.awayAvg = awayData.avg.toFixed(3);
-      }
-
-      // Parse Handedness data  
-      if (handednessData.status === 'fulfilled' && handednessData.value?.data) {
-        const vsRHP = handednessData.value.data.R?.stats?.batting;
-        const vsLHP = handednessData.value.data.L?.stats?.batting;
-        
-        if (vsRHP?.avg) stats.vsRhp = vsRHP.avg.toFixed(3);
-        if (vsLHP?.avg) stats.vsLhp = vsLHP.avg.toFixed(3);
-      }
-
+      const fmt = (v) => (typeof v === 'number' ? v.toFixed(3) : (typeof v === 'string' ? v : '.---'));
+      stats.homeAvg = fmt(homeNode?.avg);
+      stats.awayAvg = fmt(awayNode?.avg);
+      stats.vsRhp = fmt(vsRNode?.avg);
+      stats.vsLhp = fmt(vsLNode?.avg);
       setQuickStats(stats);
     } catch (error) {
-      console.error('Error loading quick stats:', error);
+      console.error('Error loading quick stats from macro:', error);
     }
   }, []);
+
+  // Normalize macro API payloads to the UI's expected shape
+  const normalizeMacroToUI = ({ by_location, by_venue, by_opponent, by_handedness, by_count, playerName }) => {
+    // Home/Away
+    const homeAway = {
+      player: playerName,
+      splits: {
+        home: by_location?.home || null,
+        away: by_location?.away || null
+      }
+    };
+
+    // Venues
+  const venues = { venues: {} };
+  if (by_venue && typeof by_venue === 'object') {
+      for (const [venue, data] of Object.entries(by_venue)) {
+        venues.venues[venue] = {
+          home: data?.home || null,
+          away: data?.away || null
+        };
+      }
+    }
+
+    // Opponents
+  const vsTeams = { opponents: {} };
+  if (by_opponent && typeof by_opponent === 'object') {
+      for (const [opp, data] of Object.entries(by_opponent)) {
+        vsTeams.opponents[opp] = {
+          home: data?.home || null,
+          away: data?.away || null
+        };
+      }
+    }
+
+    // Handedness
+  const handedness = { handedness: { left: null, right: null } };
+  if (by_handedness && typeof by_handedness === 'object') {
+      const left = by_handedness.L || by_handedness.left;
+      const right = by_handedness.R || by_handedness.right;
+      if (left) {
+        handedness.handedness.left = { home: left.home || null, away: left.away || null };
+      }
+      if (right) {
+        handedness.handedness.right = { home: right.home || null, away: right.away || null };
+      }
+    }
+
+    // Counts
+  const counts = { counts: {} };
+  if (by_count && typeof by_count === 'object') {
+      for (const [count, data] of Object.entries(by_count)) {
+        counts.counts[count] = {
+          home: data?.home || null,
+          away: data?.away || null
+        };
+      }
+    }
+
+    return { homeAway, venues, vsTeams, handedness, counts };
+  };
 
   const fetchPlayerSplits = useCallback(async (playerData) => {
     if (!playerData) return;
-    
     try {
       setLoading(true);
       setError(null);
-
       const { team, name, season } = playerData;
-      const playerName = name.replace(/\s+/g, '-');
-
-      console.log(`🔍 Fetching comprehensive splits for ${name} (${team})...`);
-
-      // Use the comprehensive splits search as primary data source
-      const allSplitsData = await splitsApi.searchPlayerSplits(team, playerName, season);
-      
-      console.log('🔍 Raw splits data structure:', allSplitsData);
-      console.log('🔍 Full response keys:', Object.keys(allSplitsData));
-      console.log('🔍 Splits keys:', Object.keys(allSplitsData.splits || {}));
-      console.log('🔍 Sample split data:', Object.values(allSplitsData.splits || {})[0]);
-      
-      // If search endpoint returns no splits, fall back to individual endpoints
-      if (!allSplitsData.splits || Object.keys(allSplitsData.splits).length === 0) {
-        console.log('⚠️ Search endpoint returned no splits. Trying individual endpoints...');
-        
-        // Fetch individual split types as fallback
-        const [
-          homeAway,
-          venues,
-          vsTeams,
-          handedness,
-          counts
-        ] = await Promise.allSettled([
-          splitsApi.getHomeAwaySplits(team, playerName, season),
-          splitsApi.getVenueSplits(team, playerName, season),
-          splitsApi.getVsTeamsSplits(team, playerName, season),
-          splitsApi.getHandednessSplits(team, playerName, season),
-          splitsApi.getCountSplits(team, playerName, season)
-        ]);
-
-        console.log('🔍 Individual endpoint results:');
-        console.log('Home/Away:', homeAway.status, homeAway.value || homeAway.reason);
-        console.log('Venues:', venues.status, venues.value || venues.reason);
-        console.log('Vs Teams:', vsTeams.status, vsTeams.value || vsTeams.reason);
-        console.log('Handedness:', handedness.status, handedness.value || handedness.reason);
-        console.log('Counts:', counts.status, counts.value || counts.reason);
-
-        setSplitsData({
-          homeAway: homeAway.status === 'fulfilled' ? homeAway.value : null,
-          venues: venues.status === 'fulfilled' ? venues.value : null,
-          vsTeams: vsTeams.status === 'fulfilled' ? vsTeams.value : null,
-          handedness: handedness.status === 'fulfilled' ? handedness.value : null,
-          counts: counts.status === 'fulfilled' ? counts.value : null,
-          allSplits: allSplitsData
-        });
-
-        return;
-      }
-      
-      console.log(`📊 Found ${Object.keys(allSplitsData.splits || {}).length} split categories for ${name}`);
-
-      // Parse the comprehensive data into our expected format
-      const parsedData = parseComprehensiveSplitsData(allSplitsData);
-
-      setSplitsData(parsedData);
-      
-      // Load quick stats overview data
-      loadQuickStats(playerData);
-
-    } catch (err) {
-      setError(`Failed to load splits for ${playerData.name}: ${err.message}`);
-      console.error('Error fetching splits:', err);
+      console.log(`🔎 Fetching macro splits for ${name} (${team})...`);
+      const full = await macroSplitsApi.getPlayerMacro(team, name, season);
+      const splits = full?.splits || {};
+      const normalized = normalizeMacroToUI({
+        by_location: splits.by_location || null,
+        by_venue: splits.by_venue || null,
+        by_opponent: splits.by_opponent || null,
+        by_handedness: splits.by_handedness || null,
+        by_count: splits.by_count || null,
+        playerName: name
+      });
+      setSplitsData(normalized);
+      await loadQuickStats(playerData);
+    } catch (macroErr) {
+      setError(`Failed to load splits for ${playerData.name}: ${macroErr.message}`);
+      console.error('Error fetching splits:', macroErr);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadQuickStats]);
 
   // Helper function to parse comprehensive splits data into component format
   const parseComprehensiveSplitsData = (allSplitsData) => {
@@ -654,9 +662,18 @@ const Splits = () => {
   // EFFECTS
   // ============================================================================
 
+  // Initial load with empty query to show top matches
   useEffect(() => {
-    fetchAvailablePlayers();
+    fetchAvailablePlayers('');
   }, [fetchAvailablePlayers]);
+
+  // Debounced live search as user types
+  useEffect(() => {
+    const h = setTimeout(() => {
+      fetchAvailablePlayers(searchText, selectedTeam || '', selectedSeason);
+    }, 250);
+    return () => clearTimeout(h);
+  }, [searchText, selectedTeam, selectedSeason, fetchAvailablePlayers]);
 
   useEffect(() => {
     if (selectedPlayer) {
@@ -725,27 +742,30 @@ const Splits = () => {
               <Autocomplete
                 options={availablePlayers}
                 getOptionLabel={(option) => `${option.name} (${option.team})`}
-                renderOption={(props, option) => (
-                  <Box component="li" {...props}>
-                    <Avatar sx={{ bgcolor: 'primary.main', mr: 2, width: 32, height: 32 }}>
-                      {option.team}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="body1" fontWeight="medium">
-                        {option.name}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {option.team} • {option.season} • {option.keyCount} splits
-                      </Typography>
+                renderOption={(props, option) => {
+                  const { key, ...liProps } = props;
+                  return (
+                    <Box component="li" key={key} {...liProps}>
+                      <Avatar sx={{ bgcolor: 'primary.main', mr: 2, width: 32, height: 32 }}>
+                        {option.team}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="body1" fontWeight="medium">
+                          {option.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {option.team} • {option.season} • {option.keyCount} splits
+                        </Typography>
+                      </Box>
                     </Box>
-                  </Box>
-                )}
+                  );
+                }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
                     label="Search Players"
                     variant="outlined"
-                    placeholder="Type player name or team..."
+                    placeholder="Type player name..."
                     fullWidth
                     sx={{
                       '& .MuiOutlinedInput-root': {
@@ -753,12 +773,13 @@ const Splits = () => {
                         background: alpha(theme.palette.background.paper, 0.8),
                       }
                     }}
+                    onChange={(e) => setSearchText(e.target.value)}
                   />
                 )}
                 onChange={handlePlayerSelect}
                 value={selectedPlayer}
-                loading={loading}
-                loadingText="Loading players..."
+                loading={searchLoading}
+                loadingText="Searching..."
                 noOptionsText="No players found with splits data"
                 isOptionEqualToValue={(option, value) => option.id === value.id}
               />
@@ -2429,19 +2450,82 @@ const VsPitchersContent = ({ playerData, showAdvanced }) => {
     
     setLoading(true);
     try {
-      // Load general pitcher splits
-      const pitchersResponse = await fetch(`http://localhost:3001/api/splits/v2/pitchers/${playerData.id}`);
-      if (pitchersResponse.ok) {
-        const pitchersData = await pitchersResponse.json();
-        setPitchersData(pitchersData);
+      const team = playerData.team;
+      const name = playerData.name;
+      const season = playerData.season || '2025';
+
+      // Pull macro subtree with count vs pitcher breakdowns
+      const subtree = await macroSplitsApi.getPlayerMacro(team, name, season, 'compound.count_vs_pitcher');
+
+      if (!subtree || typeof subtree !== 'object') {
+        setPitchersData({});
+        setCountPitchersData({});
+        return;
       }
 
-      // Load count-based pitcher splits 
-      const countPitchersResponse = await fetch(`http://localhost:3001/api/splits/v2/counts-vs-pitchers/${playerData.id}`);
-      if (countPitchersResponse.ok) {
-        const countData = await countPitchersResponse.json();
-        setCountPitchersData(countData);
+      const initTotals = () => ({
+        plateAppearances: 0,
+        atBats: 0,
+        hits: 0,
+        doubles: 0,
+        triples: 0,
+        homeRuns: 0,
+        walks: 0,
+        runs: 0,
+        rbi: 0,
+        strikeouts: 0,
+        totalBases: 0
+      });
+
+      const addStats = (tot, b) => {
+        tot.plateAppearances += b.plateAppearances || 0;
+        tot.atBats += b.atBats || 0;
+        tot.hits += b.hits || 0;
+        tot.doubles += b.doubles || 0;
+        tot.triples += b.triples || 0;
+        tot.homeRuns += b.homeRuns || 0;
+        tot.walks += b.walks || 0;
+        tot.runs += b.runs || 0;
+        tot.rbi += b.rbi || 0;
+        tot.strikeouts += b.strikeouts || 0;
+        // Prefer totalBases if present; else compute approximation
+        if (typeof b.totalBases === 'number') {
+          tot.totalBases += b.totalBases;
+        } else {
+          tot.totalBases += (b.hits || 0) + (b.doubles || 0) + 2 * (b.triples || 0) + 3 * (b.homeRuns || 0);
+        }
+      };
+
+      const finalize = (tot) => {
+        const avg = tot.atBats > 0 ? (tot.hits / tot.atBats).toFixed(3) : '.000';
+        const obp = tot.plateAppearances > 0 ? ((tot.hits + tot.walks) / tot.plateAppearances).toFixed(3) : '.000';
+        const slg = tot.atBats > 0 ? (tot.totalBases / tot.atBats).toFixed(3) : '.000';
+        const ops = (parseFloat(obp) + parseFloat(slg)).toFixed(3);
+        return { ...tot, avg, obp, slg, ops, totalPlays: tot.plateAppearances, games: 0 };
+      };
+
+      const pitchersAgg = {};
+      const countsAgg = {};
+
+      for (const [pitcherKey, counts] of Object.entries(subtree)) {
+        const pTot = initTotals();
+        for (const [count, locs] of Object.entries(counts || {})) {
+          const cTot = initTotals();
+          ['home', 'away'].forEach((loc) => {
+            const b = locs?.[loc]?.stats?.batting;
+            if (b && typeof b === 'object') {
+              addStats(pTot, b);
+              addStats(cTot, b);
+            }
+          });
+          if (!countsAgg[count]) countsAgg[count] = {};
+          countsAgg[count][pitcherKey] = finalize(cTot);
+        }
+        pitchersAgg[pitcherKey] = finalize(pTot);
       }
+
+      setPitchersData(pitchersAgg);
+      setCountPitchersData(countsAgg);
     } catch (error) {
       console.error('Error loading pitcher splits:', error);
     } finally {

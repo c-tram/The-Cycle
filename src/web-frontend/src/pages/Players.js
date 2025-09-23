@@ -58,24 +58,10 @@ import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isVa
 import { playersApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
 import { getCVRDisplay } from '../utils/cvrCalculations';
+import { getTeamLogoUrl as getSharedTeamLogoUrl } from '../utils/teamLogos';
 
-// Utility: Get MLB team logo URL by team code (3-letter abbreviation)
-const getTeamLogoUrl = (teamCode) => {
-  if (!teamCode) return null;
-  const code = teamCode.toUpperCase();
-  const codeMap = {
-    AZ: 'ARI',
-    CWS: 'CHW',
-    KC: 'KCR',
-    SD: 'SDP',
-    SF: 'SFG',
-    TB: 'TBR',
-    WSH: 'WSN',
-    // Add more mappings as needed
-  };
-  const logoCode = codeMap[code] || code;
-  return `https://a.espncdn.com/i/teamlogos/mlb/500/${logoCode}.png`;
-};
+// Utility: Get MLB team logo URL by team code (uses shared ESPN mapping)
+const getTeamLogoUrl = (teamCode) => getSharedTeamLogoUrl(teamCode, 500);
 
 // Helper function to safely get nested object values
 const getNestedValue = (obj, path) => {

@@ -121,6 +121,7 @@ class SplitTracker {
           strikePercentage: 0,
           ballPercentage: 0,
           firstPitchStrikes: 0,
+          firstPitchAttempts: 0,
           firstPitchStrikePercentage: 0,
           swingAndMiss: 0,
           swingAndMissPercentage: 0,
@@ -141,7 +142,11 @@ class SplitTracker {
     };
   }
 
-  updateStats(stats, outcome, playData) {
+  /**
+   * Update stats from a single play.
+   * mode: 'batting' | 'pitching' | 'both' (default 'both')
+   */
+  updateStats(stats, outcome, playData, mode = 'both') {
     // Core statistical engine - converts play-by-play outcomes to baseball statistics
     if (!outcome || !playData) return;
 
@@ -153,16 +158,30 @@ class SplitTracker {
     const pitchSequence = playEvents || [];
     
     // BATTING STATISTICS UPDATES
-    this.updateBattingStats(stats.batting, result, about, matchup, finalCount, pitchSequence);
+    if (mode === 'batting' || mode === 'both') {
+      this.updateBattingStats(stats.batting, result, about, matchup, finalCount, pitchSequence);
+    }
     
     // PITCHING STATISTICS UPDATES  
-    this.updatePitchingStats(stats.pitching, result, about, matchup, finalCount, pitchSequence);
+    if (mode === 'pitching' || mode === 'both') {
+      this.updatePitchingStats(stats.pitching, result, about, matchup, finalCount, pitchSequence);
+    }
     
     // COUNT-BASED UPDATES
-    this.updateCountBasedStats(stats, result, finalCount, pitchSequence, matchup);
+    if (mode === 'batting' || mode === 'both') {
+      this.updateCountBasedStats({ batting: stats.batting, pitching: this.initializeStats().pitching }, result, finalCount, pitchSequence, matchup, 'batting');
+    }
+    if (mode === 'pitching' || mode === 'both') {
+      this.updateCountBasedStats({ batting: this.initializeStats().batting, pitching: stats.pitching }, result, finalCount, pitchSequence, matchup, 'pitching');
+    }
     
     // PITCH-LEVEL UPDATES
-    this.updatePitchLevelStats(stats, pitchSequence, result);
+    if (mode === 'batting' || mode === 'both') {
+      this.updatePitchLevelStats({ batting: stats.batting, pitching: this.initializeStats().pitching }, pitchSequence, result, 'batting');
+    }
+    if (mode === 'pitching' || mode === 'both') {
+      this.updatePitchLevelStats({ batting: this.initializeStats().batting, pitching: stats.pitching }, pitchSequence, result, 'pitching');
+    }
     
     // Calculate derived statistics
     this.calculateDerivedStats(stats);
@@ -297,7 +316,8 @@ class SplitTracker {
     if (about.isComplete && this.isOut(event)) {
       const outsRecorded = this.getOutsRecorded(event);
       pitching.outs = (pitching.outs || 0) + outsRecorded;
-      pitching.inningsPitched = Math.floor(pitching.outs / 3) + ((pitching.outs % 3) / 10);
+      // Represent innings pitched as outs/3 (e.g., 5.1 -> 5.33)
+      pitching.inningsPitched = parseFloat((pitching.outs / 3).toFixed(2));
     }
   }
 
@@ -382,22 +402,21 @@ class SplitTracker {
     }
     
     // First pitch strike percentage
-    const firstPitchAttempts = pitchData.firstPitchStrikes + (pitchData.totalPitches > 0 ? 1 : 0);
-    if (firstPitchAttempts > 0) {
-      pitchData.firstPitchStrikePercentage = parseFloat((pitchData.firstPitchStrikes / firstPitchAttempts * 100).toFixed(1));
+    if (pitchData.firstPitchAttempts > 0) {
+      pitchData.firstPitchStrikePercentage = parseFloat((pitchData.firstPitchStrikes / pitchData.firstPitchAttempts * 100).toFixed(1));
     }
   }
 
   /**
    * Update count-based statistics for both batting and pitching
    */
-  updateCountBasedStats(stats, result, finalCount, pitchSequence, matchup) {
+  updateCountBasedStats(stats, result, finalCount, pitchSequence, matchup, mode = 'both') {
     const { batting, pitching } = stats;
     const { event } = result;
     const countKey = `${finalCount.balls}-${finalCount.strikes}`;
     
     // BATTING COUNT UPDATES
-    if (batting.countSituations[countKey]) {
+    if ((mode === 'batting' || mode === 'both') && batting.countSituations[countKey]) {
       batting.countSituations[countKey].pa++;
       if (this.isHit(event)) {
         batting.countSituations[countKey].hits++;
@@ -405,37 +424,37 @@ class SplitTracker {
     }
     
     // Two-strike situations
-    if (finalCount.strikes >= 2) {
+  if ((mode === 'batting' || mode === 'both') && finalCount.strikes >= 2) {
       batting.twoStrikeSituations.pa++;
       if (this.isHit(event)) batting.twoStrikeSituations.hits++;
       if (this.isStrikeout(event)) batting.twoStrikeSituations.strikeouts++;
     }
     
     // Hitter's count vs Pitcher's count
-    if (this.isHittersCount(finalCount)) {
+  if ((mode === 'batting' || mode === 'both') && this.isHittersCount(finalCount)) {
       batting.hittersCountSituations.pa++;
       if (this.isHit(event)) batting.hittersCountSituations.hits++;
-    } else if (this.isPitchersCount(finalCount)) {
+  } else if ((mode === 'batting' || mode === 'both') && this.isPitchersCount(finalCount)) {
       batting.pitchersCountSituations.pa++;
       if (this.isHit(event)) batting.pitchersCountSituations.hits++;
     }
     
     // Full count
-    if (finalCount.balls === 3 && finalCount.strikes === 2) {
+  if ((mode === 'batting' || mode === 'both') && finalCount.balls === 3 && finalCount.strikes === 2) {
       batting.fullCountSituations.pa++;
       if (this.isHit(event)) batting.fullCountSituations.hits++;
     }
     
     // PITCHING COUNT UPDATES
-    if (this.isAheadInCount(finalCount)) {
+  if ((mode === 'pitching' || mode === 'both') && this.isAheadInCount(finalCount)) {
       pitching.countResults.aheadInCount.batters++;
       if (this.isStrikeout(event)) pitching.countResults.aheadInCount.strikeouts++;
       if (this.isWalk(event)) pitching.countResults.aheadInCount.walks++;
-    } else if (this.isBehindInCount(finalCount)) {
+  } else if ((mode === 'pitching' || mode === 'both') && this.isBehindInCount(finalCount)) {
       pitching.countResults.behindInCount.batters++;
       if (this.isStrikeout(event)) pitching.countResults.behindInCount.strikeouts++;
       if (this.isWalk(event)) pitching.countResults.behindInCount.walks++;
-    } else {
+  } else if (mode === 'pitching' || mode === 'both') {
       pitching.countResults.evenCount.batters++;
       if (this.isStrikeout(event)) pitching.countResults.evenCount.strikeouts++;
       if (this.isWalk(event)) pitching.countResults.evenCount.walks++;
@@ -445,7 +464,7 @@ class SplitTracker {
   /**
    * Update pitch-level statistics from pitch sequence
    */
-  updatePitchLevelStats(stats, pitchSequence, result) {
+  updatePitchLevelStats(stats, pitchSequence, result, mode = 'both') {
     const { pitching } = stats;
     const { batting } = stats;
     
@@ -466,7 +485,7 @@ class SplitTracker {
         const pitchResult = pitch.details.description || '';
         
         // First pitch tracking
-        if (index === 0) {
+        if ((mode === 'batting' || mode === 'both') && index === 0) {
           if (pitchResult.toLowerCase().includes('strike') || 
               pitchResult.toLowerCase().includes('called strike') ||
               pitchResult.toLowerCase().includes('swinging strike')) {
@@ -485,6 +504,9 @@ class SplitTracker {
           if (this.isHit(result.event) && index === pitchSequence.length - 1) {
             batting.firstPitchResults.hits++;
           }
+        }
+        if ((mode === 'pitching' || mode === 'both') && index === 0) {
+          pitching.pitchData.firstPitchAttempts++;
         }
         
         // Strike/Ball classification
@@ -509,14 +531,15 @@ class SplitTracker {
     });
     
     // Update pitching data
-    pitching.pitchData.totalPitches += pitchCount;
-    pitching.pitchData.strikes += strikes;
-    pitching.pitchData.balls += balls;
-    pitching.pitchData.foulBalls += foulBalls;
-    pitching.pitchData.swingAndMiss += swingAndMiss;
-    
-    if (firstPitchStrike) {
-      pitching.pitchData.firstPitchStrikes++;
+  if (mode === 'pitching' || mode === 'both') {
+      pitching.pitchData.totalPitches += pitchCount;
+      pitching.pitchData.strikes += strikes;
+      pitching.pitchData.balls += balls;
+      pitching.pitchData.foulBalls += foulBalls;
+      pitching.pitchData.swingAndMiss += swingAndMiss;
+      if (firstPitchStrike) {
+        pitching.pitchData.firstPitchStrikes++;
+      }
     }
   }
 
@@ -636,6 +659,182 @@ class SplitTracker {
 }
 
 // ============================================================================
+// MACRO KEY AGGREGATOR (Per Player/Team Per Season) - Simplified, Minimal Keys
+// ============================================================================
+
+// Macro key helpers
+const MacroKeys = {
+  player: (team, playerName, year) => `splits:player:${team}-${(playerName || '').replace(/\s+/g, '_')}-${year}`,
+  team: (team, year) => `splits:team:${team}:${year}`
+};
+
+// Utility helpers
+function normalizeName(name) {
+  return (name || '').replace(/\s+/g, '_');
+}
+
+function isPlainObject(obj) {
+  return obj && typeof obj === 'object' && !Array.isArray(obj) && !(obj instanceof Set);
+}
+
+// Deep merge that sums numbers, recurses into objects, and unions sets
+function deepSumMerge(target, source) {
+  if (source instanceof Set) {
+    if (!(target instanceof Set)) target = new Set();
+    for (const v of source) target.add(v);
+    return target;
+  }
+
+  if (Array.isArray(source)) {
+    // We don't store arrays in macro state (no plays), skip/replace if needed
+    return Array.isArray(target) ? target : [];
+  }
+
+  if (isPlainObject(source)) {
+    const out = isPlainObject(target) ? { ...target } : {};
+    for (const [k, v] of Object.entries(source)) {
+      out[k] = deepSumMerge(out[k], v);
+    }
+    return out;
+  }
+
+  if (typeof source === 'number') {
+    return (typeof target === 'number' ? target : 0) + source;
+  }
+
+  // strings/booleans/dates -> prefer source
+  return source !== undefined ? source : target;
+}
+
+// Serialize Sets to Arrays recursively
+function serializeSets(obj) {
+  if (obj instanceof Set) return Array.from(obj);
+  if (Array.isArray(obj)) return obj.map(serializeSets);
+  if (isPlainObject(obj)) {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) out[k] = serializeSets(v);
+    return out;
+  }
+  return obj;
+}
+
+// Create empty macro data structure
+function createEmptyMacro(isTeam, info) {
+  return {
+    info,
+    splits: {},
+    games: new Set(),
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+// Navigate/create leaf at path under splits
+function getLeaf(rootSplits, path, initLeaf) {
+  let ctx = rootSplits;
+  for (let i = 0; i < path.length - 1; i++) {
+    const key = path[i];
+    if (!ctx[key] || !isPlainObject(ctx[key])) ctx[key] = {};
+    ctx = ctx[key];
+  }
+  const leafKey = path[path.length - 1];
+  if (!ctx[leafKey]) ctx[leafKey] = initLeaf();
+  return ctx[leafKey];
+}
+
+class MacroAggregator {
+  constructor() {
+    this.macros = new Map(); // macroKey -> macroData (partial for this run)
+    this.helper = new SplitTracker(); // reuse stat calculators
+  }
+
+  _getOrCreateMacro(macroKey, isTeam, info) {
+    if (!this.macros.has(macroKey)) {
+      this.macros.set(macroKey, createEmptyMacro(isTeam, info));
+    }
+    return this.macros.get(macroKey);
+  }
+
+  _initLeaf() {
+    return {
+      stats: this.helper.initializeStats(),
+      games: new Set()
+    };
+  }
+
+  _update(macroData, path, gameId, play, result, mode = 'both') {
+    const leaf = getLeaf(macroData.splits, path, () => this._initLeaf());
+    leaf.games.add(gameId);
+    this.helper.updateStats(leaf.stats, result, play, mode);
+    macroData.games.add(gameId);
+    macroData.lastUpdated = new Date().toISOString();
+  }
+
+  updatePlayer(team, playerName, year, path, gameId, play, result, mode = 'both') {
+    const macroKey = MacroKeys.player(team, playerName, year);
+    const macro = this._getOrCreateMacro(macroKey, false, { team, name: playerName, year });
+    this._update(macro, path, gameId, play, result, mode);
+  }
+
+  updateTeam(team, year, path, gameId, play, result, mode = 'both') {
+    const macroKey = MacroKeys.team(team, year);
+    const macro = this._getOrCreateMacro(macroKey, true, { team, year });
+    this._update(macro, path, gameId, play, result, mode);
+  }
+
+  async flush(redis) {
+    if (this.macros.size === 0) return;
+
+    // Read current, merge, then write in a pipeline
+    const pipeline = redis.pipeline();
+
+    for (const [macroKey, partial] of this.macros.entries()) {
+      try {
+        const existingStr = await redis.get(macroKey);
+        let merged;
+        if (existingStr) {
+          const existing = JSON.parse(existingStr);
+          // Convert games arrays back to Sets for merge
+          if (Array.isArray(existing.games)) existing.games = new Set(existing.games);
+          // Recursively convert leaf games to Sets
+          const reviveSets = (node) => {
+            if (!node || typeof node !== 'object') return;
+            if (node.games && Array.isArray(node.games)) node.games = new Set(node.games);
+            for (const v of Object.values(node)) reviveSets(v);
+          };
+          reviveSets(existing.splits);
+
+          merged = { ...existing };
+          merged.info = partial.info || existing.info;
+          merged.games = deepSumMerge(existing.games, partial.games);
+          merged.splits = deepSumMerge(existing.splits || {}, partial.splits || {});
+          merged.lastUpdated = new Date().toISOString();
+          // Recompute derived stats for all leaves
+          const walkLeavesAndRecompute = (node) => {
+            if (!node || typeof node !== 'object') return;
+            if (node.stats && node.stats.batting && node.stats.pitching) {
+              this.helper.calculateDerivedStats(node.stats);
+            }
+            for (const v of Object.values(node)) walkLeavesAndRecompute(v);
+          };
+          walkLeavesAndRecompute(merged.splits);
+        } else {
+          merged = partial;
+        }
+
+        const payload = serializeSets(merged);
+        pipeline.set(macroKey, JSON.stringify(payload));
+      } catch (e) {
+        // Log and continue
+        console.error(`❌ Failed to prepare macro write for ${macroKey}:`, e.message);
+      }
+    }
+
+    await pipeline.exec();
+    this.macros.clear();
+  }
+}
+
+// ============================================================================
 // PLAY-BY-PLAY DATA PROCESSING
 // ============================================================================
 
@@ -666,27 +865,27 @@ async function fetchPlayByPlayData(gameId) {
 /**
  * Process all plays in a game to extract splits
  */
-async function processGameSplits(gameId, playByPlayData, gameDate, homeTeam, awayTeam) {
-  const splitTracker = new SplitTracker();
+  async function processGameSplits(gameId, playByPlayData, gameDate, homeTeam, awayTeam, season) {
+  const macro = new MacroAggregator();
   const plays = playByPlayData.allPlays || [];
   
   console.log(`🎯 Processing ${plays.length} plays for game ${gameId} (${homeTeam} vs ${awayTeam})`);
 
   for (const play of plays) {
     try {
-      await processIndividualPlay(splitTracker, gameId, play, gameDate, homeTeam, awayTeam);
+  await processIndividualPlay(macro, gameId, play, gameDate, homeTeam, awayTeam, season);
     } catch (error) {
       console.error(`⚠️ Error processing play in game ${gameId}:`, error.message);
     }
   }
 
-  return splitTracker;
+  return macro;
 }
 
 /**
  * Process a single play to extract all possible splits
  */
-async function processIndividualPlay(splitTracker, gameId, play, gameDate, homeTeam, awayTeam) {
+async function processIndividualPlay(macro, gameId, play, gameDate, homeTeam, awayTeam, season) {
   const { result, about, matchup, count, playEvents } = play;
   
   if (!matchup || !matchup.batter || !matchup.pitcher) {
@@ -709,98 +908,79 @@ async function processIndividualPlay(splitTracker, gameId, play, gameDate, homeT
   const finalCount = count || { balls: 0, strikes: 0 };
   const countString = `${finalCount.balls}-${finalCount.strikes}`;
 
-  // 1. HOME/AWAY SPLITS
+  // 1. HOME/AWAY SPLITS -> Player macro path
   const homeAwayContext = battingTeam === homeTeam ? 'home' : 'away';
-  const homeAwaySplitKey = `split:home-away:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(homeAwaySplitKey, gameId, play, result);
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['by_location', homeAwayContext], gameId, play, result, 'batting');
+  macro.updateTeam(battingTeam, season, ['by_location', homeAwayContext], gameId, play, result, 'batting');
 
-  // 2. VENUE SPLITS  
-  const venueSplitKey = `split:venue:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${venue}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(venueSplitKey, gameId, play, result);
+  // 2. VENUE SPLITS
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['vs_venues', venue, homeAwayContext], gameId, play, result, 'batting');
+  macro.updateTeam(battingTeam, season, ['at_venues', venue, homeAwayContext], gameId, play, result, 'batting');
 
   // 2b. PITCHER VENUE SPLITS (How pitchers perform at different ballparks)
-  const pitcherVenueSplitKey = `split:pitcher-venue:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${venue}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(pitcherVenueSplitKey, gameId, play, result);
+  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['vs_venues', venue, homeAwayContext], gameId, play, result, 'pitching');
+  macro.updateTeam(fieldingTeam, season, ['at_venues', venue, homeAwayContext], gameId, play, result, 'pitching');
 
   // 3. PLAYER vs TEAM SPLITS
-  const playerTeamSplitKey = `split:player-team:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(playerTeamSplitKey, gameId, play, result);
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['vs_teams', fieldingTeam, homeAwayContext], gameId, play, result, 'batting');
+  macro.updateTeam(battingTeam, season, ['vs_teams', fieldingTeam, homeAwayContext], gameId, play, result, 'batting');
 
   // 4. BATTER vs PITCHER SPLITS (The key matchup!)
-  const batterPitcherSplitKey = `split:batter-pitcher:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(batterPitcherSplitKey, gameId, play, result);
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['vs_pitchers', `${fieldingTeam}-${normalizeName(pitcher.fullName)}`, homeAwayContext], gameId, play, result, 'batting');
 
   // 4b. PITCHER vs BATTER SPLITS (Reverse perspective!)
-  const pitcherBatterSplitKey = `split:pitcher-batter:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(pitcherBatterSplitKey, gameId, play, result);
+  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['vs_batters', `${battingTeam}-${normalizeName(batter.fullName)}`, homeAwayContext], gameId, play, result, 'pitching');
 
   // 5. HANDEDNESS SPLITS (Cumulative across all teams)
-  const batterHandSplitKey = `split:batter-hand:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${pitcherHand}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(batterHandSplitKey, gameId, play, result);
-
-  const pitcherHandSplitKey = `split:pitcher-hand:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${batterHand}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(pitcherHandSplitKey, gameId, play, result);
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['vs_handedness', pitcherHand, homeAwayContext], gameId, play, result, 'batting');
+  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['vs_handedness', batterHand, homeAwayContext], gameId, play, result, 'pitching');
 
   // 5b. TEAM-SPECIFIC HANDEDNESS SPLITS (New!)
   // Batter vs specific team's left/right pitching
-  const batterHandVsTeamKey = `split:batter-hand-vs-team:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}:${pitcherHand}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(batterHandVsTeamKey, gameId, play, result);
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['vs_handedness_by_team', fieldingTeam, pitcherHand, homeAwayContext], gameId, play, result, 'batting');
 
   // Pitcher vs specific team's left/right batters
-  const pitcherHandVsTeamKey = `split:pitcher-hand-vs-team:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${battingTeam}:${batterHand}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(pitcherHandVsTeamKey, gameId, play, result);
+  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['vs_handedness_by_team', battingTeam, batterHand, homeAwayContext], gameId, play, result, 'pitching');
 
   // 6. TEAM MATCHUP SPLITS
-  const teamMatchupSplitKey = `split:team-matchup:${battingTeam}:vs:${fieldingTeam}:2025:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(teamMatchupSplitKey, gameId, play, result);
+  macro.updateTeam(battingTeam, season, ['matchups', fieldingTeam, homeAwayContext], gameId, play, result, 'batting');
 
   // 7. COUNT SITUATION SPLITS (Basic)
-  const countSplitKey = `split:count:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${countString}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(countSplitKey, gameId, play, result);
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['by_count', countString, homeAwayContext], gameId, play, result, 'batting');
 
   // 7b. PITCHER COUNT SITUATION SPLITS (How pitchers perform in different counts)
-  const pitcherCountSplitKey = `split:pitcher-count:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${countString}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(pitcherCountSplitKey, gameId, play, result);
+  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['by_count', countString, homeAwayContext], gameId, play, result, 'pitching');
 
   // 7c. COMPOUND COUNT SPLITS - The Ultimate Granularity!
   
   // Count + Team: How does batter perform in specific counts vs specific teams?
-  const countVsTeamKey = `split:count-vs-team:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}:${countString}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(countVsTeamKey, gameId, play, result);
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['compound', 'count_vs_team', fieldingTeam, countString, homeAwayContext], gameId, play, result, 'batting');
   
   // Count + Venue: How does batter perform in specific counts at specific venues?
-  const countVsVenueKey = `split:count-vs-venue:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${venue}:${countString}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(countVsVenueKey, gameId, play, result);
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['compound', 'count_vs_venue', venue, countString, homeAwayContext], gameId, play, result, 'batting');
   
   // Count + Handedness: How does batter perform in specific counts vs L/R pitchers?
-  const countVsHandKey = `split:count-vs-hand:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${pitcherHand}:${countString}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(countVsHandKey, gameId, play, result);
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['compound', 'count_vs_hand', pitcherHand, countString, homeAwayContext], gameId, play, result, 'batting');
   
   // Count + Specific Pitcher: How does batter perform in specific counts vs specific pitchers?
-  const countVsPitcherKey = `split:count-vs-pitcher:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}-2025:vs:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}:${countString}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(countVsPitcherKey, gameId, play, result);
+  macro.updatePlayer(battingTeam, batter.fullName, season, ['compound', 'count_vs_pitcher', `${fieldingTeam}-${normalizeName(pitcher.fullName)}`, countString, homeAwayContext], gameId, play, result, 'batting');
   
   // PITCHER PERSPECTIVE COMPOUND COUNT SPLITS
   
   // Pitcher Count + Team: How does pitcher perform in specific counts vs specific teams?
-  const pitcherCountVsTeamKey = `split:pitcher-count-vs-team:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${battingTeam}:${countString}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(pitcherCountVsTeamKey, gameId, play, result);
+  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['compound', 'count_vs_team', battingTeam, countString, homeAwayContext], gameId, play, result, 'pitching');
   
   // Pitcher Count + Venue: How does pitcher perform in specific counts at specific venues?
-  const pitcherCountVsVenueKey = `split:pitcher-count-vs-venue:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${venue}:${countString}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(pitcherCountVsVenueKey, gameId, play, result);
+  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['compound', 'count_vs_venue', venue, countString, homeAwayContext], gameId, play, result, 'pitching');
   
   // Pitcher Count + Handedness: How does pitcher perform in specific counts vs L/R batters?
-  const pitcherCountVsHandKey = `split:pitcher-count-vs-hand:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${batterHand}:${countString}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(pitcherCountVsHandKey, gameId, play, result);
+  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['compound', 'count_vs_hand', batterHand, countString, homeAwayContext], gameId, play, result, 'pitching');
   
   // Pitcher Count + Specific Batter: How does pitcher perform in specific counts vs specific batters?
-  const pitcherCountVsBatterKey = `split:pitcher-count-vs-batter:${fieldingTeam}-${pitcher.fullName.replace(/\s+/g, '_')}-2025:vs:${battingTeam}-${batter.fullName.replace(/\s+/g, '_')}:${countString}:${homeAwayContext}:${gameId}`;
-  splitTracker.addSplitObservation(pitcherCountVsBatterKey, gameId, play, result);
+  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['compound', 'count_vs_batter', `${battingTeam}-${normalizeName(batter.fullName)}`, countString, homeAwayContext], gameId, play, result, 'pitching');
 
   // 8. GAME-SPECIFIC SPLIT TRACKING (For boxscore linkage)
-  const gameSpecificKey = `split-game:${gameId}-${gameDate}:batter-pitcher:${batter.fullName.replace(/\s+/g, '_')}:vs:${pitcher.fullName.replace(/\s+/g, '_')}`;
-  splitTracker.addSplitObservation(gameSpecificKey, gameId, play, result);
+  // Game linkage info is implicit via games sets under macro keys; avoid extra keys
 }
 
 // ============================================================================
@@ -810,40 +990,10 @@ async function processIndividualPlay(splitTracker, gameId, play, gameDate, homeT
 /**
  * Store split data in Redis with game linkage
  */
-async function storeSplitsInRedis(splitTracker, gameId) {
-  console.log(`💾 Storing splits data for game ${gameId}...`);
-  
-  const pipeline = redisClient.pipeline();
-  let storedCount = 0;
-
-  // Store aggregate splits
-  for (const [splitKey, splitData] of splitTracker.splits.entries()) {
-    const redisData = {
-      stats: splitData.stats,
-      games: Array.from(splitData.games),
-      lastUpdated: new Date().toISOString(),
-      playCount: splitData.plays.length
-    };
-
-    pipeline.set(splitKey, JSON.stringify(redisData));
-    storedCount++;
-  }
-
-  // Store game linkage indices
-  for (const [gameId, splitKeys] of splitTracker.gameLinkages.entries()) {
-    const linkageKey = `game-splits-index:${gameId}`;
-    const linkageData = {
-      gameId,
-      splitTypes: Array.from(splitKeys),
-      processed: new Date().toISOString()
-    };
-    
-    pipeline.set(linkageKey, JSON.stringify(linkageData));
-  }
-
-  // Execute all Redis operations
-  await pipeline.exec();
-  console.log(`✅ Stored ${storedCount} split records for game ${gameId}`);
+async function storeMacrosInRedis(macroAggregator, gameId) {
+  console.log(`💾 Flushing macro keys for game ${gameId}...`);
+  await macroAggregator.flush(redisClient);
+  console.log(`✅ Macro keys flushed for game ${gameId}`);
 }
 
 // ============================================================================
@@ -1028,11 +1178,11 @@ async function pullPlayByPlaySplits(season, startDate, endDate) {
           const playByPlayData = await fetchPlayByPlayData(gameId);
           
           if (playByPlayData) {
-            // Process splits
-            const splitTracker = await processGameSplits(gameId, playByPlayData, gameDate, homeTeam, awayTeam);
-            
-            // Store in Redis
-            await storeSplitsInRedis(splitTracker, gameId);
+            // Process into macro aggregator
+            const macroAgg = await processGameSplits(gameId, playByPlayData, gameDate, homeTeam, awayTeam, season);
+
+            // Store macro keys in Redis
+            await storeMacrosInRedis(macroAgg, gameId);
             
             return { success: true, gameId, awayTeam, homeTeam, gameDate };
           } else {
@@ -1091,22 +1241,12 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const season = args[0] || '2025';
   const startDate = args[1] || '2025-03-17'; 
-  const endDate = args[2] || '2025-08-21';
+  const endDate = args[2] || '2025-09-21';
   
   pullPlayByPlaySplits(season, startDate, endDate)
     .then(async () => {
       console.log('\n✅ Play-by-Play Splits collection completed successfully!');
-      
-      // 🚀 REFRESH DASHBOARD SUMMARY CACHE after splits update
-      console.log('\n🔄 Refreshing dashboard summary cache with new splits data...');
-      try {
-        const { generateAndCacheSummary } = require('../src/utils/summaryCache');
-        await generateAndCacheSummary(redisClient, season);
-        console.log('✅ Dashboard summary cache refreshed with splits analytics!');
-      } catch (summaryError) {
-        console.error('⚠️  Failed to refresh summary cache:', summaryError.message);
-      }
-      
+            
       process.exit(0);
     })
     .catch(err => {
@@ -1115,4 +1255,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { pullPlayByPlaySplits, processGameSplits, SplitTracker };
+module.exports = { pullPlayByPlaySplits, processGameSplits, SplitTracker, MacroAggregator };

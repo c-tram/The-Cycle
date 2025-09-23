@@ -295,16 +295,19 @@ const Analytics = () => {
                         }}
                       />
                     )}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props}>
-                        <Box>
-                          <Typography variant="body1">{option.name}</Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {option.team} • {option.position}
-                          </Typography>
+                    renderOption={(props, option) => {
+                      const { key, ...liProps } = props;
+                      return (
+                        <Box component="li" key={key} {...liProps}>
+                          <Box>
+                            <Typography variant="body1">{option.name}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {option.team} • {option.position}
+                            </Typography>
+                          </Box>
                         </Box>
-                      </Box>
-                    )}
+                      );
+                    }}
                     sx={{ mb: 2 }}
                   />
                   <Button
@@ -397,16 +400,19 @@ const Analytics = () => {
                         }}
                       />
                     )}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props}>
-                        <Box>
-                          <Typography variant="body1">{option.name}</Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {option.id}
-                          </Typography>
+                    renderOption={(props, option) => {
+                      const { key, ...liProps } = props;
+                      return (
+                        <Box component="li" key={key} {...liProps}>
+                          <Box>
+                            <Typography variant="body1">{option.name}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {option.id}
+                            </Typography>
+                          </Box>
                         </Box>
-                      </Box>
-                    )}
+                      );
+                    }}
                     sx={{ mb: 2 }}
                   />
                   <Button
@@ -485,16 +491,19 @@ const Analytics = () => {
                       }
                     }}
                     getOptionLabel={(option) => `${option.fullName} (${option.primaryPosition})`}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props}>
-                        <div>
-                          <Typography variant="subtitle1">{option.fullName}</Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {option.currentTeam?.name} - {option.primaryPosition}
-                          </Typography>
-                        </div>
-                      </Box>
-                    )}
+                    renderOption={(props, option) => {
+                      const { key, ...liProps } = props;
+                      return (
+                        <Box component="li" key={key} {...liProps}>
+                          <div>
+                            <Typography variant="subtitle1">{option.fullName}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {option.currentTeam?.name} - {option.primaryPosition}
+                            </Typography>
+                          </div>
+                        </Box>
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField {...params} label="Search Player 1" variant="outlined" />
                     )}
@@ -514,16 +523,19 @@ const Analytics = () => {
                       }
                     }}
                     getOptionLabel={(option) => `${option.fullName} (${option.primaryPosition})`}
-                    renderOption={(props, option) => (
-                      <Box component="li" {...props}>
-                        <div>
-                          <Typography variant="subtitle1">{option.fullName}</Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {option.currentTeam?.name} - {option.primaryPosition}
-                          </Typography>
-                        </div>
-                      </Box>
-                    )}
+                    renderOption={(props, option) => {
+                      const { key, ...liProps } = props;
+                      return (
+                        <Box component="li" key={key} {...liProps}>
+                          <div>
+                            <Typography variant="subtitle1">{option.fullName}</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {option.currentTeam?.name} - {option.primaryPosition}
+                            </Typography>
+                          </div>
+                        </Box>
+                      );
+                    }}
                     renderInput={(params) => (
                       <TextField {...params} label="Search Player 2" variant="outlined" />
                     )}

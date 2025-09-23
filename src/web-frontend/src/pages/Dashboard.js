@@ -46,6 +46,7 @@ import { useNavigate } from 'react-router-dom';
 
 // API and utils
 import { statsApi, playersApi, teamsApi } from '../services/apiService';
+import { getTeamLogoUrl as getSharedTeamLogoUrl } from '../utils/teamLogos';
 import { themeUtils } from '../theme/theme';
 import LiveScoreboard from '../components/LiveScoreboard';
 
@@ -55,20 +56,8 @@ const getTeamLogoUrl = (teamCode) => {
   // You can use ESPN, MLB, or your own CDN. Example below uses ESPN CDN:
   // https://a.espncdn.com/i/teamlogos/mlb/500/{teamCode}.png
   // Team codes must be uppercase and mapped to ESPN/MLB codes if needed
-  const code = teamCode.toUpperCase();
-  // Some codes may need mapping (e.g., "CWS" -> "CHW", "AZ" -> "ARI")
-  const codeMap = {
-    AZ: 'ARI',
-    CWS: 'CHW',
-    KC: 'KCR',
-    SD: 'SDP',
-    SF: 'SFG',
-    TB: 'TBR',
-    WSH: 'WSN',
-    // Add more mappings as needed
-  };
-  const logoCode = codeMap[code] || code;
-  return `https://a.espncdn.com/i/teamlogos/mlb/500/${logoCode}.png`;
+  const code = teamCode.toUpperCase(); 
+  return getSharedTeamLogoUrl(teamCode, 500);
 };
 
 const Dashboard = () => {

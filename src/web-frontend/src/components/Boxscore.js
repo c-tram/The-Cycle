@@ -51,13 +51,10 @@ import {
   Refresh
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
+import { getTeamLogoUrl as getSharedTeamLogoUrl } from '../utils/teamLogos';
 
-// Utility: Get MLB team logo URL
-const getTeamLogoUrl = (teamCode) => {
-  if (!teamCode) return null;
-  const code = teamCode.toUpperCase();
-  return `https://a.espncdn.com/i/teamlogos/mlb/500/${code}.png`;
-};
+// Utility: Get MLB team logo URL (shared mapping to ESPN codes)
+const getTeamLogoUrl = (teamCode) => getSharedTeamLogoUrl(teamCode, 500);
 
 // Utility: Format game time
 const formatGameTime = (dateTime) => {

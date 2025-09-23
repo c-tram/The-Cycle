@@ -18,31 +18,23 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "feat: Add floating Baseball AI chat widget for future RAG integration
+git commit -m "
+Backend
+Aggregate PBP into macro keys per player/team-season (splits:player/ splits:team)
+Separate batting/pitching updates; recompute derived rates post-merge
+Correct IP (outs/3), first-pitch attempts, and season propagation
 
-🤖 New Floating Chat Widget:
-- Sleek floating button with baseball icon in bottom-right corner
-- Professional chat interface with Material-UI styling
-- Smooth animations (slide-up, hover effects, typing indicators)
-- Global accessibility across all pages of the app
-- Message history with timestamps and user/bot styling
-- Quick question suggestions for new users
-- Multi-line input with Enter/Shift+Enter functionality
+Frontend
+Centralize team logo mapping (utils/teamLogos.js) to ESPN slugs (tb, kc, sd, wsh, chw, ari, sf, etc.)
+Replace inline logo builders across pages/components; resolve 404s
+Fix Teams.js ESLint by importing missing React hooks
 
-🎯 Prepared for Azure AI Integration:
-- Mock conversation system ready for backend connection
-- Designed for RAG (Retrieval-Augmented Generation) architecture
-- Baseball-themed UI matching existing app design
-- Foundation for 2025 MLB season analytics chatbot
+Docs
+Add repo README and frontend/backend README with endpoints and FE↔BE connection
+Forward-looking:
 
-✨ User Experience:
-- Non-intrusive floating design until activated
-- Responsive 400x600px chat window
-- Auto-scroll to newest messages
-- Easy close/open functionality
-- Baseball branding throughout interface
-
-Ready for Azure OpenAI Service integration! $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+Macro keys enable structured, single-source retrieval for a GenAI chatbot (LLM-ready), simplifying natural-language Q&A over comprehensive situational splits.
+ $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."

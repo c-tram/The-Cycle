@@ -47,21 +47,8 @@ import { statsApi, gamesApi } from '../services/apiService';
 import Boxscore from './Boxscore';
 
 // Utility: Get MLB team logo URL
-const getTeamLogoUrl = (teamCode) => {
-  if (!teamCode) return null;
-  const code = teamCode.toUpperCase();
-  const codeMap = {
-    AZ: 'ARI',
-    CWS: 'CHW',
-    KC: 'KCR',
-    SD: 'SDP',
-    SF: 'SFG',
-    TB: 'TBR',
-    WSH: 'WSN',
-  };
-  const logoCode = codeMap[code] || code;
-  return `https://a.espncdn.com/i/teamlogos/mlb/500/${logoCode}.png`;
-};
+import { getTeamLogoUrl as getSharedTeamLogoUrl } from '../utils/teamLogos';
+const getTeamLogoUrl = (teamCode) => getSharedTeamLogoUrl(teamCode, 500);
 
 // MLB Teams list for filtering
 const MLB_TEAMS = [

@@ -20,31 +20,17 @@ async function clearSplitCache() {
   console.log('🎯 Clearing all split-related keys from Redis cache...\n');
 
   // Get all split-related keys
-  const splitKeys = await redisClient.keys('split:*');
-  const splitGameKeys = await redisClient.keys('split-game:*');
-  const gameSplitsIndexKeys = await redisClient.keys('game-splits-index:*');
-  const playerSplitsIndexKeys = await redisClient.keys('player-splits-index:*');
+  const splitKeys = await redisClient.keys('splits:*');
   
-  // Combine all split-related keys
-  const allSplitKeys = [
-    ...splitKeys,
-    ...splitGameKeys, 
-    ...gameSplitsIndexKeys,
-    ...playerSplitsIndexKeys
-  ];
 
-  if (allSplitKeys.length === 0) {
+  if (splitKeys.length === 0) {
     console.log('✅ No split keys found in Redis cache - already clean!');
     redisClient.disconnect();
     return;
   }
   
   console.log(`📊 Found split-related keys to delete:`);
-  console.log(`   🔹 Aggregate splits: ${splitKeys.length}`);
-  console.log(`   🔹 Game-specific splits: ${splitGameKeys.length}`);
-  console.log(`   🔹 Game index keys: ${gameSplitsIndexKeys.length}`);
-  console.log(`   🔹 Player index keys: ${playerSplitsIndexKeys.length}`);
-  console.log(`   📈 Total: ${allSplitKeys.length} keys\n`);
+  console.log(`   📈 Total: ${splitKeys.length} keys\n`);
   
   console.log('🗑️ Processing deletions in batches...');
   
@@ -52,11 +38,11 @@ async function clearSplitCache() {
   const batchSize = 1000;
   let deletedCount = 0;
   
-  for (let i = 0; i < allSplitKeys.length; i += batchSize) {
-    const batch = allSplitKeys.slice(i, i + batchSize);
+  for (let i = 0; i < splitKeys.length; i += batchSize) {
+    const batch = splitKeys.slice(i, i + batchSize);
     await redisClient.del(batch);
     deletedCount += batch.length;
-    console.log(`   ✅ Deleted batch ${Math.floor(i/batchSize) + 1}: ${deletedCount}/${allSplitKeys.length} keys`);
+    console.log(`   ✅ Deleted batch ${Math.floor(i/batchSize) + 1}: ${deletedCount}/${splitKeys.length} keys`);
   }
   
   // Verify cleanup
