@@ -24,6 +24,25 @@ function normalizePlayerName(name) {
 
 const { getCachedSummary } = require('../utils/summaryCache');
 
+// ---------------------------------------------------------------------------
+// League Baselines Route
+// Single key pattern: baseline:season:<year>:latest
+// ---------------------------------------------------------------------------
+router.get('/baselines', async (req, res) => {
+  try {
+    const { year = '2025' } = req.query;
+    const redisClient = getRedisClient();
+    const key = `baseline:season:${year}:latest`;
+    const raw = await redisClient.get(key);
+    if (!raw) return res.status(404).json({ error: 'Baseline not found', key });
+    const data = JSON.parse(raw);
+    res.json({ key, ...data });
+  } catch (err) {
+    console.error('Error fetching baselines:', err);
+    res.status(500).json({ error: 'Failed to fetch baselines' });
+  }
+});
+
 // GET /api/stats/summary - Enhanced database summary using cached data
 router.get('/summary', async (req, res) => {
   try {

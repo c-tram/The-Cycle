@@ -18,23 +18,7 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "
-Backend
-Aggregate PBP into macro keys per player/team-season (splits:player/ splits:team)
-Separate batting/pitching updates; recompute derived rates post-merge
-Correct IP (outs/3), first-pitch attempts, and season propagation
-
-Frontend
-Centralize team logo mapping (utils/teamLogos.js) to ESPN slugs (tb, kc, sd, wsh, chw, ari, sf, etc.)
-Replace inline logo builders across pages/components; resolve 404s
-Fix Teams.js ESLint by importing missing React hooks
-
-Docs
-Add repo README and frontend/backend README with endpoints and FE↔BE connection
-Forward-looking:
-
-Macro keys enable structured, single-source retrieval for a GenAI chatbot (LLM-ready), simplifying natural-language Q&A over comprehensive situational splits.
- $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Macro & Splits Overhaul: unified macro route (on-the-fly fallback), dynamic league baselines (batting+pitching), pitching integration & auto-detect, CSV & percentile fixes, player key normalization (underscores), graceful empty macro 200s, prep for team logo fixes, API refactors & stability hardening. $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."

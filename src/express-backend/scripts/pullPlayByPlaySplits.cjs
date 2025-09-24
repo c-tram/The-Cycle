@@ -79,32 +79,17 @@ class SplitTracker {
   initializeStats() {
     return {
       batting: {
-        plateAppearances: 0, atBats: 0, hits: 0, runs: 0, rbi: 0, 
+  plateAppearances: 0, atBats: 0, hits: 0, runs: 0, rbi: 0, 
         homeRuns: 0, doubles: 0, triples: 0, singles: 0,
         walks: 0, strikeouts: 0, hitByPitch: 0,
         sacrificeFlies: 0, sacrificeHits: 0, stolenBases: 0,
         groundedIntoDoublePlay: 0,
         avg: 0, obp: 0, slg: 0, ops: 0,
         
-        // COUNT-BASED ANALYTICS
-        countSituations: {
-          '0-0': { pa: 0, hits: 0, avg: 0 },
-          '1-0': { pa: 0, hits: 0, avg: 0 },
-          '0-1': { pa: 0, hits: 0, avg: 0 },
-          '1-1': { pa: 0, hits: 0, avg: 0 },
-          '2-0': { pa: 0, hits: 0, avg: 0 },
-          '0-2': { pa: 0, hits: 0, avg: 0 },
-          '2-1': { pa: 0, hits: 0, avg: 0 },
-          '1-2': { pa: 0, hits: 0, avg: 0 },
-          '3-0': { pa: 0, hits: 0, avg: 0 },
-          '2-2': { pa: 0, hits: 0, avg: 0 },
-          '3-1': { pa: 0, hits: 0, avg: 0 },
-          '3-2': { pa: 0, hits: 0, avg: 0 }
-        },
+  // COUNT-BASED ANALYTICS (aggregated only)
         twoStrikeSituations: { pa: 0, hits: 0, avg: 0, strikeouts: 0 },
-        hittersCountSituations: { pa: 0, hits: 0, avg: 0 }, // 1-0, 2-0, 2-1, 3-0, 3-1
-        pitchersCountSituations: { pa: 0, hits: 0, avg: 0 }, // 0-1, 0-2, 1-2
-        fullCountSituations: { pa: 0, hits: 0, avg: 0 },
+  hittersCountSituations: { pa: 0, hits: 0, avg: 0 }, // 1-0, 2-0, 2-1, 3-0, 3-1
+  pitchersCountSituations: { pa: 0, hits: 0, avg: 0 }, // 0-1, 0-2, 1-2
         firstPitchResults: { swings: 0, takes: 0, strikes: 0, balls: 0, hits: 0 }
       },
       pitching: {
@@ -134,8 +119,6 @@ class SplitTracker {
         countResults: {
           aheadInCount: { batters: 0, strikeouts: 0, walks: 0 }, // 0-1, 0-2, 1-2
           behindInCount: { batters: 0, strikeouts: 0, walks: 0 }, // 1-0, 2-0, 2-1, 3-0, 3-1
-          evenCount: { batters: 0, strikeouts: 0, walks: 0 }, // 0-0, 1-1, 2-2
-          fullCount: { batters: 0, strikeouts: 0, walks: 0 },
           twoStrikeCount: { batters: 0, strikeouts: 0, hits: 0 }
         }
       }
@@ -344,9 +327,9 @@ class SplitTracker {
     }
     
     // Calculate count-based batting averages
-    this.calculateCountAverages(batting.countSituations);
+  // Skip detailed per-count averages to reduce storage/noise
     this.calculateCountAverages([batting.twoStrikeSituations, batting.hittersCountSituations, 
-                                batting.pitchersCountSituations, batting.fullCountSituations]);
+      batting.pitchersCountSituations]);
     
     // Pitching rates  
     if (pitching.inningsPitched > 0) {
@@ -413,15 +396,7 @@ class SplitTracker {
   updateCountBasedStats(stats, result, finalCount, pitchSequence, matchup, mode = 'both') {
     const { batting, pitching } = stats;
     const { event } = result;
-    const countKey = `${finalCount.balls}-${finalCount.strikes}`;
-    
-    // BATTING COUNT UPDATES
-    if ((mode === 'batting' || mode === 'both') && batting.countSituations[countKey]) {
-      batting.countSituations[countKey].pa++;
-      if (this.isHit(event)) {
-        batting.countSituations[countKey].hits++;
-      }
-    }
+  // Removed detailed per-count (0-0, 1-0, ...) tracking to reduce storage
     
     // Two-strike situations
   if ((mode === 'batting' || mode === 'both') && finalCount.strikes >= 2) {
@@ -439,12 +414,6 @@ class SplitTracker {
       if (this.isHit(event)) batting.pitchersCountSituations.hits++;
     }
     
-    // Full count
-  if ((mode === 'batting' || mode === 'both') && finalCount.balls === 3 && finalCount.strikes === 2) {
-      batting.fullCountSituations.pa++;
-      if (this.isHit(event)) batting.fullCountSituations.hits++;
-    }
-    
     // PITCHING COUNT UPDATES
   if ((mode === 'pitching' || mode === 'both') && this.isAheadInCount(finalCount)) {
       pitching.countResults.aheadInCount.batters++;
@@ -454,10 +423,6 @@ class SplitTracker {
       pitching.countResults.behindInCount.batters++;
       if (this.isStrikeout(event)) pitching.countResults.behindInCount.strikeouts++;
       if (this.isWalk(event)) pitching.countResults.behindInCount.walks++;
-  } else if (mode === 'pitching' || mode === 'both') {
-      pitching.countResults.evenCount.batters++;
-      if (this.isStrikeout(event)) pitching.countResults.evenCount.strikeouts++;
-      if (this.isWalk(event)) pitching.countResults.evenCount.walks++;
     }
   }
 
@@ -679,6 +644,7 @@ function isPlainObject(obj) {
 
 // Deep merge that sums numbers, recurses into objects, and unions sets
 function deepSumMerge(target, source) {
+  // In-place merge to avoid large object cloning (major perf win for deep trees)
   if (source instanceof Set) {
     if (!(target instanceof Set)) target = new Set();
     for (const v of source) target.add(v);
@@ -686,23 +652,22 @@ function deepSumMerge(target, source) {
   }
 
   if (Array.isArray(source)) {
-    // We don't store arrays in macro state (no plays), skip/replace if needed
+    // Arrays not expected (plays omitted) – return existing or empty array
     return Array.isArray(target) ? target : [];
   }
 
   if (isPlainObject(source)) {
-    const out = isPlainObject(target) ? { ...target } : {};
+    if (!isPlainObject(target)) target = {};
     for (const [k, v] of Object.entries(source)) {
-      out[k] = deepSumMerge(out[k], v);
+      target[k] = deepSumMerge(target[k], v);
     }
-    return out;
+    return target;
   }
 
   if (typeof source === 'number') {
     return (typeof target === 'number' ? target : 0) + source;
   }
 
-  // strings/booleans/dates -> prefer source
   return source !== undefined ? source : target;
 }
 
@@ -716,6 +681,59 @@ function serializeSets(obj) {
     return out;
   }
   return obj;
+}
+
+// Count leaf nodes (where stats live) for profiling
+function countStatLeaves(node) {
+  if (!node || typeof node !== 'object') return 0;
+  let count = 0;
+  const stack = [node];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (cur && typeof cur === 'object') {
+      if (cur.stats && cur.stats.batting) count++;
+      for (const v of Object.values(cur)) if (v && typeof v === 'object') stack.push(v);
+    }
+  }
+  return count;
+}
+
+// Prune unused batting/pitching branches in leaf stats to reduce payload size
+function hasAnyPositiveNumber(obj) {
+  if (!obj || typeof obj !== 'object') return false;
+  const stack = [obj];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (cur && typeof cur === 'object') {
+      for (const val of Object.values(cur)) {
+        if (typeof val === 'number' && val > 0) return true;
+        if (val && typeof val === 'object') stack.push(val);
+      }
+    }
+  }
+  return false;
+}
+
+function pruneUnusedStatBranches(node) {
+  if (!node || typeof node !== 'object') return;
+  const stack = [node];
+  while (stack.length) {
+    const cur = stack.pop();
+    if (!cur || typeof cur !== 'object') continue;
+    if (cur.stats && cur.stats.batting && cur.stats.pitching) {
+      const battingUsed = hasAnyPositiveNumber(cur.stats.batting);
+      const pitchingUsed = hasAnyPositiveNumber(cur.stats.pitching);
+      if (battingUsed && !pitchingUsed) {
+        delete cur.stats.pitching;
+      } else if (!battingUsed && pitchingUsed) {
+        delete cur.stats.batting;
+      } else if (!battingUsed && !pitchingUsed) {
+        // Keep one minimal branch to preserve shape (default to batting)
+        delete cur.stats.pitching;
+      }
+    }
+    for (const v of Object.values(cur)) if (v && typeof v === 'object') stack.push(v);
+  }
 }
 
 // Create empty macro data structure
@@ -783,32 +801,39 @@ class MacroAggregator {
 
   async flush(redis) {
     if (this.macros.size === 0) return;
+    const start = Date.now();
+    const keys = Array.from(this.macros.keys());
+    const BATCH = parseInt(process.env.MACRO_FLUSH_BATCH || '50', 10);
+    console.log(`🗄️  Flushing ${keys.length} macro keys (batch size ${BATCH})...`);
 
-    // Read current, merge, then write in a pipeline
-    const pipeline = redis.pipeline();
+    // Pre-fetch existing values in a single MGET to reduce round-trips
+    const existingValues = keys.length ? await redis.mget(keys) : [];
 
-    for (const [macroKey, partial] of this.macros.entries()) {
+    const reviveSets = (node) => {
+      if (!node || typeof node !== 'object') return;
+      if (node.games && Array.isArray(node.games)) node.games = new Set(node.games);
+      for (const v of Object.values(node)) reviveSets(v);
+    };
+
+  let pipeline = redis.pipeline();
+  const DO_PROFILE = process.env.MACRO_PROFILE === '1';
+  let totalBytes = 0, totalKeys = 0, totalLeaves = 0;
+    for (let i = 0; i < keys.length; i++) {
+      const macroKey = keys[i];
+      const partial = this.macros.get(macroKey);
       try {
-        const existingStr = await redis.get(macroKey);
+        const existingStr = existingValues[i];
         let merged;
         if (existingStr) {
           const existing = JSON.parse(existingStr);
-          // Convert games arrays back to Sets for merge
           if (Array.isArray(existing.games)) existing.games = new Set(existing.games);
-          // Recursively convert leaf games to Sets
-          const reviveSets = (node) => {
-            if (!node || typeof node !== 'object') return;
-            if (node.games && Array.isArray(node.games)) node.games = new Set(node.games);
-            for (const v of Object.values(node)) reviveSets(v);
-          };
           reviveSets(existing.splits);
-
-          merged = { ...existing };
+          merged = existing; // mutate existing in-place
           merged.info = partial.info || existing.info;
           merged.games = deepSumMerge(existing.games, partial.games);
           merged.splits = deepSumMerge(existing.splits || {}, partial.splits || {});
           merged.lastUpdated = new Date().toISOString();
-          // Recompute derived stats for all leaves
+          // Recompute derived stats only for updated leaves: quick full traversal (could optimize further)
           const walkLeavesAndRecompute = (node) => {
             if (!node || typeof node !== 'object') return;
             if (node.stats && node.stats.batting && node.stats.pitching) {
@@ -820,16 +845,40 @@ class MacroAggregator {
         } else {
           merged = partial;
         }
-
-        const payload = serializeSets(merged);
-        pipeline.set(macroKey, JSON.stringify(payload));
+  // Option A: prune unused stat branches to reduce payload size
+  pruneUnusedStatBranches(merged.splits);
+  const payload = serializeSets(merged);
+        const json = JSON.stringify(payload);
+        if (DO_PROFILE) {
+          totalBytes += Buffer.byteLength(json, 'utf8');
+          totalLeaves += countStatLeaves(merged.splits);
+          totalKeys++;
+        }
+        pipeline.set(macroKey, json);
+        if ((i + 1) % BATCH === 0) {
+          const t0 = Date.now();
+          await pipeline.exec();
+          const elapsed = Date.now() - t0;
+            console.log(`   ✅ Flushed ${(i+1)} / ${keys.length} (batch ${(i+1)/BATCH}| size ${json.length.toLocaleString()} bytes, batch exec ${elapsed} ms)`);
+          pipeline = redis.pipeline();
+          // Yield event loop
+          await new Promise(r => setImmediate(r));
+        }
       } catch (e) {
-        // Log and continue
-        console.error(`❌ Failed to prepare macro write for ${macroKey}:`, e.message);
+        console.error(`❌ Failed macro merge/flush for ${macroKey}:`, e.message);
       }
     }
-
+    // Flush remaining
     await pipeline.exec();
+    const totalMs = Date.now() - start;
+    console.log(`🟢 Macro flush complete (${keys.length} keys) in ${totalMs} ms`);
+    if (DO_PROFILE && totalKeys) {
+      const avg = (totalBytes / totalKeys).toFixed(1);
+      const avgLeaves = (totalLeaves / totalKeys).toFixed(1);
+      console.log(`📦 Macro profile: total ${(totalBytes/1024).toFixed(1)} KB across ${totalKeys} keys (avg ${avg} bytes/key, avg leaves ${avgLeaves}).`);
+      const gzipEst = (totalBytes * 0.28); // rough heuristic 72% compression
+      console.log(`🪶 Estimated gzip size ${(gzipEst/1024).toFixed(1)} KB (enable Redis data compression if supported).`);
+    }
     this.macros.clear();
   }
 }
@@ -913,13 +962,7 @@ async function processIndividualPlay(macro, gameId, play, gameDate, homeTeam, aw
   macro.updatePlayer(battingTeam, batter.fullName, season, ['by_location', homeAwayContext], gameId, play, result, 'batting');
   macro.updateTeam(battingTeam, season, ['by_location', homeAwayContext], gameId, play, result, 'batting');
 
-  // 2. VENUE SPLITS
-  macro.updatePlayer(battingTeam, batter.fullName, season, ['vs_venues', venue, homeAwayContext], gameId, play, result, 'batting');
-  macro.updateTeam(battingTeam, season, ['at_venues', venue, homeAwayContext], gameId, play, result, 'batting');
-
-  // 2b. PITCHER VENUE SPLITS (How pitchers perform at different ballparks)
-  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['vs_venues', venue, homeAwayContext], gameId, play, result, 'pitching');
-  macro.updateTeam(fieldingTeam, season, ['at_venues', venue, homeAwayContext], gameId, play, result, 'pitching');
+  // 2. VENUE SPLITS removed to reduce payload size
 
   // 3. PLAYER vs TEAM SPLITS
   macro.updatePlayer(battingTeam, batter.fullName, season, ['vs_teams', fieldingTeam, homeAwayContext], gameId, play, result, 'batting');
@@ -945,19 +988,14 @@ async function processIndividualPlay(macro, gameId, play, gameDate, homeTeam, aw
   // 6. TEAM MATCHUP SPLITS
   macro.updateTeam(battingTeam, season, ['matchups', fieldingTeam, homeAwayContext], gameId, play, result, 'batting');
 
-  // 7. COUNT SITUATION SPLITS (Basic)
-  macro.updatePlayer(battingTeam, batter.fullName, season, ['by_count', countString, homeAwayContext], gameId, play, result, 'batting');
-
-  // 7b. PITCHER COUNT SITUATION SPLITS (How pitchers perform in different counts)
-  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['by_count', countString, homeAwayContext], gameId, play, result, 'pitching');
+  // 7. COUNT SITUATIONS: keep only aggregate metrics (no by_count branch)
 
   // 7c. COMPOUND COUNT SPLITS - The Ultimate Granularity!
   
   // Count + Team: How does batter perform in specific counts vs specific teams?
   macro.updatePlayer(battingTeam, batter.fullName, season, ['compound', 'count_vs_team', fieldingTeam, countString, homeAwayContext], gameId, play, result, 'batting');
   
-  // Count + Venue: How does batter perform in specific counts at specific venues?
-  macro.updatePlayer(battingTeam, batter.fullName, season, ['compound', 'count_vs_venue', venue, countString, homeAwayContext], gameId, play, result, 'batting');
+  // Count + Venue removed
   
   // Count + Handedness: How does batter perform in specific counts vs L/R pitchers?
   macro.updatePlayer(battingTeam, batter.fullName, season, ['compound', 'count_vs_hand', pitcherHand, countString, homeAwayContext], gameId, play, result, 'batting');
@@ -970,8 +1008,7 @@ async function processIndividualPlay(macro, gameId, play, gameDate, homeTeam, aw
   // Pitcher Count + Team: How does pitcher perform in specific counts vs specific teams?
   macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['compound', 'count_vs_team', battingTeam, countString, homeAwayContext], gameId, play, result, 'pitching');
   
-  // Pitcher Count + Venue: How does pitcher perform in specific counts at specific venues?
-  macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['compound', 'count_vs_venue', venue, countString, homeAwayContext], gameId, play, result, 'pitching');
+  // Pitcher Count + Venue removed
   
   // Pitcher Count + Handedness: How does pitcher perform in specific counts vs L/R batters?
   macro.updatePlayer(fieldingTeam, pitcher.fullName, season, ['compound', 'count_vs_hand', batterHand, countString, homeAwayContext], gameId, play, result, 'pitching');
@@ -1241,7 +1278,7 @@ if (require.main === module) {
   const args = process.argv.slice(2);
   const season = args[0] || '2025';
   const startDate = args[1] || '2025-03-17'; 
-  const endDate = args[2] || '2025-09-21';
+  const endDate = args[2] || '2025-09-22';
   
   pullPlayByPlaySplits(season, startDate, endDate)
     .then(async () => {

@@ -136,6 +136,12 @@ export const statsApi = {
     const response = await apiClient.get(`/v2/stats/salary/all/${year}`);
     return response.data;
   }
+  ,
+  // League baselines (dynamic league averages)
+  getBaselines: async (year = '2025') => {
+    const response = await apiClient.get(`/v2/stats/baselines?year=${year}`);
+    return response.data;
+  }
 };
 
 // ============================================================================
@@ -412,9 +418,10 @@ export const legacyApi = {
 
 export const splitsApi = {
   // Search for available splits for a player
-  searchPlayerSplits: async (team, player, season = '2025') => {
-    const playerName = player.replace(/\s+/g, '-');
-    const response = await apiClient.get(`/v2/splits/search/${team}/${playerName}/${season}`);
+  searchPlayerSplits: async (query, params = {}) => {
+    const { season = '2025', team, limit = 25 } = params;
+    const qs = new URLSearchParams({ q: query, season, limit: String(limit), ...(team && { team }) });
+    const response = await apiClient.get(`/v2/splits/players/search?${qs.toString()}`);
     return response.data;
   },
 
@@ -432,12 +439,6 @@ export const splitsApi = {
     return response.data;
   },
 
-  // Get venue splits
-  getVenueSplits: async (team, player, season = '2025') => {
-    const playerName = player.replace(/\s+/g, '-');
-    const response = await apiClient.get(`/v2/splits/venue/${team}/${playerName}/${season}`);
-    return response.data;
-  },
 
   // Get handedness splits
   getHandednessSplits: async (team, player, season = '2025') => {
@@ -501,11 +502,7 @@ export const splitsApi = {
     return response.data;
   },
 
-  // Search all splits for a player
-  searchPlayerSplits: async (team, playerName, season = '2025') => {
-    const response = await apiClient.get(`/v2/splits/search/${team}/${playerName}/${season}`);
-    return response.data;
-  },
+  // (deprecated duplicate removed)
 
   // Get team abbreviations
   getTeamAbbreviations: async () => {
@@ -521,20 +518,56 @@ export const splitsApi = {
 // ============================================================================
 
 export const macroSplitsApi = {
-  // Get full player macro splits object, or a subtree via ?path=
-  getPlayerMacro: async (team, player, season = '2025', path) => {
-    const safePlayer = encodeURIComponent(player.replace(/\s+/g, '-'));
-    const qs = path ? `?path=${encodeURIComponent(path)}` : '';
-  const response = await apiClient.get(`/v2/splits/macro/player/${team}/${safePlayer}/${season}${qs}`);
-  // When path is provided, backend wraps the subtree under { data }
-  return path ? (response.data?.data ?? null) : response.data;
+  // Get full player macro splits object, a subtree via ?path=, or multiple subtrees via paths
+  // pathOrOptions can be a string path or an options object: { path, paths: string[], compact: boolean, maxDepth?: number }
+  getPlayerMacro: async (team, player, season = '2025', pathOrOptions) => {
+  // Normalize to underscores (backend normalizes similarly) to improve cache hit rate
+  const safePlayer = encodeURIComponent(player.replace(/\s+/g, '_').replace(/-+/g,'_'));
+    const params = new URLSearchParams();
+    if (typeof pathOrOptions === 'string') {
+      params.set('path', pathOrOptions);
+      params.set('compact', 'true'); // default compact for subtree
+    } else if (pathOrOptions && typeof pathOrOptions === 'object') {
+      const { path, paths, compact, maxDepth } = pathOrOptions;
+      if (path) params.set('path', path);
+      if (paths && Array.isArray(paths) && paths.length) params.set('paths', paths.join(','));
+      if (compact != null) params.set('compact', String(Boolean(compact)));
+      if (maxDepth != null) params.set('maxDepth', String(maxDepth));
+    }
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const response = await apiClient.get(`/v2/splits/macro/player/${team}/${safePlayer}/${season}${qs}`);
+    // When path(s) provided, backend may wrap results under { data } or { results }
+    if (typeof pathOrOptions === 'string' || (pathOrOptions && pathOrOptions.path)) {
+      return response.data?.data ?? null;
+    }
+    if (pathOrOptions && Array.isArray(pathOrOptions.paths)) {
+      return response.data?.results ?? [];
+    }
+    return response.data;
   },
 
-  // Get full team macro splits object, or a subtree via ?path=
-  getTeamMacro: async (team, season = '2025', path) => {
-    const qs = path ? `?path=${encodeURIComponent(path)}` : '';
-  const response = await apiClient.get(`/v2/splits/macro/team/${team}/${season}${qs}`);
-  return path ? (response.data?.data ?? null) : response.data;
+  // Get full team macro splits object, a subtree via ?path=, or multi-path batch
+  getTeamMacro: async (team, season = '2025', pathOrOptions) => {
+    const params = new URLSearchParams();
+    if (typeof pathOrOptions === 'string') {
+      params.set('path', pathOrOptions);
+      params.set('compact', 'true');
+    } else if (pathOrOptions && typeof pathOrOptions === 'object') {
+      const { path, paths, compact, maxDepth } = pathOrOptions;
+      if (path) params.set('path', path);
+      if (paths && Array.isArray(paths) && paths.length) params.set('paths', paths.join(','));
+      if (compact != null) params.set('compact', String(Boolean(compact)));
+      if (maxDepth != null) params.set('maxDepth', String(maxDepth));
+    }
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const response = await apiClient.get(`/v2/splits/macro/team/${team}/${season}${qs}`);
+    if (typeof pathOrOptions === 'string' || (pathOrOptions && pathOrOptions.path)) {
+      return response.data?.data ?? null;
+    }
+    if (pathOrOptions && Array.isArray(pathOrOptions.paths)) {
+      return response.data?.results ?? [];
+    }
+    return response.data;
   }
 };
 

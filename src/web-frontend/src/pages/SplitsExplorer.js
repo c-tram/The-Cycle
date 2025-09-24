@@ -1,3228 +1,1352 @@
-// ============================================================================
-// PROFESSIONAL MLB SPLITS ANALYTICS DASHBOARD
-// ============================================================================
-// The most comprehensive situational analysis platform in baseball
-// "Testing every possible baseball statistic that is imaginable"
-// ============================================================================
-
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
-  Box,
-  Container,
-  Typography,
-  Grid,
-  Card,
-  CardContent,
-  CardHeader,
-  TextField,
-  Autocomplete,
-  Chip,
-  Avatar,
-  Divider,
-  Tab,
-  Tabs,
-  IconButton,
-  Tooltip,
-  Switch,
-  FormControlLabel,
-  Alert,
-  AlertTitle,
-  CircularProgress,
-  useTheme,
-  useMediaQuery,
-  alpha,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TableSortLabel,
-  TablePagination,
-  InputAdornment,
-  Menu,
-  MenuItem,
-  Checkbox,
-  ListItemText,
-  FormControl,
-  InputLabel,
-  Select,
-  Paper,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails
+	Box,
+	Card,
+	CardContent,
+	Typography,
+	TextField,
+	InputAdornment,
+	IconButton,
+	Tabs,
+	Tab,
+	Chip,
+	Table,
+	TableHead,
+	TableRow,
+	TableCell,
+	TableBody,
+	TableContainer,
+	Collapse,
+	Avatar,
+	Tooltip,
+	CircularProgress,
+	Divider,
+	Button,
+	Autocomplete,
+	ListItem,
+	ListItemAvatar,
+	ListItemText,
+		Paper,
+		TableSortLabel
 } from '@mui/material';
+	import { Switch, FormControlLabel } from '@mui/material';
+import { alpha, useTheme } from '@mui/material/styles';
 import {
-  Analytics as AnalyticsIcon,
-  TrendingUp,
-  TrendingDown,
-  SportsBaseball,
-  Stadium,
-  Home,
-  FlightTakeoff,
-  Person,
-  Group,
-  Compare,
-  Search,
-  Refresh,
-  Download,
-  Share,
-  Psychology,
-  Speed,
-  ShowChart,
-  BarChart,
-  Settings,
-  AutoAwesome,
-  Numbers,
-  ExpandMore
+	Search,
+	Refresh,
+	ExpandMore,
+	ExpandLess,
+	Analytics,
+	SportsBaseball,
+	PersonSearch,
+	Troubleshoot,
+	SportsMma,
+	Numbers,
+	Hub,
+	Download
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  RadialLinearScale,
-  Title,
-  Tooltip as ChartTooltip,
-  Legend,
-  Filler
-} from 'chart.js';
+import { splitsApi, macroSplitsApi, statsApi } from '../services/apiService';
+import { getTeamLogoUrl } from '../utils/teamLogos';
 
-import { macroSplitsApi, splitsApi } from '../services/apiService';
-import LoadingSpinner from '../components/common/LoadingSpinner';
+// ---------------------------------------------------------------------------
+// Utility helpers
+// ---------------------------------------------------------------------------
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  RadialLinearScale,
-  Title,
-  ChartTooltip,
-  Legend,
-  Filler
-);
+const formatRate = (val, digits = 3) => (val || val === 0) ? Number(val).toFixed(digits) : '—';
+const pct = (v, d = 1) => (v || v === 0) ? (v * 100).toFixed(d) + '%' : '—';
 
-// ============================================================================
-// STATISTICAL AGGREGATION HELPERS
-// ============================================================================
-
-/**
- * Properly combine batting statistics from home and away games
- * @param {Object} homeStats - Home batting statistics
- * @param {Object} awayStats - Away batting statistics
- * @returns {Object} Combined and calculated statistics
- */
-const combineStats = (homeStats = {}, awayStats = {}) => {
-  const combined = {
-    atBats: (homeStats.atBats || 0) + (awayStats.atBats || 0),
-    hits: (homeStats.hits || 0) + (awayStats.hits || 0),
-    runs: (homeStats.runs || 0) + (awayStats.runs || 0),
-    rbi: (homeStats.rbi || 0) + (awayStats.rbi || 0),
-    doubles: (homeStats.doubles || 0) + (awayStats.doubles || 0),
-    triples: (homeStats.triples || 0) + (awayStats.triples || 0),
-    homeRuns: (homeStats.homeRuns || 0) + (awayStats.homeRuns || 0),
-    walks: (homeStats.walks || 0) + (awayStats.walks || 0),
-    strikeouts: (homeStats.strikeouts || 0) + (awayStats.strikeouts || 0),
-    plateAppearances: (homeStats.plateAppearances || 0) + (awayStats.plateAppearances || 0),
-  };
-
-  // Calculate combined averages properly
-  if (combined.atBats > 0) {
-    combined.avg = (combined.hits / combined.atBats).toFixed(3);
-  } else {
-    combined.avg = '.000';
-  }
-
-  if (combined.plateAppearances > 0) {
-    const totalBases = combined.hits + combined.doubles + (2 * combined.triples) + (3 * combined.homeRuns);
-    combined.slg = combined.atBats > 0 ? (totalBases / combined.atBats).toFixed(3) : '.000';
-    combined.obp = ((combined.hits + combined.walks) / combined.plateAppearances).toFixed(3);
-    combined.ops = (parseFloat(combined.obp) + parseFloat(combined.slg)).toFixed(3);
-  } else {
-    combined.slg = '.000';
-    combined.obp = '.000';
-    combined.ops = '.000';
-  }
-
-  return combined;
+// Merge stat objects (assumes leaf numeric) - shallow only for table rows
+const mergeStats = (a = {}, b = {}) => {
+	const out = { ...a };
+	for (const k of Object.keys(b)) {
+		const av = out[k];
+		const bv = b[k];
+		if (typeof bv === 'number' && typeof av === 'number') out[k] = av + bv; else if (av == null) out[k] = bv;
+	}
+	return out;
 };
 
-// ============================================================================
-// PROFESSIONAL ANIMATION VARIANTS
-// ============================================================================
-
-const pageVariants = {
-  initial: { opacity: 0, y: 20 },
-  in: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } },
-  out: { opacity: 0, y: -20, transition: { duration: 0.3 } }
+// Extract display core stats from a raw batting split node
+const deriveBattingDisplay = (raw = {}) => {
+	// Unwrap typical nesting variants
+	const node = raw?.stats?.batting || raw?.batting || raw;
+	const atBats = node.atBats || 0;
+	const hits = node.hits || 0;
+	const doubles = node.doubles || 0;
+	const triples = node.triples || 0;
+	const homeRuns = node.homeRuns || 0;
+	// Walks naming variance
+	const baseOnBalls = node.baseOnBalls ?? node.walks ?? 0;
+	// Strikeouts naming variance
+	const strikeOuts = node.strikeOuts ?? node.strikeouts ?? 0;
+	const hitByPitch = node.hitByPitch || 0;
+	const sacrificeFlies = node.sacrificeFlies || 0;
+	const plateAppearances = node.plateAppearances;
+	const singles = node.singles != null ? node.singles : (hits - doubles - triples - homeRuns);
+	const totalBases = node.totalBases != null ? node.totalBases : (singles + 2 * doubles + 3 * triples + 4 * homeRuns);
+	const pa = plateAppearances || (atBats + baseOnBalls + hitByPitch + sacrificeFlies);
+	// Prefer backend precalculated if present
+	const avg = node.avg != null ? node.avg : (atBats > 0 ? hits / atBats : 0);
+	const obp = node.obp != null ? node.obp : (pa > 0 ? (hits + baseOnBalls + hitByPitch) / pa : 0);
+	const slg = node.slg != null ? node.slg : (atBats > 0 ? totalBases / atBats : 0);
+	const ops = node.ops != null ? node.ops : (obp + slg);
+	const kRate = pa > 0 ? strikeOuts / pa : 0;
+	const bbRate = pa > 0 ? baseOnBalls / pa : 0;
+	return { pa, atBats, hits, doubles, triples, homeRuns, baseOnBalls, strikeOuts, avg, obp, slg, ops, kRate, bbRate };
 };
 
-const cardVariants = {
-  hidden: { opacity: 0, y: 30, scale: 0.95 },
-  visible: (i) => ({
-    opacity: 1,
-    y: 0,
-    scale: 1,
-    transition: {
-      delay: i * 0.1,
-      duration: 0.5,
-      ease: "easeOut"
-    }
-  }),
-  hover: {
-    y: -8,
-    scale: 1.02,
-    boxShadow: "0 20px 40px rgba(0,0,0,0.12)",
-    transition: { duration: 0.2 }
-  }
+// Pitching stat extraction (hoisted normal function so row builders can use before later hooks)
+function derivePitchingDisplay(raw = {}) {
+	const node = raw?.stats?.pitching || raw?.pitching || raw;
+	if (!node || typeof node !== 'object') return {};
+	const ip = node.inningsPitched || 0;
+	const innings = typeof ip === 'string' ? parseFloat(ip) || 0 : ip;
+	const era = node.era != null ? Number(node.era) : 0;
+	const whip = node.whip != null ? Number(node.whip) : 0;
+	const fip = node.fip != null ? Number(node.fip) : (node.FIP || 0);
+	const strikeOuts = node.strikeOuts ?? node.strikeouts ?? 0;
+	const baseOnBalls = node.baseOnBalls ?? node.walks ?? 0;
+	const hits = node.hits || 0;
+	const homeRuns = node.homeRuns || 0;
+	const battersFaced = node.battersFaced || 0;
+	const k9 = innings > 0 ? (strikeOuts * 9) / innings : 0;
+	const bb9 = innings > 0 ? (baseOnBalls * 9) / innings : 0;
+	const kRate = battersFaced > 0 ? strikeOuts / battersFaced : 0;
+	const bbRate = battersFaced > 0 ? baseOnBalls / battersFaced : 0;
+	return { innings, era, whip, fip, k9, bb9, strikeOuts, baseOnBalls, hits, homeRuns, kRate, bbRate, battersFaced };
+}
+
+// Aggregate home/away (and potential future neutral) location objects into a single batting stats object
+const aggregateLocations = (locContainer = {}) => {
+	const fields = ['plateAppearances','atBats','hits','runs','rbi','homeRuns','doubles','triples','singles','walks','baseOnBalls','strikeouts','strikeOuts','hitByPitch','sacrificeFlies','sacrificeHits','stolenBases','groundedIntoDoublePlay','totalBases'];
+	const sum = {};
+	for (const loc of Object.keys(locContainer)) {
+		const n = locContainer[loc]?.stats?.batting || locContainer[loc]?.batting || locContainer[loc];
+		if (!n) continue;
+		for (const f of fields) {
+			if (n[f] != null && typeof n[f] === 'number') sum[f] = (sum[f] || 0) + n[f];
+		}
+	}
+	// Normalize naming to what deriveBattingDisplay expects
+	if (sum.walks != null && sum.baseOnBalls == null) sum.baseOnBalls = sum.walks;
+	if (sum.strikeouts != null && sum.strikeOuts == null) sum.strikeOuts = sum.strikeouts;
+	// Recompute singles if missing
+	if (sum.hits != null && sum.singles == null) {
+		sum.singles = sum.hits - (sum.doubles || 0) - (sum.triples || 0) - (sum.homeRuns || 0);
+	}
+	return sum;
 };
 
-const statCardVariants = {
-  initial: { opacity: 0, scale: 0.8 },
-  animate: { 
-    opacity: 1, 
-    scale: 1,
-    transition: { duration: 0.4, ease: "easeOut" }
-  },
-  hover: { 
-    scale: 1.05,
-    transition: { duration: 0.2 }
-  }
+// Table column definitions (batting focus for now)
+const BATTING_COLUMNS = [
+	{ key: 'pa', label: 'PA', format: v => v || 0 },
+	{ key: 'atBats', label: 'AB', format: v => v || 0 },
+	{ key: 'hits', label: 'H', format: v => v || 0 },
+	{ key: 'homeRuns', label: 'HR', format: v => v || 0 },
+	{ key: 'avg', label: 'AVG', format: v => formatRate(v, 3) },
+	{ key: 'obp', label: 'OBP', format: v => formatRate(v, 3) },
+	{ key: 'slg', label: 'SLG', format: v => formatRate(v, 3) },
+	{ key: 'ops', label: 'OPS', format: v => formatRate(v, 3) },
+	{ key: 'kRate', label: 'K%', format: v => pct(v) },
+	{ key: 'bbRate', label: 'BB%', format: v => pct(v) }
+];
+
+// ---------------------------------------------------------------------------
+// Color Classification (All Stats)
+// ---------------------------------------------------------------------------
+// Tier colors reused everywhere
+const STAT_COLORS = [
+	'rgba(211,47,47,0.85)',   // Poor
+	'rgba(239,108,0,0.85)',   // Below Avg
+	'rgba(255,179,0,0.90)',   // Avg
+	'rgba(102,187,106,0.90)', // Above Avg
+	'rgba(46,125,50,0.95)'    // Elite
+];
+
+// Which stats are "lower is better"
+const LOWER_BETTER = new Set(['era','whip','fip','kRatePitch','bb9','hitsPer9','runsPer9']);
+// Which batting stats are inverted (lower is better) - only K% for now
+const BATTING_LOWER_BETTER = new Set(['kRate']);
+
+// Metrics we compare to league baseline directly if available (batting)
+const BASELINE_RATES = new Set(['avg','obp','slg','ops','kRate','bbRate']);
+
+// Compute percentile-based tier (fallback) among a list of numeric values
+function percentileTier(value, values) {
+	if (value == null || isNaN(value)) return 2; // neutral
+	const sorted = values.filter(v => v != null && !isNaN(v)).sort((a,b)=>a-b);
+	if (!sorted.length) return 2;
+	const idx = sorted.findIndex(v => v >= value);
+	const rank = idx === -1 ? sorted.length - 1 : idx;
+	const pct = rank / (sorted.length - 1 || 1); // 0..1
+	if (pct >= 0.90) return 4;
+	if (pct >= 0.65) return 3;
+	if (pct >= 0.35) return 2;
+	if (pct >= 0.10) return 1;
+	return 0;
+}
+
+// Given metric & value produce tier (0..4)
+function classifyStatMetric({ statKey, value, baselineBatting, baselinePitching, sampleValues, context }) {
+	if (value == null || isNaN(value)) return 2;
+	// Normalize naming for pitching context
+	const directionLower = context === 'pitching' ? (statKey === 'era' || statKey === 'whip' || statKey === 'fip') : BATTING_LOWER_BETTER.has(statKey);
+	// Baseline comparison for specified rate stats (batting)
+	if (context === 'batting' && BASELINE_RATES.has(statKey) && baselineBatting && baselineBatting[statKey] != null) {
+		const base = baselineBatting[statKey];
+		if (base && base > 0) {
+			const pctDiff = directionLower ? (base - value) / base : (value - base) / base; // positive good
+			if (pctDiff > 0.10) return 4;
+			if (pctDiff > 0.03) return 3;
+			if (pctDiff > -0.03) return 2;
+			if (pctDiff > -0.10) return 1;
+			return 0;
+		}
+	}
+	// For pitching we have baseline ERA (already used elsewhere) -> treat same pattern for era/whip/fip if available
+	if (context === 'pitching' && baselinePitching && ['era','whip','fip'].includes(statKey) && baselinePitching[statKey] != null) {
+		const base = baselinePitching[statKey];
+		if (base && base > 0) {
+			const pctDiff = (base - value) / base; // lower better
+			if (pctDiff > 0.10) return 4;
+			if (pctDiff > 0.03) return 3;
+			if (pctDiff > -0.03) return 2;
+			if (pctDiff > -0.10) return 1;
+			return 0;
+		}
+	}
+	// Percentile fallback
+	const tier = percentileTier(value, sampleValues);
+	// Invert tiers if lower is better (so low value yields high tier)
+	if (directionLower) return 4 - tier;
+	return tier;
+}
+
+function colorForStat(params) {
+	const tier = classifyStatMetric(params);
+	return STAT_COLORS[tier];
+}
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
+const SplitsExplorer = () => {
+	const theme = useTheme();
+	const searchRef = useRef(null);
+
+	// Global state
+	const [season, setSeason] = useState('2025');
+	const [team, setTeam] = useState('HOU'); // default fallback team
+	const [playerQuery, setPlayerQuery] = useState('');
+		const [playerResults, setPlayerResults] = useState([]);
+		const [recentPlayers, setRecentPlayers] = useState(() => []);
+		const [openSearch, setOpenSearch] = useState(false);
+	const [selectedPlayer, setSelectedPlayer] = useState(null); // { team, name }
+	const [loadingSearch, setLoadingSearch] = useState(false);
+	const [macroLoading, setMacroLoading] = useState(false);
+	const [macroError, setMacroError] = useState(null);
+	const [macroData, setMacroData] = useState(null); // full macro object
+	const [leagueBaselines, setLeagueBaselines] = useState(null); // dynamic league averages
+	const [showBaselines, setShowBaselines] = useState(false); // toggle to reveal baseline numbers
+	const [activeTab, setActiveTab] = useState('overview');
+		const [sortKey, setSortKey] = useState('pa');
+		const [sortDir, setSortDir] = useState('desc');
+			const [splitMode, setSplitMode] = useState('batting'); // 'batting' | 'pitching'
+
+	// Drill-down state (e.g., vs pitchers accordion)
+	const [expanded, setExpanded] = useState({});
+
+	// Debounced search effect
+	useEffect(() => {
+		if (!playerQuery || playerQuery.length < 2) { setPlayerResults([]); setOpenSearch(false); return; }
+			const handle = setTimeout(async () => {
+			try {
+				setLoadingSearch(true);
+				const res = await splitsApi.searchPlayerSplits(playerQuery, { season, limit: 15 });
+					const rawPlayers = res.players || [];
+					// Deduplicate by (playerId) or (team+name) signature
+					const seen = new Set();
+					const players = [];
+					for (const p of rawPlayers) {
+						const baseId = p.playerId || `${p.team}-${p.name}`;
+							if (!seen.has(baseId)) {
+								seen.add(baseId);
+								players.push({ ...p, _key: baseId });
+							}
+					}
+					setPlayerResults(players);
+					setOpenSearch(players.length > 0);
+			} catch (e) {
+				console.error('Player search failed', e);
+			} finally { setLoadingSearch(false); }
+		}, 300);
+		return () => clearTimeout(handle);
+	}, [playerQuery, season]);
+
+	const loadMacro = useCallback(async (p) => {
+		if (!p) return;
+		try {
+			setMacroLoading(true); setMacroError(null); setMacroData(null);
+			// Pass raw name; service will normalize
+			const data = await macroSplitsApi.getPlayerMacro(p.team, p.name, season);
+			const payload = data?.splits || data;
+			if (!payload || Object.keys(payload).length === 0) {
+				console.warn('[SplitsExplorer] Empty macro splits payload', { team: p.team, player: p.name, season });
+			}
+			setMacroData(payload);
+		} catch (e) {
+			console.error('Macro load error', e);
+			setMacroError(e.message || 'Failed loading macro splits');
+		} finally { setMacroLoading(false); }
+	}, [season]);
+
+	// Auto-load macro when player selected
+	useEffect(() => { if (selectedPlayer) loadMacro(selectedPlayer); }, [selectedPlayer, loadMacro]);
+
+	// Auto-detect pitcher once macroData loaded
+	useEffect(() => {
+		if (!macroData) return;
+		// Criteria: has any pitching innings AND very few plate appearances OR pitching stats exist without batting improvement
+		const loc = macroData.by_location;
+		if (!loc) return;
+		let totalIPOuts = 0; let totalPA = 0; let hasPitching = false;
+		for (const k of Object.keys(loc)) {
+			const p = loc[k]?.stats?.pitching || loc[k]?.pitching;
+			if (p?.inningsPitched) {
+				hasPitching = true;
+				const parts = String(p.inningsPitched).split('.');
+				const outs = (parseInt(parts[0]||'0',10)*3)+parseInt(parts[1]||'0',10);
+				totalIPOuts += outs;
+			}
+			const b = loc[k]?.stats?.batting || loc[k]?.batting;
+			if (b?.plateAppearances) totalPA += b.plateAppearances;
+		}
+		const innings = totalIPOuts/3;
+		if (hasPitching && innings >= 5 && totalPA <= 15 && splitMode !== 'pitching') {
+			setSplitMode('pitching');
+		}
+	}, [macroData, splitMode]);
+
+	// Load league baselines once per season change
+	useEffect(() => {
+		let mounted = true;
+		(async () => {
+			try {
+				const data = await statsApi.getBaselines(season);
+				if (mounted) setLeagueBaselines(data);
+			} catch (e) {
+				console.warn('Baseline fetch failed, using static tiers fallback', e.message);
+				if (mounted) setLeagueBaselines(null);
+			}
+		})();
+		return () => { mounted = false; };
+	}, [season]);
+
+	// Normalized views per tab
+			const homeAwayRows = useMemo(() => {
+					if (!macroData?.by_location) return [];
+					return Object.entries(macroData.by_location).map(([loc, node]) => {
+						const batting = deriveBattingDisplay(node);
+						const pitching = derivePitchingDisplay(node);
+						return { key: loc, label: loc.toUpperCase(), batting, pitching, stats: batting };
+					});
+			}, [macroData]);
+
+		const aggregatePitchingLocations = useCallback((locContainer = {}) => {
+			// Aggregate core counting stats to recompute rates
+			const sum = { outs: 0, strikeOuts: 0, baseOnBalls: 0, hits: 0, homeRuns: 0, earnedRuns: 0, battersFaced: 0 };
+			for (const loc of Object.keys(locContainer)) {
+				const n = locContainer[loc]?.stats?.pitching || locContainer[loc]?.pitching || locContainer[loc];
+				if (!n) continue;
+				const ip = n.inningsPitched || '0.0';
+				const [ipInnings, ipRemainder] = String(ip).split('.');
+				const outs = (parseInt(ipInnings || '0', 10) * 3) + parseInt(ipRemainder || '0', 10);
+				sum.outs += outs;
+				sum.strikeOuts += (n.strikeOuts ?? n.strikeouts ?? 0);
+				sum.baseOnBalls += (n.baseOnBalls ?? n.walks ?? 0);
+				sum.hits += (n.hits || 0);
+				sum.homeRuns += (n.homeRuns || 0);
+				sum.earnedRuns += (n.earnedRuns || 0);
+				sum.battersFaced += (n.battersFaced || 0);
+			}
+			// Rebuild pseudo pitching node for derivePitchingDisplay
+			const inningsWhole = Math.floor(sum.outs / 3);
+			const remainder = sum.outs % 3;
+			const aggregated = {
+				inningsPitched: `${inningsWhole}.${remainder}`,
+				strikeOuts: sum.strikeOuts,
+				baseOnBalls: sum.baseOnBalls,
+				hits: sum.hits,
+				homeRuns: sum.homeRuns,
+				earnedRuns: sum.earnedRuns,
+				battersFaced: sum.battersFaced,
+				// era & whip will be recomputed in derivePitchingDisplay fallback path (if present) else computed below
+			};
+			return { stats: { pitching: aggregated } };
+		}, []);
+
+			const vsHandednessRows = useMemo(() => {
+					if (!macroData?.vs_handedness) return [];
+					return Object.entries(macroData.vs_handedness).map(([hand, locObj]) => {
+						const batting = deriveBattingDisplay(aggregateLocations(locObj));
+						const pitching = derivePitchingDisplay(aggregatePitchingLocations(locObj));
+						return { key: hand, label: hand, batting, pitching, stats: batting };
+					});
+			}, [macroData, aggregatePitchingLocations]);
+
+			const countRows = useMemo(() => {
+					const source = macroData?.by_count || macroData?.counts || macroData?.byCount;
+					if (!source) return [];
+					return Object.entries(source).map(([count, node]) => {
+						const batting = deriveBattingDisplay(node);
+						const pitching = derivePitchingDisplay(node);
+						return { key: count, label: count, batting, pitching, stats: batting };
+					});
+			}, [macroData]);
+
+			const vsTeamsRows = useMemo(() => {
+					if (!macroData?.vs_teams) return [];
+					return Object.entries(macroData.vs_teams).map(([opp, locObj]) => {
+						const batting = deriveBattingDisplay(aggregateLocations(locObj));
+						const pitching = derivePitchingDisplay(aggregatePitchingLocations(locObj));
+						return { key: opp, label: opp, batting, pitching, stats: batting };
+					});
+			}, [macroData, aggregatePitchingLocations]);
+
+			const vsPitchersRows = useMemo(() => {
+					if (!macroData?.vs_pitchers) return [];
+					return Object.entries(macroData.vs_pitchers).map(([compoundKey, locObj]) => {
+						const batting = deriveBattingDisplay(aggregateLocations(locObj));
+						const pitching = derivePitchingDisplay(aggregatePitchingLocations(locObj));
+						return { key: compoundKey, label: compoundKey.replace('-', ' '), batting, pitching, stats: batting };
+					});
+			}, [macroData, aggregatePitchingLocations]);
+
+			// Determine if pitching data exists (for toggle)
+			const hasPitchingSplits = useMemo(() => {
+				const loc = macroData?.by_location;
+				if (!loc) return false;
+				return Object.values(loc).some(v => v?.stats?.pitching);
+			}, [macroData]);
+
+			// Pitching derivation helpers ---------------------------------------------------------
+			const pitchingHomeAway = useMemo(() => {
+				if (!macroData?.by_location) return {};
+				const out = {};
+				for (const [loc, node] of Object.entries(macroData.by_location)) out[loc] = derivePitchingDisplay(node);
+				return out;
+			}, [macroData]);
+
+			const pitchingVsHandedness = useMemo(() => {
+				if (!macroData?.vs_handedness) return {};
+				const out = {};
+				for (const [hand, locObj] of Object.entries(macroData.vs_handedness)) out[hand] = derivePitchingDisplay(aggregateLocations(locObj));
+				return out;
+			}, [macroData]);
+
+	// Compound analytics (after venue removal only keep count_vs_team, count_vs_handedness, handedness_vs_team)
+	const compoundGroups = useMemo(() => {
+		const compound = macroData?.compound || {};
+		const out = [];
+			if (compound.count_vs_team) {
+				const groupRows = [];
+				for (const [countKey, teams] of Object.entries(compound.count_vs_team)) {
+					for (const [opp, locObj] of Object.entries(teams)) {
+						groupRows.push({ key: `${countKey}-${opp}`, label: `${countKey} vs ${opp}`, stats: deriveBattingDisplay(aggregateLocations(locObj)) });
+					}
+				}
+				out.push({ key: 'count_vs_team', label: 'Count vs Team', rows: groupRows });
+			}
+			if (compound.count_vs_handedness) {
+				const groupRows = [];
+				for (const [countKey, hands] of Object.entries(compound.count_vs_handedness)) {
+					for (const [hand, locObj] of Object.entries(hands)) {
+						groupRows.push({ key: `${countKey}-${hand}`, label: `${countKey} vs ${hand}`, stats: deriveBattingDisplay(aggregateLocations(locObj)) });
+					}
+				}
+				out.push({ key: 'count_vs_handedness', label: 'Count vs Handedness', rows: groupRows });
+			}
+			if (compound.handedness_vs_team) {
+				const groupRows = [];
+				for (const [hand, teams] of Object.entries(compound.handedness_vs_team)) {
+					for (const [opp, locObj] of Object.entries(teams)) {
+						groupRows.push({ key: `${hand}-${opp}`, label: `${hand} vs ${opp}`, stats: deriveBattingDisplay(aggregateLocations(locObj)) });
+					}
+				}
+				out.push({ key: 'handedness_vs_team', label: 'Handedness vs Team', rows: groupRows });
+			}
+		return out;
+	}, [macroData]);
+
+	// Active tab dataset selection
+	const currentRows = useMemo(() => {
+		switch (activeTab) {
+			case 'overview': return homeAwayRows;
+			case 'teams': return vsTeamsRows;
+			case 'pitchers': return vsPitchersRows;
+			case 'counts': return countRows;
+			case 'compound': return []; // handled separately
+			default: return [];
+		}
+	}, [activeTab, homeAwayRows, vsTeamsRows, vsPitchersRows, countRows]);
+
+		// Sorting logic for non-compound tables
+	const sortedRows = useMemo(() => {
+		const rows = [...currentRows];
+		if (!sortKey) return rows;
+		rows.sort((a, b) => {
+			const aStats = splitMode === 'pitching' ? a.pitching : a.batting;
+			const bStats = splitMode === 'pitching' ? b.pitching : b.batting;
+			const av = aStats?.[sortKey];
+			const bv = bStats?.[sortKey];
+			if (av == null && bv == null) return 0;
+			if (av == null) return 1;
+			if (bv == null) return -1;
+			if (typeof av === 'number' && typeof bv === 'number') return sortDir === 'desc' ? bv - av : av - bv;
+			const as = String(av).toLowerCase();
+			const bs = String(bv).toLowerCase();
+			return sortDir === 'desc' ? bs.localeCompare(as) : as.localeCompare(bs);
+		});
+		return rows;
+	}, [currentRows, sortKey, sortDir, splitMode]);
+
+		// For compound groups apply same sorting inside each group
+		const sortedCompoundGroups = useMemo(() => {
+			if (activeTab !== 'compound') return compoundGroups;
+			return compoundGroups.map(g => {
+				const rows = [...g.rows];
+				rows.sort((a, b) => {
+					const av = a.stats[sortKey];
+					const bv = b.stats[sortKey];
+					if (av == null && bv == null) return 0;
+					if (av == null) return 1;
+					if (bv == null) return -1;
+					if (typeof av === 'number' && typeof bv === 'number') {
+						return sortDir === 'desc' ? bv - av : av - bv;
+					}
+					const as = String(av).toLowerCase();
+					const bs = String(bv).toLowerCase();
+					return sortDir === 'desc' ? bs.localeCompare(as) : as.localeCompare(bs);
+				});
+				return { ...g, rows };
+			});
+		}, [compoundGroups, activeTab, sortKey, sortDir]);
+
+		// CSV Export --------------------------------------------------------------
+		const buildCsv = useCallback(() => {
+			// Support pitching mode export
+			const PITCHING_COLUMNS = [
+				{ key: 'era', label: 'ERA', format: v => v==null? '—' : Number(v).toFixed(2) },
+				{ key: 'whip', label: 'WHIP', format: v => v==null? '—' : Number(v).toFixed(2) },
+				{ key: 'fip', label: 'FIP', format: v => v==null? '—' : Number(v).toFixed(2) },
+				{ key: 'innings', label: 'IP', format: v => v==null? 0 : Number(v).toFixed(1) },
+				{ key: 'k9', label: 'K/9', format: v => v==null? 0 : Number(v).toFixed(1) },
+				{ key: 'bb9', label: 'BB/9', format: v => v==null? 0 : Number(v).toFixed(1) },
+				{ key: 'strikeOuts', label: 'K', format: v => v || 0 },
+				{ key: 'baseOnBalls', label: 'BB', format: v => v || 0 },
+				{ key: 'hits', label: 'H', format: v => v || 0 },
+				{ key: 'homeRuns', label: 'HR', format: v => v || 0 }
+			];
+			const activeCols = splitMode === 'pitching' ? PITCHING_COLUMNS : BATTING_COLUMNS;
+			const cols = ['Split', ...activeCols.map(c => c.label)];
+			const lines = [cols.join(',')];
+			const escape = (v) => {
+				if (v == null) return '';
+				const s = String(v);
+				return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+			};
+			const addRow = (label, stats) => {
+				const row = [label, ...activeCols.map(c => stats?.[c.key] != null ? stats[c.key] : '')];
+				lines.push(row.map(escape).join(','));
+			};
+			if (activeTab === 'compound') {
+				sortedCompoundGroups.forEach(group => {
+					lines.push(`# ${group.label}`);
+					group.rows.forEach(r => addRow(r.label, r.stats));
+					lines.push('');
+				});
+			} else {
+				sortedRows.forEach(r => {
+					const block = splitMode === 'pitching' ? r.pitching : r.batting; // choose correct stat block
+					addRow(r.label, block);
+				});
+			}
+			return lines.join('\n');
+		}, [activeTab, sortedRows, sortedCompoundGroups, splitMode]);
+
+		const handleExport = useCallback(() => {
+			const csv = buildCsv();
+			const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+			const safeName = (selectedPlayer?.name || 'player').replace(/[^a-z0-9_\-]+/gi, '_');
+			const fileName = `splits_${safeName}_${activeTab}_${Date.now()}.csv`;
+			const link = document.createElement('a');
+			link.href = URL.createObjectURL(blob);
+			link.setAttribute('download', fileName);
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+		}, [buildCsv, selectedPlayer, activeTab]);
+
+		const handleSort = (key) => {
+			if (sortKey === key) {
+				setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+			} else {
+				setSortKey(key);
+				setSortDir('desc');
+			}
+		};
+
+	// -----------------------------------------------------------------------
+	// Rendering helpers
+	// -----------------------------------------------------------------------
+		const renderStatsTable = (rows) => {
+			const showingPitching = splitMode === 'pitching';
+			const PITCHING_COLUMNS = [
+				{ key: 'era', label: 'ERA', format: v => v==null? '—' : Number(v).toFixed(2) },
+				{ key: 'whip', label: 'WHIP', format: v => v==null? '—' : Number(v).toFixed(2) },
+				{ key: 'fip', label: 'FIP', format: v => v==null? '—' : Number(v).toFixed(2) },
+				{ key: 'innings', label: 'IP', format: v => v==null? 0 : Number(v).toFixed(1) },
+				{ key: 'k9', label: 'K/9', format: v => v==null? 0 : Number(v).toFixed(1) },
+				{ key: 'bb9', label: 'BB/9', format: v => v==null? 0 : Number(v).toFixed(1) },
+				{ key: 'strikeOuts', label: 'K', format: v => v || 0 },
+				{ key: 'baseOnBalls', label: 'BB', format: v => v || 0 },
+				{ key: 'hits', label: 'H', format: v => v || 0 },
+				{ key: 'homeRuns', label: 'HR', format: v => v || 0 }
+			];
+			const columns = showingPitching ? PITCHING_COLUMNS : BATTING_COLUMNS;
+			// Build sample maps for percentile fallback per context (use correct stat block)
+			const sampleMap = {};
+			columns.forEach(c => { sampleMap[c.key] = []; });
+			rows.forEach(r => {
+				const block = showingPitching ? r.pitching : r.batting;
+				columns.forEach(c => { const val = block?.[c.key]; if (typeof val === 'number' && !isNaN(val)) sampleMap[c.key].push(val); });
+			});
+			const baselineBatting = leagueBaselines?.batting;
+			const baselinePitching = leagueBaselines?.pitching;
+			return (
+				<TableContainer sx={{ maxHeight: 520 }}>
+					<Table stickyHeader size="small">
+						<TableHead>
+							<TableRow>
+								<TableCell sx={{ position: 'sticky', left: 0, background: theme.palette.background.paper, zIndex: 10 }}>
+									<TableSortLabel active={sortKey === 'label'} direction={sortKey === 'label' ? sortDir : 'asc'} onClick={() => handleSort('label')}>
+										Split
+									</TableSortLabel>
+								</TableCell>
+								{columns.map(c => {
+									const active = sortKey === c.key;
+									return (
+										<TableCell key={c.key} align="center" sx={{ cursor: 'pointer' }} onClick={() => handleSort(c.key)}>
+											<TableSortLabel active={active} direction={active ? sortDir : 'asc'}>{c.label}</TableSortLabel>
+										</TableCell>
+									);
+								})}
+							</TableRow>
+						</TableHead>
+						<TableBody>
+							{rows.map(r => {
+								const statBlock = showingPitching ? r.pitching : r.batting;
+								return (
+									<TableRow key={r.key} hover>
+										<TableCell sx={{ position: 'sticky', left: 0, background: theme.palette.background.paper }}>{r.label}</TableCell>
+										{columns.map(c => {
+											const val = statBlock?.[c.key];
+											const bg = colorForStat({ statKey: c.key, value: val, baselineBatting, baselinePitching, sampleValues: sampleMap[c.key], context: showingPitching ? 'pitching' : 'batting' });
+											return (
+												<TableCell key={c.key} align="center" sx={{ backgroundColor: bg, color: '#fff', transition: 'background-color .3s' }}>
+													{c.format ? c.format(val) : val ?? '—'}
+												</TableCell>
+											);
+										})}
+									</TableRow>
+								);
+							})}
+							{rows.length === 0 && (
+								<TableRow>
+									<TableCell colSpan={1 + columns.length} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+										No data
+									</TableCell>
+								</TableRow>
+							)}
+						</TableBody>
+					</Table>
+				</TableContainer>
+			);
+		};
+
+		// Reusable card grid for other tabs -------------------------------------------------
+		const [filterText, setFilterText] = useState('');
+	const filteredRows = useMemo(() => {
+		if (!filterText) return sortedRows;
+		const ft = filterText.toLowerCase();
+		return sortedRows.filter(r => r.label.toLowerCase().includes(ft));
+	}, [filterText, sortedRows]);
+
+		const classifyColor = (v, isPitchingLocal) => {
+			const OPS_TIERS = [0.0, 0.600, 0.700, 0.760, 0.850];
+			const ERA_TIERS = [Infinity, 5.00, 4.25, 3.60, 3.10];
+			const COLORS = [
+				'rgba(211,47,47,0.85)',
+				'rgba(239,108,0,0.85)',
+				'rgba(255,179,0,0.90)',
+				'rgba(102,187,106,0.90)',
+				'rgba(46,125,50,0.95)'
+			];
+			if (v == null || isNaN(v)) return COLORS[2];
+			if (!isPitchingLocal) {
+				if (v >= OPS_TIERS[4]) return COLORS[4];
+				if (v >= OPS_TIERS[3]) return COLORS[3];
+				if (v >= OPS_TIERS[2]) return COLORS[2];
+				if (v >= OPS_TIERS[1]) return COLORS[1];
+				return COLORS[0];
+			}
+			// pitching
+			if (v < ERA_TIERS[4]) return COLORS[4];
+			if (v < ERA_TIERS[3]) return COLORS[3];
+			if (v < ERA_TIERS[2]) return COLORS[2];
+			if (v < ERA_TIERS[1]) return COLORS[1];
+			return COLORS[0];
+		};
+
+		const renderRowCard = (row, isPitchingLocal) => {
+			const statBlock = isPitchingLocal ? row.pitching : row.batting;
+			const headlineValue = isPitchingLocal ? (statBlock?.era != null ? statBlock.era.toFixed(2)+' ERA' : '—') : (statBlock?.ops != null ? formatRate(statBlock.ops,3)+' OPS' : '—');
+			const baselineBatting = leagueBaselines?.batting;
+			const baselinePitching = leagueBaselines?.pitching;
+			return (
+				<Card key={row.key} variant="outlined" sx={{ flex: '1 1 240px', minWidth: 240 }}>
+					<CardContent sx={{ p: 1.5 }}>
+						<Box sx={{ display:'flex', alignItems:'center', justifyContent:'space-between', mb: 0.5 }}>
+							<Typography variant="caption" fontWeight={600}>{row.label}</Typography>
+							{activeTab === 'teams' && <Avatar src={getTeamLogoUrl(row.label)} alt={row.label} sx={{ width: 24, height: 24 }} />}
+						</Box>
+						<Typography variant="subtitle1" fontWeight={700} sx={{ backgroundColor: classifyColor(isPitchingLocal ? statBlock?.era : statBlock?.ops, isPitchingLocal), color:'#fff', display:'inline-block', px: 0.75, borderRadius: 1 }}>{headlineValue}</Typography>
+							<Table size="small" sx={{ mt: 0.5 }}>
+								<TableBody>
+									{BATTING_COLUMNS.slice(0,8).map(c => {
+										const val = statBlock?.[c.key];
+										const baselineVal = !isPitchingLocal ? (leagueBaselines?.batting?.[c.key] ?? null) : (leagueBaselines?.pitching?.[c.key] ?? null);
+										const bg = colorForStat({ statKey: c.key, value: val, baselineBatting, baselinePitching, sampleValues: [val], context: isPitchingLocal ? 'pitching' : 'batting' });
+										const diffPct = baselineVal != null && val != null && baselineVal !== 0 ? (((val - baselineVal) / baselineVal) * 100) : null;
+										return (
+											<TableRow key={c.key}>
+												<TableCell sx={{ py:0.25, borderBottom:'none' }}><Typography variant="caption" color="text.secondary">{c.label}</Typography></TableCell>
+												<TableCell sx={{ py:0.25, borderBottom:'none', backgroundColor: bg, color:'#fff', borderRadius: 1 }} align="right">
+													<Tooltip title={baselineVal != null ? `League ${c.label}: ${c.format(baselineVal)}${diffPct!=null?` | Diff: ${diffPct>0?'+':''}${diffPct.toFixed(1)}%`:''}` : ''} placement="top" arrow>
+														<Box component="span">
+															<Typography variant="caption" fontWeight={600} component="span">{c.format(val)}</Typography>
+															{showBaselines && baselineVal != null && (
+																<Typography variant="caption" component="span" sx={{ ml: .5, opacity: 0.85 }}>({c.format(baselineVal)})</Typography>
+															)}
+														</Box>
+													</Tooltip>
+												</TableCell>
+											</TableRow>
+										);
+									})}
+								</TableBody>
+							</Table>
+					</CardContent>
+				</Card>
+			);
+		};
+
+		const renderCompoundCards = () => (
+			<Box>
+				{sortedCompoundGroups.length === 0 && <Typography variant="body2" color="text.secondary" sx={{ p:2 }}>No compound analytics (after pruning)</Typography>}
+				{sortedCompoundGroups.map(group => (
+					<Box key={group.key} sx={{ mb: 3 }}>
+						<Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>{group.label}</Typography>
+						<Box sx={{ display:'flex', flexWrap:'wrap', gap: 1.5 }}>
+							{group.rows.filter(r => !filterText || r.label.toLowerCase().includes(filterText.toLowerCase())).map(r => renderRowCard(r, splitMode==='pitching'))}
+						</Box>
+					</Box>
+				))}
+			</Box>
+		);
+
+		const renderFilteredCards = () => (
+			<Box>
+				<Box sx={{ mb: 1.5 }}>
+					<TextField value={filterText} onChange={e=>setFilterText(e.target.value)} size="small" placeholder={`Filter ${activeTab==='teams'?'teams':activeTab==='pitchers'?'pitchers':activeTab==='counts'?'counts':'rows'}`} fullWidth />
+				</Box>
+				<Box sx={{ display:'flex', flexWrap:'wrap', gap: 1.5 }}>
+					{filteredRows.map(r => renderRowCard(r, splitMode==='pitching'))}
+					{filteredRows.length===0 && <Typography variant="body2" color="text.secondary" sx={{ p:2 }}>No matches</Typography>}
+				</Box>
+			</Box>
+		);
+
+		const renderCompound = () => renderCompoundCards();
+
+			// Home/Away card layout with additional L/R splits ---------------------------------
+			const HOME_AWAY_METRICS = [
+				{ key: 'pa', label: 'PA' },
+				{ key: 'atBats', label: 'AB' },
+				{ key: 'hits', label: 'H' },
+				{ key: 'homeRuns', label: 'HR' },
+				{ key: 'avg', label: 'AVG', fmt: v => formatRate(v) },
+				{ key: 'obp', label: 'OBP', fmt: v => formatRate(v) },
+				{ key: 'slg', label: 'SLG', fmt: v => formatRate(v) },
+				{ key: 'ops', label: 'OPS', fmt: v => formatRate(v) },
+				{ key: 'kRate', label: 'K%', fmt: v => pct(v) },
+				{ key: 'bbRate', label: 'BB%', fmt: v => pct(v) }
+			];
+
+			const renderStatChipRow = (stats) => (
+				<Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
+					{HOME_AWAY_METRICS.map(m => (
+						<Chip
+							key={m.key}
+								label={`${m.label}: ${(m.fmt ? m.fmt(stats[m.key]) : stats[m.key] ?? 0)}`}
+							size="small"
+							sx={{ fontWeight: 500 }}
+						/>
+					))}
+				</Box>
+			);
+
+			const renderHomeAwayCards = () => {
+					// Select mode-specific data
+					const battingHome = homeAwayRows.find(r => r.key === 'home')?.batting;
+					const battingAway = homeAwayRows.find(r => r.key === 'away')?.batting;
+					const battingVsLeft = vsHandednessRows.find(r => r.key.toLowerCase().startsWith('l'))?.batting;
+					const battingVsRight = vsHandednessRows.find(r => r.key.toLowerCase().startsWith('r'))?.batting;
+
+					const pitchingHome = pitchingHomeAway.home;
+					const pitchingAway = pitchingHomeAway.away;
+					const pitchingVsLeft = pitchingVsHandedness['L'] || pitchingVsHandedness['LHP'] || pitchingVsHandedness['L'];
+					const pitchingVsRight = pitchingVsHandedness['R'] || pitchingVsHandedness['RHP'] || pitchingVsHandedness['R'];
+
+					const isPitching = splitMode === 'pitching';
+
+					// Build arrays for iteration
+					const cards = isPitching ? [
+						{ key: 'home', title: 'HOME', stats: pitchingHome },
+						{ key: 'away', title: 'AWAY', stats: pitchingAway },
+					] : [
+						{ key: 'home', title: 'HOME', stats: battingHome },
+						{ key: 'away', title: 'AWAY', stats: battingAway },
+					];
+
+					// Aggregate total
+					const aggregate = () => {
+						if (isPitching) {
+							if (!pitchingHome && !pitchingAway) return null;
+							const base = {};
+							[pitchingHome, pitchingAway].filter(Boolean).forEach(s => {
+								Object.keys(s).forEach(k => { if (typeof s[k] === 'number') base[k] = (base[k] || 0) + s[k]; });
+							});
+							// Recompute derived where needed (ERA weighted by innings)
+							if (base.innings > 0) {
+								const totalER = ( (pitchingHome?.era||0) * (pitchingHome?.innings||0) + (pitchingAway?.era||0) * (pitchingAway?.innings||0) ) / 9;
+								base.era = base.innings > 0 ? (totalER * 9) / base.innings : 0;
+								base.k9 = base.innings > 0 ? (base.strikeOuts * 9) / base.innings : 0;
+								base.bb9 = base.innings > 0 ? (base.baseOnBalls * 9) / base.innings : 0;
+								base.kRate = base.battersFaced > 0 ? base.strikeOuts / base.battersFaced : 0;
+								base.bbRate = base.battersFaced > 0 ? base.baseOnBalls / base.battersFaced : 0;
+							}
+							return base;
+						} else {
+							if (!battingHome && !battingAway) return null;
+							const agg = {};
+							[battingHome, battingAway].filter(Boolean).forEach(s => {
+								HOME_AWAY_METRICS.forEach(m => { const v = s[m.key]; if (typeof v === 'number') agg[m.key] = (agg[m.key] || 0) + v; });
+							});
+							if (agg.atBats > 0 && agg.hits != null) agg.avg = agg.hits / agg.atBats;
+							if (agg.pa > 0) {
+								const bb = (battingHome?.baseOnBalls || 0) + (battingAway?.baseOnBalls || 0);
+								const hbp = (battingHome?.hitByPitch || 0) + (battingAway?.hitByPitch || 0);
+								const hits = (battingHome?.hits || 0) + (battingAway?.hits || 0);
+								agg.obp = (hits + bb + hbp) / agg.pa;
+								const tb = (battingHome?.slg || 0) * (battingHome?.atBats || 0) + (battingAway?.slg || 0) * (battingAway?.atBats || 0);
+								agg.slg = agg.atBats > 0 ? tb / agg.atBats : 0;
+								agg.ops = (agg.obp || 0) + (agg.slg || 0);
+								const k = (battingHome?.strikeOuts || 0) + (battingAway?.strikeOuts || 0);
+								const bbTotal = bb;
+								agg.kRate = k / agg.pa;
+								agg.bbRate = bbTotal / agg.pa;
+							}
+							return agg;
+						}
+					};
+					const total = aggregate();
+
+					const lh = isPitching ? pitchingVsLeft : battingVsLeft;
+					const rh = isPitching ? pitchingVsRight : battingVsRight;
+
+					// Heat map scale values
+							const valueAccessor = isPitching ? (s => s?.era) : (s => s?.ops);
+							// Dynamic baseline logic: compute deviation from league average; fallback to fixed tiers if baseline absent
+							const baselineBattingOPS = leagueBaselines?.batting?.ops || leagueBaselines?.batting?.ops || null;
+							const baselinePitchingERA = leagueBaselines?.pitching?.era || null;
+							const OPS_TIERS = [0.0, 0.600, 0.700, 0.760, 0.850]; // fallback boundaries
+							const ERA_TIERS = [Infinity, 5.00, 4.25, 3.60, 3.10]; // fallback boundaries
+							const COLORS = [
+								'rgba(211,47,47,0.85)',   // Poor - Red
+								'rgba(239,108,0,0.85)',   // Below Avg - Deep Orange
+								'rgba(255,179,0,0.90)',   // Avg - Amber
+								'rgba(102,187,106,0.90)', // Above Avg - Light Green
+								'rgba(46,125,50,0.95)'    // Elite - Green
+							];
+							const classify = (v) => {
+								if (v == null || isNaN(v)) return 2; // neutral/avg
+								if (!isPitching) {
+										if (baselineBattingOPS) {
+											// Relative deviation buckets: <=-10%, -10% to -3%, -3% to +3%, +3% to +10%, > +10%
+											const pctDiff = (v - baselineBattingOPS) / baselineBattingOPS;
+											if (pctDiff > 0.10) return 4; // elite green
+											if (pctDiff > 0.03) return 3; // above avg
+											if (pctDiff > -0.03) return 2; // average band
+											if (pctDiff > -0.10) return 1; // below avg
+											return 0; // poor
+										}
+										// Fallback static tiers
+										if (v >= OPS_TIERS[4]) return 4;
+										if (v >= OPS_TIERS[3]) return 3;
+										if (v >= OPS_TIERS[2]) return 2;
+										if (v >= OPS_TIERS[1]) return 1;
+									return 0;
+								} else {
+										// Pitching ERA baseline: inverse logic (lower better)
+										if (baselinePitchingERA) {
+											const pctDiff = (baselinePitchingERA - v) / baselinePitchingERA; // positive good
+											if (pctDiff > 0.10) return 4; // elite
+											if (pctDiff > 0.03) return 3; // above avg
+											if (pctDiff > -0.03) return 2; // average
+											if (pctDiff > -0.10) return 1; // below avg
+											return 0; // poor
+										}
+										// Fallback static tiers (lower better)
+										if (v < ERA_TIERS[4]) return 4; // Elite
+										if (v < ERA_TIERS[3]) return 3; // Above Avg
+									if (v < ERA_TIERS[2]) return 2; // Avg
+									if (v < ERA_TIERS[1]) return 1; // Below Avg
+									return 0; // Poor
+								}
+							};
+							const heatColor = (v) => COLORS[classify(v)];
+
+								const Legend = () => {
+									const labels = ['Poor','Below Avg','Avg','Above Avg','Elite'];
+									// Dynamic legend: if baselines exist show % deviation bands else static ranges
+									const hasBaseline = isPitching ? !!baselinePitchingERA : !!baselineBattingOPS;
+									const rangesBattingStatic = ['< .600','.600-.699','.700-.759','.760-.849','≥ .850'];
+									const rangesPitchingStatic = ['> 5.00','4.25-5.00','3.60-4.24','3.10-3.59','< 3.10'];
+									const rangesBattingDynamic = ['≤ -10%','-10% to -3%','±3%','+3% to +10%','> +10%'];
+									const rangesPitchingDynamic = ['≥ +10% ERA','+3% to +10%','±3%','-10% to -3%','≤ -10% ERA'];
+									const ranges = hasBaseline ? (isPitching ? rangesPitchingDynamic : rangesBattingDynamic) : (isPitching ? rangesPitchingStatic : rangesBattingStatic);
+									return (
+										<Box sx={{ mt: 1 }}>
+											<Box sx={{ display:'flex', gap:1, flexWrap:'wrap', alignItems:'center' }}>
+												{labels.map((lab,i) => (
+													<Box key={lab} sx={{ display:'flex', flexDirection:'column', alignItems:'center', px:0.5 }}>
+														<Box sx={{ width:44, height:16, borderRadius:1, bgcolor: COLORS[i], display:'flex', alignItems:'center', justifyContent:'center' }}>
+															<Typography variant="caption" sx={{ color:'#fff', fontSize:10 }}>{lab.split(' ').map(w=>w[0]).join('')}</Typography>
+														</Box>
+														<Typography variant="caption" color="text.secondary" sx={{ fontSize:9 }}>{ranges[i]}</Typography>
+													</Box>
+												))}
+												<Typography variant="caption" color="text.secondary" sx={{ ml:1 }}>{isPitching ? 'Lower ERA better' : 'Higher OPS better'}</Typography>
+											</Box>
+										</Box>
+									);
+								};
+
+
+					const battingCols = [
+						{ k: 'ops', l: 'OPS', fmt: v => formatRate(v) },
+						{ k: 'avg', l: 'AVG', fmt: v => formatRate(v) },
+						{ k: 'obp', l: 'OBP', fmt: v => formatRate(v) },
+						{ k: 'slg', l: 'SLG', fmt: v => formatRate(v) },
+						{ k: 'pa', l: 'PA' },
+						{ k: 'atBats', l: 'AB' },
+						{ k: 'hits', l: 'H' },
+						{ k: 'homeRuns', l: 'HR' },
+						{ k: 'kRate', l: 'K%', fmt: v => pct(v) },
+						{ k: 'bbRate', l: 'BB%', fmt: v => pct(v) }
+					];
+					const pitchingCols = [
+						{ k: 'era', l: 'ERA', fmt: v => v?.toFixed(2) },
+						{ k: 'whip', l: 'WHIP', fmt: v => v?.toFixed(2) },
+						{ k: 'fip', l: 'FIP', fmt: v => v?.toFixed(2) },
+						{ k: 'innings', l: 'IP', fmt: v => v?.toFixed(1) },
+						{ k: 'k9', l: 'K/9', fmt: v => v?.toFixed(1) },
+						{ k: 'bb9', l: 'BB/9', fmt: v => v?.toFixed(1) },
+						{ k: 'strikeOuts', l: 'K' },
+						{ k: 'baseOnBalls', l: 'BB' },
+						{ k: 'hits', l: 'H' },
+						{ k: 'homeRuns', l: 'HR' }
+					];
+
+					const cols = isPitching ? pitchingCols : battingCols;
+
+					// Delta calculations (home vs away)
+					const delta = (a, b, key, invert=false) => {
+						if (!a || !b) return null;
+						const av = a[key]; const bv = b[key];
+						if (av == null || bv == null) return null;
+						const diff = av - bv; // positive means home better for batting metrics
+						const sign = diff > 0 ? '+' : diff < 0 ? '' : '';
+						const val = isNaN(diff) ? '' : (Math.abs(diff) < 0.001 ? diff.toFixed(4) : diff.toFixed(3));
+						const isBetter = invert ? diff < 0 : diff > 0;
+						return { text: `${key.toUpperCase()} ${sign}${val}`, color: isBetter ? 'success' : diff === 0 ? 'default' : 'error' };
+					};
+					const deltas = isPitching ? [
+						delta(pitchingHome, pitchingAway, 'era', true),
+						delta(pitchingHome, pitchingAway, 'whip', true),
+						delta(pitchingHome, pitchingAway, 'k9'),
+						delta(pitchingHome, pitchingAway, 'bb9', true)
+					].filter(Boolean) : [
+						delta(battingHome, battingAway, 'ops'),
+						delta(battingHome, battingAway, 'avg'),
+						delta(battingHome, battingAway, 'kRate', true),
+						delta(battingHome, battingAway, 'bbRate')
+					].filter(Boolean);
+
+					return (
+						<Box>
+							{leagueBaselines && (
+								<Box sx={{ display:'flex', justifyContent:'flex-end', mb: 1 }}>
+									<FormControlLabel
+										control={<Switch size="small" checked={showBaselines} onChange={e => setShowBaselines(e.target.checked)} />}
+										label={<Typography variant="caption" fontWeight={600}>{showBaselines ? 'Hide League Values' : 'Show League Values'}</Typography>}
+									/>
+								</Box>
+							)}
+									<Legend />
+							<Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+								{cards.map(c => (
+									<Card key={c.key} variant="outlined" sx={{ flex: '1 1 300px', minWidth: 280 }}>
+										<CardContent>
+											<Typography variant="subtitle2" color="text.secondary">{c.title}</Typography>
+											<Typography variant="h5" fontWeight={700} sx={{ backgroundColor: heatColor(valueAccessor(c.stats)), display: 'inline-block', px: 1, borderRadius: 1, color: '#fff' }}>
+												{c.stats ? (isPitching ? (c.stats.era?.toFixed(2) + ' ERA') : (formatRate(c.stats.ops,3) + ' OPS')) : '—'}
+											</Typography>
+											{c.stats ? (
+												<Table size="small" sx={{ mt: 1 }}>
+													<TableBody>
+														{cols.map(col => {
+															const val = c.stats[col.k];
+															// Derive baseline for overview metrics
+															let baselineVal = null;
+															if (!isPitching) baselineVal = leagueBaselines?.batting?.[col.k] ?? null; else baselineVal = leagueBaselines?.pitching?.[col.k] ?? null;
+															// For k9/bb9 compute from totals if baseline not directly present
+															if (baselineVal == null && isPitching && ['k9','bb9'].includes(col.k)) {
+																const p = leagueBaselines?.pitching;
+																if (p?.totals?.inningsPitched && p?.totals?.inningsPitched !== '0.0') {
+																	const parts = p.totals.inningsPitched.split('.');
+																	const outs = (parseInt(parts[0]||'0',10)*3) + parseInt(parts[1]||'0',10);
+																	const ip = outs/3;
+																	if (ip > 0) {
+																		if (col.k==='k9') baselineVal = (p.totals.strikeOuts*9)/ip; else if (col.k==='bb9') baselineVal = (p.totals.baseOnBalls*9)/ip;
+																	}
+																}
+															}
+															const bg = colorForStat({ statKey: col.k, value: val, baselineBatting: leagueBaselines?.batting, baselinePitching: leagueBaselines?.pitching, sampleValues: [val], context: isPitching ? 'pitching' : 'batting' });
+															const diffPct = baselineVal != null && val != null && baselineVal !== 0 ? (((val - baselineVal) / baselineVal) * 100) : null;
+															return (
+																<TableRow key={col.k}>
+																	<TableCell sx={{ py: 0.5, borderBottom: 'none' }}><Typography variant="caption" color="text.secondary">{col.l}</Typography></TableCell>
+																	<TableCell sx={{ py: 0.5, borderBottom: 'none', backgroundColor: bg, color:'#fff', borderRadius:1 }} align="right">
+																		<Tooltip title={baselineVal != null ? `League ${col.l}: ${col.fmt?col.fmt(baselineVal):baselineVal}${diffPct!=null?` | Diff: ${diffPct>0?'+':''}${diffPct.toFixed(1)}%`:''}` : ''} arrow>
+																			<Box component="span">
+																				<Typography variant="caption" fontWeight={600} component="span">{col.fmt ? col.fmt(val) : (val ?? 0)}</Typography>
+																				{showBaselines && baselineVal != null && (
+																					<Typography variant="caption" component="span" sx={{ ml:.5, opacity:.85 }}>({col.fmt ? col.fmt(baselineVal) : baselineVal})</Typography>
+																				)}
+																			</Box>
+																		</Tooltip>
+																	</TableCell>
+																</TableRow>
+															);
+														})}
+													</TableBody>
+												</Table>
+											) : (
+												<Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>No data</Typography>
+											)}
+											{/* Mini bars removed as requested */}
+										</CardContent>
+									</Card>
+								))}
+								<Card variant="outlined" sx={{ flex: '1 1 300px', minWidth: 280, bgcolor: theme => alpha(theme.palette.primary.main, 0.04) }}>
+									<CardContent>
+										<Typography variant="subtitle2" color="text.secondary">TOTAL</Typography>
+										  <Typography variant="h5" fontWeight={700} sx={{ backgroundColor: heatColor(valueAccessor(total)), display: 'inline-block', px: 1, borderRadius: 1, color: '#fff' }}>
+											{total ? (isPitching ? (total.era?.toFixed(2) + ' ERA') : (formatRate(total.ops,3) + ' OPS')) : '—'}
+										</Typography>
+										{total && (
+											<Table size="small" sx={{ mt: 1 }}>
+												<TableBody>
+													{cols.map(col => {
+														const val = total[col.k];
+														let baselineVal = !isPitching ? (leagueBaselines?.batting?.[col.k] ?? null) : (leagueBaselines?.pitching?.[col.k] ?? null);
+														if (baselineVal == null && isPitching && ['k9','bb9'].includes(col.k)) {
+															const p = leagueBaselines?.pitching; if (p?.totals?.inningsPitched) { const parts=p.totals.inningsPitched.split('.'); const outs=(parseInt(parts[0]||'0',10)*3)+parseInt(parts[1]||'0',10); const ip=outs/3; if (ip>0){ if(col.k==='k9') baselineVal=(p.totals.strikeOuts*9)/ip; else if(col.k==='bb9') baselineVal=(p.totals.baseOnBalls*9)/ip; }}}
+														const bg = colorForStat({ statKey: col.k, value: val, baselineBatting: leagueBaselines?.batting, baselinePitching: leagueBaselines?.pitching, sampleValues:[val], context: isPitching?'pitching':'batting' });
+														const diffPct = baselineVal != null && val != null && baselineVal !== 0 ? (((val - baselineVal)/baselineVal)*100) : null;
+														return (
+															<TableRow key={col.k}>
+																<TableCell sx={{ py: 0.5, borderBottom: 'none' }}><Typography variant="caption" color="text.secondary">{col.l}</Typography></TableCell>
+																<TableCell sx={{ py: 0.5, borderBottom: 'none', backgroundColor:bg, color:'#fff', borderRadius:1 }} align="right">
+																	<Tooltip title={baselineVal != null ? `League ${col.l}: ${col.fmt?col.fmt(baselineVal):baselineVal}${diffPct!=null?` | Diff: ${diffPct>0?'+':''}${diffPct.toFixed(1)}%`:''}`:''} arrow>
+																		<Box component="span">
+																			<Typography variant="caption" fontWeight={700} component="span">{col.fmt ? col.fmt(val) : (val ?? 0)}</Typography>
+																			{showBaselines && baselineVal != null && (
+																				<Typography variant="caption" component="span" sx={{ ml:.5, opacity:.85 }}>({col.fmt?col.fmt(baselineVal):baselineVal})</Typography>
+																			)}
+																		</Box>
+																	</Tooltip>
+																</TableCell>
+														</TableRow>
+														);
+													})}
+												</TableBody>
+											</Table>
+										)}
+										  {/* Mini bars removed as requested */}
+									</CardContent>
+								</Card>
+							</Box>
+							<Divider sx={{ my: 3 }} />
+							<Typography variant="subtitle1" fontWeight={700} gutterBottom>Vs Handedness (Aggregate)</Typography>
+							<Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>
+								<Card variant="outlined" sx={{ flex: '1 1 300px', minWidth: 280 }}>
+									<CardContent>
+										<Typography variant="subtitle2" color="text.secondary">VS LEFT</Typography>
+										  <Typography variant="h6" fontWeight={700} sx={{ backgroundColor: heatColor(valueAccessor(lh)), display: 'inline-block', px: 1, borderRadius: 1, color: '#fff' }}>
+											{lh ? (isPitching ? (lh.era?.toFixed(2)+' ERA') : (formatRate(lh.ops,3)+' OPS')) : '—'}
+										</Typography>
+										{lh && (
+											<Table size="small" sx={{ mt: 1 }}>
+												<TableBody>
+													{cols.map(col => {
+														const val = lh[col.k];
+														let baselineVal = !isPitching ? (leagueBaselines?.batting?.[col.k] ?? null) : (leagueBaselines?.pitching?.[col.k] ?? null);
+														if (baselineVal == null && isPitching && ['k9','bb9'].includes(col.k)) {
+															const p = leagueBaselines?.pitching; if (p?.totals?.inningsPitched){ const parts=p.totals.inningsPitched.split('.'); const outs=(parseInt(parts[0]||'0',10)*3)+parseInt(parts[1]||'0',10); const ip=outs/3; if(ip>0){ if(col.k==='k9') baselineVal=(p.totals.strikeOuts*9)/ip; else if(col.k==='bb9') baselineVal=(p.totals.baseOnBalls*9)/ip; }}}
+														const bg = colorForStat({ statKey: col.k, value: val, baselineBatting: leagueBaselines?.batting, baselinePitching: leagueBaselines?.pitching, sampleValues:[val], context: isPitching?'pitching':'batting' });
+														const diffPct = baselineVal != null && val != null && baselineVal !== 0 ? (((val - baselineVal)/baselineVal)*100) : null;
+														return (
+															<TableRow key={col.k}>
+																<TableCell sx={{ py: 0.4, borderBottom:'none' }}><Typography variant="caption" color="text.secondary">{col.l}</Typography></TableCell>
+																<TableCell sx={{ py: 0.4, borderBottom:'none', backgroundColor:bg, color:'#fff', borderRadius:1 }} align="right">
+																	<Tooltip title={baselineVal != null ? `League ${col.l}: ${col.fmt?col.fmt(baselineVal):baselineVal}${diffPct!=null?` | Diff: ${diffPct>0?'+':''}${diffPct.toFixed(1)}%`:''}`:''} arrow>
+																		<Box component="span">
+																			<Typography variant="caption" fontWeight={600} component="span">{col.fmt ? col.fmt(val) : (val ?? 0)}</Typography>
+																			{showBaselines && baselineVal != null && (<Typography variant="caption" component="span" sx={{ ml:.5, opacity:.85 }}>({col.fmt?col.fmt(baselineVal):baselineVal})</Typography>)}
+																		</Box>
+																	</Tooltip>
+																</TableCell>
+															</TableRow>
+														);
+													})}
+												</TableBody>
+											</Table>
+										)}
+										  {/* Mini bars removed as requested */}
+									</CardContent>
+								</Card>
+								<Card variant="outlined" sx={{ flex: '1 1 300px', minWidth: 280 }}>
+									<CardContent>
+										<Typography variant="subtitle2" color="text.secondary">VS RIGHT</Typography>
+										  <Typography variant="h6" fontWeight={700} sx={{ backgroundColor: heatColor(valueAccessor(rh)), display: 'inline-block', px: 1, borderRadius: 1, color: '#fff' }}>
+											{rh ? (isPitching ? (rh.era?.toFixed(2)+' ERA') : (formatRate(rh.ops,3)+' OPS')) : '—'}
+										</Typography>
+										{rh && (
+											<Table size="small" sx={{ mt: 1 }}>
+												<TableBody>
+													{cols.map(col => {
+														const val = rh[col.k];
+														let baselineVal = !isPitching ? (leagueBaselines?.batting?.[col.k] ?? null) : (leagueBaselines?.pitching?.[col.k] ?? null);
+														if (baselineVal == null && isPitching && ['k9','bb9'].includes(col.k)) { const p=leagueBaselines?.pitching; if(p?.totals?.inningsPitched){ const parts=p.totals.inningsPitched.split('.'); const outs=(parseInt(parts[0]||'0',10)*3)+parseInt(parts[1]||'0',10); const ip=outs/3; if(ip>0){ if(col.k==='k9') baselineVal=(p.totals.strikeOuts*9)/ip; else if(col.k==='bb9') baselineVal=(p.totals.baseOnBalls*9)/ip; }}}
+														const bg = colorForStat({ statKey: col.k, value: val, baselineBatting: leagueBaselines?.batting, baselinePitching: leagueBaselines?.pitching, sampleValues:[val], context: isPitching?'pitching':'batting' });
+														const diffPct = baselineVal != null && val != null && baselineVal !== 0 ? (((val - baselineVal)/baselineVal)*100) : null;
+														return (
+															<TableRow key={col.k}>
+																<TableCell sx={{ py: 0.4, borderBottom:'none' }}><Typography variant="caption" color="text.secondary">{col.l}</Typography></TableCell>
+																<TableCell sx={{ py: 0.4, borderBottom:'none', backgroundColor:bg, color:'#fff', borderRadius:1 }} align="right">
+																	<Tooltip title={baselineVal != null ? `League ${col.l}: ${col.fmt?col.fmt(baselineVal):baselineVal}${diffPct!=null?` | Diff: ${diffPct>0?'+':''}${diffPct.toFixed(1)}%`:''}`:''} arrow>
+																		<Box component="span">
+																			<Typography variant="caption" fontWeight={600} component="span">{col.fmt ? col.fmt(val) : (val ?? 0)}</Typography>
+																			{showBaselines && baselineVal != null && (<Typography variant="caption" component="span" sx={{ ml:.5, opacity:.85 }}>({col.fmt?col.fmt(baselineVal):baselineVal})</Typography>)}
+																		</Box>
+																	</Tooltip>
+																</TableCell>
+															</TableRow>
+														);
+													})}
+												</TableBody>
+											</Table>
+										)}
+										  {/* Mini bars removed as requested */}
+									</CardContent>
+								</Card>
+							</Box>
+						</Box>
+					);
+				};
+
+	// -----------------------------------------------------------------------
+	// Main UI
+	// -----------------------------------------------------------------------
+	return (
+		<Box sx={{ p: { xs: 2, sm: 3 } }}>
+			<Box sx={{ mb: 4 }}>
+				<Typography variant="h4" fontWeight={800} gutterBottom>Splits Explorer</Typography>
+				<Typography variant="body1" color="text.secondary">Unified macro-based situational splits (storage-optimized)</Typography>
+			</Box>
+
+			{/* Search / Selection Card */}
+			<Card elevation={0} sx={{ mb: 3 }}>
+				<CardContent sx={{ p: 3 }}>
+					<Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+									<Box sx={{ minWidth: 320, position: 'relative' }}>
+														<Autocomplete
+											open={openSearch}
+											onOpen={() => { if (playerResults.length) setOpenSearch(true); }}
+											onClose={() => setOpenSearch(false)}
+											loading={loadingSearch}
+											options={playerResults}
+															isOptionEqualToValue={(o, v) => o._key === v._key}
+											getOptionLabel={(o) => `${o.name} (${o.team})`}
+											filterOptions={(x) => x} // backend provides filtered
+											noOptionsText={playerQuery.length < 2 ? 'Type at least 2 characters' : 'No matches'}
+											renderInput={(params) => (
+												<TextField
+													{...params}
+													inputRef={searchRef}
+													placeholder="Search player (min 2 chars)"
+													size="small"
+													onChange={(e) => {
+														setPlayerQuery(e.target.value);
+														if (!openSearch) setOpenSearch(true);
+													}}
+													InputProps={{
+														...params.InputProps,
+														startAdornment: <InputAdornment position="start"><Search /></InputAdornment>,
+														endAdornment: (
+															<Box sx={{ display: 'flex', alignItems: 'center', pr: 0.5 }}>
+																{loadingSearch && <CircularProgress size={16} />}
+																{params.InputProps.endAdornment}
+															</Box>
+														)
+													}}
+												/>
+											)}
+															renderOption={(props, option) => (
+																<ListItem {...props} key={option._key} sx={{ py: 0.5 }}>
+													<ListItemAvatar>
+														<Avatar src={getTeamLogoUrl(option.team)} alt={option.team} sx={{ width: 34, height: 34 }} />
+													</ListItemAvatar>
+													<ListItemText
+														primary={<Typography variant="body2" fontWeight={600}>{option.name}</Typography>}
+														secondary={<Typography variant="caption" color="text.secondary">{option.team}</Typography>}
+													/>
+												</ListItem>
+											)}
+											onChange={(_, value) => {
+												if (value) {
+													setSelectedPlayer({ team: value.team, name: value.name });
+													setRecentPlayers(prev => {
+														const exists = prev.find(p => p.name === value.name && p.team === value.team);
+														const updated = exists ? prev : [{ team: value.team, name: value.name }, ...prev].slice(0, 8);
+														return updated;
+													});
+													setOpenSearch(false);
+												}
+											}}
+										/>
+										{/* Recent selections pill row */}
+										{recentPlayers.length > 0 && !playerQuery && (
+											<Box sx={{ mt: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+												{recentPlayers.map(r => (
+													<Chip
+														key={`${r.team}-${r.name}`}
+														label={`${r.name.split(' ')[0]} (${r.team})`}
+														size="small"
+														onClick={() => setSelectedPlayer(r)}
+														color={selectedPlayer?.name === r.name && selectedPlayer?.team === r.team ? 'primary' : 'default'}
+													/>
+												))}
+											</Box>
+										)}
+									</Box>
+						<Box sx={{ flexGrow: 1 }} />
+						<IconButton onClick={() => selectedPlayer && loadMacro(selectedPlayer)} size="small"><Refresh /></IconButton>
+					</Box>
+					{selectedPlayer && (
+						<Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+							<Avatar src={getTeamLogoUrl(selectedPlayer.team)} alt={selectedPlayer.team} sx={{ width: 40, height: 40 }} />
+							<Box>
+								<Typography variant="h6" fontWeight={600}>{selectedPlayer.name}</Typography>
+								<Typography variant="body2" color="text.secondary">{selectedPlayer.team} • {season}</Typography>
+							</Box>
+							{macroLoading && <Chip label="Loading splits..." size="small" color="info" />}
+							{macroError && <Chip label={macroError} size="small" color="error" />}
+						</Box>
+					)}
+				</CardContent>
+			</Card>
+
+			{/* Tabs */}
+			<Card elevation={0} sx={{ mb: 3 }}>
+				<CardContent sx={{ p: 0 }}>
+					<Tabs
+						value={activeTab}
+						onChange={(_, v) => setActiveTab(v)}
+						variant="scrollable"
+						scrollButtons="auto"
+						sx={{ px: 2, borderBottom: 1, borderColor: 'divider', '& .MuiTab-root': { textTransform: 'none', fontWeight: 600 } }}
+					>
+						<Tab value="overview" label="Overview" icon={<SportsBaseball fontSize="small" />} iconPosition="start" />
+						<Tab value="teams" label="Vs Teams" icon={<Analytics fontSize="small" />} iconPosition="start" />
+						<Tab value="pitchers" label="Vs Pitchers" icon={<PersonSearch fontSize="small" />} iconPosition="start" />
+						<Tab value="counts" label="Counts" icon={<Numbers fontSize="small" />} iconPosition="start" />
+						<Tab value="compound" label="Compound" icon={<Hub fontSize="small" />} iconPosition="start" />
+					</Tabs>
+				</CardContent>
+			</Card>
+
+			{/* Data Section */}
+			<AnimatePresence mode="wait">
+				{!selectedPlayer ? (
+					<motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+						<Card variant="outlined">
+							<CardContent sx={{ p: 6, textAlign: 'center' }}>
+								<Typography variant="h6" gutterBottom>Select a player to view splits</Typography>
+								<Typography variant="body2" color="text.secondary">Search above to begin exploring situational performance.</Typography>
+							</CardContent>
+						</Card>
+					</motion.div>
+				) : macroLoading ? (
+					<motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+						<Card variant="outlined"><CardContent sx={{ p: 6, textAlign: 'center' }}><CircularProgress /><Typography variant="body2" sx={{ mt: 2 }}>Loading macro splits...</Typography></CardContent></Card>
+					</motion.div>
+				) : macroError ? (
+					<motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+						<Card variant="outlined"><CardContent sx={{ p: 6, textAlign: 'center' }}><Typography color="error" variant="h6">{macroError}</Typography><Button onClick={() => loadMacro(selectedPlayer)} sx={{ mt: 2 }} startIcon={<Refresh />}>Retry</Button></CardContent></Card>
+					</motion.div>
+				) : (
+					<motion.div key={activeTab} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}>
+												{activeTab !== 'overview' && (
+													<Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+														<Tooltip title="Export CSV of current view">
+															<IconButton size="small" onClick={handleExport} disabled={(activeTab === 'compound' ? sortedCompoundGroups.length === 0 : sortedRows.length === 0)}>
+																<Download fontSize="small" />
+															</IconButton>
+														</Tooltip>
+													</Box>
+												)}
+												{activeTab === 'overview' ? renderHomeAwayCards() : activeTab === 'compound' ? renderCompound() : renderFilteredCards()}
+					</motion.div>
+				)}
+			</AnimatePresence>
+		</Box>
+	);
 };
 
-// ============================================================================
-// PROFESSIONAL STYLING COMPONENTS
-// ============================================================================
-
-const GlassCard = ({ children, ...props }) => {
-  const theme = useTheme();
-  return (
-    <Card
-      sx={{
-        background: `linear-gradient(135deg, 
-          ${alpha(theme.palette.background.paper, 0.8)} 0%, 
-          ${alpha(theme.palette.background.paper, 0.9)} 100%)`,
-        backdropFilter: 'blur(20px)',
-        border: `1px solid ${alpha(theme.palette.divider, 0.2)}`,
-        borderRadius: 3,
-        boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
-        transition: 'all 0.3s ease',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: `0 20px 60px ${alpha(theme.palette.common.black, 0.2)}`,
-        }
-      }}
-      {...props}
-    >
-      {children}
-    </Card>
-  );
-};
-
-const StatChip = ({ label, value, color = 'primary', icon, trend, size = 'medium' }) => {
-  const theme = useTheme();
-  const getTrendColor = () => {
-    if (trend > 0) return theme.palette.success.main;
-    if (trend < 0) return theme.palette.error.main;
-    return theme.palette.text.secondary;
-  };
-
-  return (
-    <motion.div variants={statCardVariants} initial="initial" animate="animate" whileHover="hover">
-      <Chip
-        icon={icon}
-        label={
-          <Box display="flex" alignItems="center" gap={0.5}>
-            <Typography variant={size === 'small' ? 'caption' : 'body2'} fontWeight="medium">
-              {label}
-            </Typography>
-            <Typography variant={size === 'small' ? 'body2' : 'h6'} fontWeight="bold" color={color}>
-              {value}
-            </Typography>
-            {trend !== undefined && (
-              <Box display="flex" alignItems="center" ml={0.5}>
-                {trend > 0 ? <TrendingUp sx={{ fontSize: 14, color: getTrendColor() }} /> : 
-                 trend < 0 ? <TrendingDown sx={{ fontSize: 14, color: getTrendColor() }} /> : null}
-                <Typography variant="caption" color={getTrendColor()}>
-                  {Math.abs(trend)}
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        }
-        sx={{
-          background: `linear-gradient(45deg, ${alpha(theme.palette[color].main, 0.1)}, ${alpha(theme.palette[color].main, 0.05)})`,
-          border: `1px solid ${alpha(theme.palette[color].main, 0.2)}`,
-          borderRadius: 2,
-          px: 2,
-          py: 1,
-          height: 'auto',
-          '& .MuiChip-label': {
-            px: 1,
-          }
-        }}
-      />
-    </motion.div>
-  );
-};
-
-const HeroSection = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-
-  return (
-    <motion.div variants={pageVariants} initial="initial" animate="in">
-      <Box
-        sx={{
-          background: `linear-gradient(135deg, 
-            ${theme.palette.primary.main} 0%, 
-            ${theme.palette.secondary.main} 100%)`,
-          color: 'white',
-          py: { xs: 6, md: 10 },
-          mb: 4,
-          borderRadius: '0 0 24px 24px',
-          position: 'relative',
-          overflow: 'hidden'
-        }}
-      >
-        {/* Background Pattern */}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='7' cy='7' r='7'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-            opacity: 0.1
-          }}
-        />
-
-        <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1 }}>
-          <Grid container spacing={4} alignItems="center">
-            <Grid item xs={12} md={8}>
-              <motion.div
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2, duration: 0.8 }}
-              >
-                <Box display="flex" alignItems="center" gap={2} mb={3}>
-                  <Avatar
-                    sx={{
-                      bgcolor: alpha(theme.palette.common.white, 0.2),
-                      width: 72,
-                      height: 72,
-                      backdropFilter: 'blur(10px)'
-                    }}
-                  >
-                    <AnalyticsIcon sx={{ fontSize: 40, color: 'white' }} />
-                  </Avatar>
-                  <Box>
-                    <Typography 
-                      variant={isMobile ? 'h3' : 'h2'} 
-                      fontWeight="800"
-                      sx={{
-                        background: 'linear-gradient(45deg, #ffffff 30%, #f0f0f0 90%)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        mb: 1
-                      }}
-                    >
-                      MLB Splits Analytics
-                    </Typography>
-                    <Typography variant="h6" sx={{ opacity: 0.9, fontWeight: 300 }}>
-                      Professional Situational Performance Intelligence
-                    </Typography>
-                  </Box>
-                </Box>
-
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
-                    opacity: 0.95, 
-                    fontWeight: 400, 
-                    lineHeight: 1.6,
-                    mb: 3,
-                    maxWidth: 600
-                  }}
-                >
-                  Discover comprehensive situational splits with count-based analytics, 
-                  handedness matchups, venue performance, and advanced pitch-level insights.
-                </Typography>
-
-                <Box display="flex" gap={2} flexWrap="wrap">
-                  <StatChip label="Split Types" value="7+" color="success" icon={<ShowChart />} />
-                  <StatChip label="Count Analytics" value="12" color="info" icon={<BarChart />} />
-                  <StatChip label="Pitch Data" value="Real-time" color="warning" icon={<Speed />} />
-                </Box>
-              </motion.div>
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.6, duration: 0.8 }}
-              >
-                <Box
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    height: 300,
-                    background: alpha(theme.palette.common.white, 0.1),
-                    borderRadius: 3,
-                    backdropFilter: 'blur(10px)',
-                    border: `1px solid ${alpha(theme.palette.common.white, 0.2)}`
-                  }}
-                >
-                  <Box textAlign="center">
-                    <SportsBaseball sx={{ fontSize: 80, opacity: 0.7, mb: 2 }} />
-                    <Typography variant="h4" fontWeight="bold">
-                      2025 Season
-                    </Typography>
-                    <Typography variant="body1" sx={{ opacity: 0.8 }}>
-                      Live Analytics
-                    </Typography>
-                  </Box>
-                </Box>
-              </motion.div>
-            </Grid>
-          </Grid>
-        </Container>
-      </Box>
-    </motion.div>
-  );
-};
-
-// ============================================================================
-// MAIN SPLITS DASHBOARD COMPONENT
-// ============================================================================
-
-const Splits = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const isTablet = useMediaQuery(theme.breakpoints.down('lg'));
-
-  // ============================================================================
-  // STATE MANAGEMENT
-  // ============================================================================
-  
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [selectedTab, setSelectedTab] = useState(0);
-  const [viewMode, setViewMode] = useState('cards'); // cards, table, timeline
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [selectedTeam, setSelectedTeam] = useState('');
-  const [selectedSeason, setSelectedSeason] = useState('2025');
-  const [availablePlayers, setAvailablePlayers] = useState([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchText, setSearchText] = useState('');
-  const [splitsData, setSplitsData] = useState({});
-  const [activeFilters, setActiveFilters] = useState(new Set());
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [quickStats, setQuickStats] = useState({
-    homeAvg: '.---',
-    awayAvg: '.---', 
-    vsRhp: '.---',
-    vsLhp: '.---'
-  });
-  
-  // Table state
-  const [tableFilters, setTableFilters] = useState({
-    searchTerm: '',
-    sortBy: 'name',
-    sortOrder: 'asc',
-    showHome: true,
-    showAway: true,
-    minAtBats: 0,
-    selectedColumns: new Set(['name', 'avg', 'obp', 'slg', 'ops', 'atBats', 'hits'])
-  });
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState(null);
-
-  // Tab configuration
-  const splitTabs = [
-    { label: 'Overview', value: 'overview', icon: <AnalyticsIcon /> },
-    { label: 'Home/Away', value: 'home-away', icon: <Home /> },
-    { label: 'Venues', value: 'venues', icon: <Stadium /> },
-    { label: 'vs Teams', value: 'vs-teams', icon: <Group /> },
-    { label: 'vs Pitchers', value: 'vs-pitchers', icon: <Person /> },
-    { label: 'Handedness', value: 'handedness', icon: <Compare /> },
-    { label: 'Count Analytics', value: 'counts', icon: <Psychology /> },
-    { label: 'Compound Analytics', value: 'compound', icon: <AutoAwesome /> },
-  ];
-
-  // ============================================================================
-  // DATA FETCHING
-  // ============================================================================
-
-  // Live search players via macro search endpoint with debounce
-  const fetchAvailablePlayers = useCallback(async (query = '', team = '', season = selectedSeason) => {
-    try {
-      setSearchLoading(true);
-      const params = new URLSearchParams();
-      if (query) params.set('q', query);
-      if (team) params.set('team', team);
-      if (season) params.set('season', season);
-      params.set('limit', '25');
-      const res = await fetch(`/api/v2/splits/players/search?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setAvailablePlayers(data.players || []);
-      } else {
-        setAvailablePlayers([]);
-      }
-    } catch (err) {
-      console.error('Error fetching players:', err);
-      setAvailablePlayers([]);
-    } finally {
-      setSearchLoading(false);
-    }
-  }, [selectedSeason]);
-
-  // Load quick stats overview (Home/Away/vs RHP/LHP)
-  const loadQuickStats = useCallback(async (playerData) => {
-    if (!playerData) return;
-    
-    try {
-      const { team, name, season } = playerData;
-      const macro = await macroSplitsApi.getPlayerMacro(team, name, season);
-      const splits = macro?.splits || {};
-      const homeNode = splits.by_location?.home?.stats?.batting;
-      const awayNode = splits.by_location?.away?.stats?.batting;
-      const vsRNode = (splits.by_handedness?.R || splits.by_handedness?.right)?.stats?.batting;
-      const vsLNode = (splits.by_handedness?.L || splits.by_handedness?.left)?.stats?.batting;
-      const stats = { homeAvg: '.---', awayAvg: '.---', vsRhp: '.---', vsLhp: '.---' };
-      const fmt = (v) => (typeof v === 'number' ? v.toFixed(3) : (typeof v === 'string' ? v : '.---'));
-      stats.homeAvg = fmt(homeNode?.avg);
-      stats.awayAvg = fmt(awayNode?.avg);
-      stats.vsRhp = fmt(vsRNode?.avg);
-      stats.vsLhp = fmt(vsLNode?.avg);
-      setQuickStats(stats);
-    } catch (error) {
-      console.error('Error loading quick stats from macro:', error);
-    }
-  }, []);
-
-  // Normalize macro API payloads to the UI's expected shape
-  const normalizeMacroToUI = ({ by_location, by_venue, by_opponent, by_handedness, by_count, playerName }) => {
-    // Home/Away
-    const homeAway = {
-      player: playerName,
-      splits: {
-        home: by_location?.home || null,
-        away: by_location?.away || null
-      }
-    };
-
-    // Venues
-  const venues = { venues: {} };
-  if (by_venue && typeof by_venue === 'object') {
-      for (const [venue, data] of Object.entries(by_venue)) {
-        venues.venues[venue] = {
-          home: data?.home || null,
-          away: data?.away || null
-        };
-      }
-    }
-
-    // Opponents
-  const vsTeams = { opponents: {} };
-  if (by_opponent && typeof by_opponent === 'object') {
-      for (const [opp, data] of Object.entries(by_opponent)) {
-        vsTeams.opponents[opp] = {
-          home: data?.home || null,
-          away: data?.away || null
-        };
-      }
-    }
-
-    // Handedness
-  const handedness = { handedness: { left: null, right: null } };
-  if (by_handedness && typeof by_handedness === 'object') {
-      const left = by_handedness.L || by_handedness.left;
-      const right = by_handedness.R || by_handedness.right;
-      if (left) {
-        handedness.handedness.left = { home: left.home || null, away: left.away || null };
-      }
-      if (right) {
-        handedness.handedness.right = { home: right.home || null, away: right.away || null };
-      }
-    }
-
-    // Counts
-  const counts = { counts: {} };
-  if (by_count && typeof by_count === 'object') {
-      for (const [count, data] of Object.entries(by_count)) {
-        counts.counts[count] = {
-          home: data?.home || null,
-          away: data?.away || null
-        };
-      }
-    }
-
-    return { homeAway, venues, vsTeams, handedness, counts };
-  };
-
-  const fetchPlayerSplits = useCallback(async (playerData) => {
-    if (!playerData) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const { team, name, season } = playerData;
-      console.log(`🔎 Fetching macro splits for ${name} (${team})...`);
-      const full = await macroSplitsApi.getPlayerMacro(team, name, season);
-      const splits = full?.splits || {};
-      const normalized = normalizeMacroToUI({
-        by_location: splits.by_location || null,
-        by_venue: splits.by_venue || null,
-        by_opponent: splits.by_opponent || null,
-        by_handedness: splits.by_handedness || null,
-        by_count: splits.by_count || null,
-        playerName: name
-      });
-      setSplitsData(normalized);
-      await loadQuickStats(playerData);
-    } catch (macroErr) {
-      setError(`Failed to load splits for ${playerData.name}: ${macroErr.message}`);
-      console.error('Error fetching splits:', macroErr);
-    } finally {
-      setLoading(false);
-    }
-  }, [loadQuickStats]);
-
-  // Helper function to parse comprehensive splits data into component format
-  const parseComprehensiveSplitsData = (allSplitsData) => {
-    const splits = allSplitsData.splits || {};
-    
-    console.log('🔍 Parsing splits data. Total splits:', Object.keys(splits).length);
-    
-    // Simple parsing - let's see what the actual data looks like first
-    const homeAway = { splits: { home: null, away: null } };
-    const venues = { venues: {} };
-    const vsTeams = { opponents: {} };
-    const handedness = { handedness: { left: null, right: null } };
-    const counts = { counts: {} };
-    
-    // Log first few splits to understand structure
-    const sampleSplits = Object.entries(splits).slice(0, 5);
-    console.log('🔍 Sample splits:', sampleSplits);
-    
-    // Check if we have direct home/away splits
-    if (splits.home) {
-      console.log('✅ Found direct home split:', splits.home);
-      homeAway.splits.home = splits.home;
-    }
-    
-    if (splits.away) {
-      console.log('✅ Found direct away split:', splits.away);
-      homeAway.splits.away = splits.away;
-    }
-    
-    // If no direct home/away, try to find them in the keys
-    if (!splits.home && !splits.away) {
-      console.log('❌ No direct home/away splits found. Looking for patterns...');
-      
-      // Look for home/away patterns in keys
-      Object.entries(splits).forEach(([key, data]) => {
-        if (key.includes('home') || key.includes('Home')) {
-          console.log('🏠 Found potential home data:', key, data);
-          homeAway.splits.home = data;
-        } else if (key.includes('away') || key.includes('Away') || key.includes('road') || key.includes('Road')) {
-          console.log('✈️ Found potential away data:', key, data);
-          homeAway.splits.away = data;
-        }
-      });
-    }
-    
-    // For now, return simplified structure until we understand the data better
-    return {
-      homeAway,
-      venues,
-      vsTeams,
-      handedness,
-      counts,
-      allSplits: allSplitsData
-    };
-  };
-
-  // ============================================================================
-  // EFFECTS
-  // ============================================================================
-
-  // Initial load with empty query to show top matches
-  useEffect(() => {
-    fetchAvailablePlayers('');
-  }, [fetchAvailablePlayers]);
-
-  // Debounced live search as user types
-  useEffect(() => {
-    const h = setTimeout(() => {
-      fetchAvailablePlayers(searchText, selectedTeam || '', selectedSeason);
-    }, 250);
-    return () => clearTimeout(h);
-  }, [searchText, selectedTeam, selectedSeason, fetchAvailablePlayers]);
-
-  useEffect(() => {
-    if (selectedPlayer) {
-      fetchPlayerSplits(selectedPlayer);
-    }
-  }, [selectedPlayer, fetchPlayerSplits]);
-
-  // ============================================================================
-  // EVENT HANDLERS
-  // ============================================================================
-
-  const handlePlayerSelect = (event, newValue) => {
-    setSelectedPlayer(newValue);
-    if (newValue) {
-      setSelectedTeam(newValue.team);
-    }
-  };
-
-  const handleTabChange = (event, newValue) => {
-    setSelectedTab(newValue);
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await fetchAvailablePlayers();
-    if (selectedPlayer) {
-      await fetchPlayerSplits(selectedPlayer);
-    }
-    setRefreshing(false);
-  };
-
-  const handleFilterToggle = (filter) => {
-    const newFilters = new Set(activeFilters);
-    if (newFilters.has(filter)) {
-      newFilters.delete(filter);
-    } else {
-      newFilters.add(filter);
-    }
-    setActiveFilters(newFilters);
-  };
-
-  // ============================================================================
-  // RENDER METHODS
-  // ============================================================================
-
-  const renderPlayerSearch = () => (
-    <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={0}>
-      <GlassCard>
-        <CardContent sx={{ p: 3 }}>
-          <Box display="flex" alignItems="center" gap={2} mb={3}>
-            <Search sx={{ color: 'primary.main' }} />
-            <Typography variant="h6" fontWeight="bold">
-              Select Player for Split Analysis
-            </Typography>
-            <Box flexGrow={1} />
-            <Tooltip title="Refresh Player List">
-              <IconButton onClick={handleRefresh} disabled={refreshing}>
-                <Refresh sx={{ color: refreshing ? 'action.disabled' : 'primary.main' }} />
-                {refreshing && <CircularProgress size={24} sx={{ position: 'absolute' }} />}
-              </IconButton>
-            </Tooltip>
-          </Box>
-
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={8}>
-              <Autocomplete
-                options={availablePlayers}
-                getOptionLabel={(option) => `${option.name} (${option.team})`}
-                renderOption={(props, option) => {
-                  const { key, ...liProps } = props;
-                  return (
-                    <Box component="li" key={key} {...liProps}>
-                      <Avatar sx={{ bgcolor: 'primary.main', mr: 2, width: 32, height: 32 }}>
-                        {option.team}
-                      </Avatar>
-                      <Box>
-                        <Typography variant="body1" fontWeight="medium">
-                          {option.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {option.team} • {option.season} • {option.keyCount} splits
-                        </Typography>
-                      </Box>
-                    </Box>
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Search Players"
-                    variant="outlined"
-                    placeholder="Type player name..."
-                    fullWidth
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        borderRadius: 2,
-                        background: alpha(theme.palette.background.paper, 0.8),
-                      }
-                    }}
-                    onChange={(e) => setSearchText(e.target.value)}
-                  />
-                )}
-                onChange={handlePlayerSelect}
-                value={selectedPlayer}
-                loading={searchLoading}
-                loadingText="Searching..."
-                noOptionsText="No players found with splits data"
-                isOptionEqualToValue={(option, value) => option.id === value.id}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={4}>
-              <Box display="flex" gap={1} flexWrap="wrap">
-                <TextField
-                  select
-                  label="Season"
-                  value={selectedSeason}
-                  onChange={(e) => setSelectedSeason(e.target.value)}
-                  SelectProps={{ native: true }}
-                  size="small"
-                  sx={{ minWidth: 100 }}
-                >
-                  <option value="2025">2025</option>
-                  <option value="2024">2024</option>
-                </TextField>
-                
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={showAdvanced}
-                      onChange={(e) => setShowAdvanced(e.target.checked)}
-                      color="primary"
-                    />
-                  }
-                  label="Advanced"
-                  sx={{ ml: 1 }}
-                />
-              </Box>
-            </Grid>
-          </Grid>
-
-          {selectedPlayer && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              transition={{ delay: 0.2 }}
-            >
-              <Divider sx={{ my: 3 }} />
-              <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-                <Avatar sx={{ bgcolor: 'primary.main', width: 48, height: 48 }}>
-                  {selectedPlayer.team}
-                </Avatar>
-                <Box>
-                  <Typography variant="h6" fontWeight="bold">
-                    {selectedPlayer.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedPlayer.team} • {selectedPlayer.season} Season
-                  </Typography>
-                </Box>
-                <Box flexGrow={1} />
-                <StatChip 
-                  label="Split Records" 
-                  value={selectedPlayer.keyCount} 
-                  color="info" 
-                  icon={<BarChart />}
-                />
-              </Box>
-            </motion.div>
-          )}
-        </CardContent>
-      </GlassCard>
-    </motion.div>
-  );
-
-  const renderTabContent = () => {
-    if (!selectedPlayer || loading) {
-      return (
-        <Box display="flex" justifyContent="center" py={8}>
-          {loading ? <LoadingSpinner /> : (
-            <Box textAlign="center">
-              <SportsBaseball sx={{ fontSize: 80, color: 'text.disabled', mb: 2 }} />
-              <Typography variant="h6" color="text.secondary">
-                Select a player to view their splits analysis
-              </Typography>
-            </Box>
-          )}
-        </Box>
-      );
-    }
-
-    const currentTab = splitTabs[selectedTab];
-
-    return (
-      <motion.div
-        key={selectedTab}
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -20 }}
-        transition={{ duration: 0.3 }}
-      >
-        <SplitTabContent 
-          tabValue={currentTab.value}
-          playerData={selectedPlayer}
-          splitsData={splitsData}
-          showAdvanced={showAdvanced}
-          quickStats={quickStats}
-        />
-      </motion.div>
-    );
-  };
-
-  const renderQuickStats = () => {
-    if (!selectedPlayer || loading) return null;
-
-    return (
-      <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={1}>
-        <GlassCard>
-          <CardHeader
-            title="Quick Stats Overview"
-            titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-            avatar={<AnalyticsIcon sx={{ color: 'primary.main' }} />}
-          />
-          <CardContent>
-            <Grid container spacing={2}>
-              <Grid item xs={6} sm={3}>
-                <StatChip 
-                  label="Home AVG" 
-                  value={quickStats.homeAvg || '.---'} 
-                  color="success"
-                  icon={<Home />}
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <StatChip 
-                  label="Away AVG" 
-                  value={quickStats.awayAvg || '.---'} 
-                  color="info"
-                  icon={<FlightTakeoff />}
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <StatChip 
-                  label="vs RHP" 
-                  value={quickStats.vsRhp || '.---'} 
-                  color="warning"
-                  icon={<Person />}
-                  size="small"
-                />
-              </Grid>
-              <Grid item xs={6} sm={3}>
-                <StatChip 
-                  label="vs LHP" 
-                  value={quickStats.vsLhp || '.---'} 
-                  color="secondary"
-                  icon={<Person />}
-                  size="small"
-                />
-              </Grid>
-            </Grid>
-          </CardContent>
-        </GlassCard>
-      </motion.div>
-    );
-  };
-
-  // ============================================================================
-  // MAIN RENDER
-  // ============================================================================
-
-  return (
-    <motion.div variants={pageVariants} initial="initial" animate="in" exit="out">
-      <Box sx={{ minHeight: '100vh', background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)' }}>
-        <HeroSection />
-
-        <Container maxWidth="xl" sx={{ pb: 8 }}>
-          {/* Error Alert */}
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -50 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -50 }}
-              >
-                <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
-                  <AlertTitle>Error</AlertTitle>
-                  {error}
-                </Alert>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Player Search Section */}
-          <Box mb={4}>
-            {renderPlayerSearch()}
-          </Box>
-
-          {/* Quick Stats */}
-          {selectedPlayer && (
-            <Box mb={4}>
-              {renderQuickStats()}
-            </Box>
-          )}
-
-          {/* Split Tabs */}
-          {selectedPlayer && (
-            <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={2}>
-              <GlassCard sx={{ mb: 4 }}>
-                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-                  <Tabs
-                    value={selectedTab}
-                    onChange={handleTabChange}
-                    variant={isMobile ? 'scrollable' : 'fullWidth'}
-                    scrollButtons="auto"
-                    sx={{
-                      '& .MuiTab-root': {
-                        minHeight: 64,
-                        fontWeight: 600,
-                        textTransform: 'none',
-                      },
-                      '& .Mui-selected': {
-                        color: 'primary.main',
-                      }
-                    }}
-                  >
-                    {splitTabs.map((tab, index) => (
-                      <Tab
-                        key={tab.value}
-                        label={
-                          <Box display="flex" alignItems="center" gap={1}>
-                            {tab.icon}
-                            <span>{tab.label}</span>
-                          </Box>
-                        }
-                        value={index}
-                      />
-                    ))}
-                  </Tabs>
-                </Box>
-              </GlassCard>
-            </motion.div>
-          )}
-
-          {/* Tab Content */}
-          <AnimatePresence mode="wait">
-            {renderTabContent()}
-          </AnimatePresence>
-        </Container>
-      </Box>
-    </motion.div>
-  );
-};
-
-// ============================================================================
-// PROFESSIONAL FILTERABLE DATA TABLE COMPONENT
-// ============================================================================
-
-const FilterableDataTable = ({ 
-  data, 
-  title, 
-  subtitle,
-  icon,
-  columns,
-  defaultSort = 'name',
-  showFilters = true,
-  showExport = true 
-}) => {
-  const theme = useTheme();
-  const [filters, setFilters] = useState({
-    searchTerm: '',
-    sortBy: defaultSort,
-    sortOrder: 'asc',
-    showHome: true,
-    showAway: true,
-    minAtBats: 0,
-    selectedColumns: new Set(columns.filter(col => col.default).map(col => col.id))
-  });
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [columnMenuAnchor, setColumnMenuAnchor] = useState(null);
-
-  // Process and filter data
-  const processedData = useMemo(() => {
-    if (!data || !Array.isArray(data)) return [];
-
-    let processed = data.map(item => {
-      // Flatten the data structure for table display
-      const result = {
-        id: item.id || Math.random(),
-        name: item.name || item.opponent || item.venue || 'Unknown',
-        ...item
-      };
-
-      // Extract batting stats from nested structure
-      if (item.home?.stats?.batting || item.away?.stats?.batting) {
-        const homeStats = item.home?.stats?.batting || {};
-        const awayStats = item.away?.stats?.batting || {};
-        
-        // Combined stats (weighted average where appropriate)
-        const totalAtBats = (parseInt(homeStats.atBats) || 0) + (parseInt(awayStats.atBats) || 0);
-        const totalHits = (parseInt(homeStats.hits) || 0) + (parseInt(awayStats.hits) || 0);
-        const totalPlateAppearances = (parseInt(homeStats.plateAppearances) || 0) + (parseInt(awayStats.plateAppearances) || 0);
-        
-        result.atBats = totalAtBats;
-        result.hits = totalHits;
-        result.plateAppearances = totalPlateAppearances;
-        result.avg = totalAtBats > 0 ? (totalHits / totalAtBats).toFixed(3) : '.000';
-        
-        // Add individual home/away stats
-        result.homeAvg = homeStats.avg || '.000';
-        result.awayAvg = awayStats.avg || '.000';
-        result.homeOps = homeStats.ops || '0.000';
-        result.awayOps = awayStats.ops || '0.000';
-        result.homeAtBats = parseInt(homeStats.atBats) || 0;
-        result.awayAtBats = parseInt(awayStats.atBats) || 0;
-        
-        // Calculate other combined stats
-        if (homeStats.obp && awayStats.obp && totalPlateAppearances > 0) {
-          const homePA = parseInt(homeStats.plateAppearances) || 0;
-          const awayPA = parseInt(awayStats.plateAppearances) || 0;
-          const weightedOBP = ((parseFloat(homeStats.obp) * homePA) + (parseFloat(awayStats.obp) * awayPA)) / totalPlateAppearances;
-          result.obp = weightedOBP.toFixed(3);
-        }
-        
-        if (homeStats.slg && awayStats.slg && totalAtBats > 0) {
-          const homeAB = parseInt(homeStats.atBats) || 0;
-          const awayAB = parseInt(awayStats.atBats) || 0;
-          const weightedSLG = ((parseFloat(homeStats.slg) * homeAB) + (parseFloat(awayStats.slg) * awayAB)) / totalAtBats;
-          result.slg = weightedSLG.toFixed(3);
-          result.ops = (parseFloat(result.obp) + parseFloat(result.slg)).toFixed(3);
-        }
-        
-        // Add counting stats
-        result.homeRuns = (parseInt(homeStats.homeRuns) || 0) + (parseInt(awayStats.homeRuns) || 0);
-        result.rbi = (parseInt(homeStats.rbi) || 0) + (parseInt(awayStats.rbi) || 0);
-        result.runs = (parseInt(homeStats.runs) || 0) + (parseInt(awayStats.runs) || 0);
-        result.strikeouts = (parseInt(homeStats.strikeouts) || 0) + (parseInt(awayStats.strikeouts) || 0);
-        result.walks = (parseInt(homeStats.walks) || 0) + (parseInt(awayStats.walks) || 0);
-      }
-
-      return result;
-    });
-
-    // Apply filters
-    if (filters.searchTerm) {
-      const search = filters.searchTerm.toLowerCase();
-      processed = processed.filter(item => 
-        item.name.toLowerCase().includes(search) ||
-        (item.opponent && item.opponent.toLowerCase().includes(search)) ||
-        (item.venue && item.venue.toLowerCase().includes(search))
-      );
-    }
-
-    if (filters.minAtBats > 0) {
-      processed = processed.filter(item => (item.atBats || 0) >= filters.minAtBats);
-    }
-
-    // Apply sorting
-    processed.sort((a, b) => {
-      let aVal = a[filters.sortBy];
-      let bVal = b[filters.sortBy];
-      
-      // Handle numeric values
-      if (typeof aVal === 'string' && !isNaN(parseFloat(aVal))) {
-        aVal = parseFloat(aVal);
-        bVal = parseFloat(bVal);
-      }
-      
-      if (filters.sortOrder === 'asc') {
-        return aVal > bVal ? 1 : aVal < bVal ? -1 : 0;
-      } else {
-        return aVal < bVal ? 1 : aVal > bVal ? -1 : 0;
-      }
-    });
-
-    return processed;
-  }, [data, filters]);
-
-  // Pagination
-  const paginatedData = useMemo(() => {
-    const start = page * rowsPerPage;
-    const end = start + rowsPerPage;
-    return processedData.slice(start, end);
-  }, [processedData, page, rowsPerPage]);
-
-  // Available columns for selection
-  const availableColumns = columns.filter(col => filters.selectedColumns.has(col.id));
-
-  const handleSort = (columnId) => {
-    const isAsc = filters.sortBy === columnId && filters.sortOrder === 'asc';
-    setFilters(prev => ({
-      ...prev,
-      sortBy: columnId,
-      sortOrder: isAsc ? 'desc' : 'asc'
-    }));
-  };
-
-  const handleColumnToggle = (columnId) => {
-    setFilters(prev => {
-      const newSelected = new Set(prev.selectedColumns);
-      if (newSelected.has(columnId)) {
-        newSelected.delete(columnId);
-      } else {
-        newSelected.add(columnId);
-      }
-      return { ...prev, selectedColumns: newSelected };
-    });
-  };
-
-  const exportToCSV = () => {
-    const headers = availableColumns.map(col => col.label).join(',');
-    const rows = processedData.map(row => 
-      availableColumns.map(col => row[col.id] || '').join(',')
-    ).join('\n');
-    
-    const csvContent = `${headers}\n${rows}`;
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${title.replace(/\s+/g, '_').toLowerCase()}_splits.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  };
-
-  return (
-    <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={0}>
-      <GlassCard>
-        <CardHeader
-          title={title}
-          subheader={subtitle}
-          titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-          avatar={icon}
-          action={
-            <Box display="flex" gap={1}>
-              {showExport && (
-                <Tooltip title="Export to CSV">
-                  <IconButton onClick={exportToCSV} size="small">
-                    <Download />
-                  </IconButton>
-                </Tooltip>
-              )}
-              <Tooltip title="Column Settings">
-                <IconButton 
-                  onClick={(e) => setColumnMenuAnchor(e.currentTarget)}
-                  size="small"
-                >
-                  <Settings />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          }
-        />
-
-        {showFilters && (
-          <CardContent sx={{ pb: 0 }}>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} sm={6} md={3}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Search"
-                  value={filters.searchTerm}
-                  onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search />
-                      </InputAdornment>
-                    )
-                  }}
-                />
-              </Grid>
-              
-              <Grid item xs={12} sm={6} md={2}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Min At-Bats"
-                  type="number"
-                  value={filters.minAtBats}
-                  onChange={(e) => setFilters(prev => ({ ...prev, minAtBats: parseInt(e.target.value) || 0 }))}
-                />
-              </Grid>
-
-              <Grid item xs={12} md={4}>
-                <Box display="flex" gap={1} flexWrap="wrap">
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={filters.showHome}
-                        onChange={(e) => setFilters(prev => ({ ...prev, showHome: e.target.checked }))}
-                        size="small"
-                      />
-                    }
-                    label="Home"
-                    sx={{ mr: 2 }}
-                  />
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        checked={filters.showAway}
-                        onChange={(e) => setFilters(prev => ({ ...prev, showAway: e.target.checked }))}
-                        size="small"
-                      />
-                    }
-                    label="Away"
-                  />
-                </Box>
-              </Grid>
-
-              <Grid item xs={12} md={3}>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Typography variant="body2" color="text.secondary">
-                    {processedData.length} records
-                  </Typography>
-                  {filters.searchTerm && (
-                    <Chip 
-                      label={`"${filters.searchTerm}"`}
-                      size="small" 
-                      onDelete={() => setFilters(prev => ({ ...prev, searchTerm: '' }))}
-                    />
-                  )}
-                </Box>
-              </Grid>
-            </Grid>
-          </CardContent>
-        )}
-
-        <TableContainer>
-          <Table size="small" stickyHeader>
-            <TableHead>
-              <TableRow>
-                {availableColumns.map((column) => (
-                  <TableCell
-                    key={column.id}
-                    align={column.numeric ? 'right' : 'left'}
-                    sx={{ 
-                      fontWeight: 'bold',
-                      background: alpha(theme.palette.primary.main, 0.05),
-                      minWidth: column.minWidth || 'auto'
-                    }}
-                  >
-                    <TableSortLabel
-                      active={filters.sortBy === column.id}
-                      direction={filters.sortBy === column.id ? filters.sortOrder : 'asc'}
-                      onClick={() => handleSort(column.id)}
-                    >
-                      {column.label}
-                    </TableSortLabel>
-                  </TableCell>
-                ))}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {paginatedData.map((row, index) => (
-                <TableRow 
-                  key={row.id || index}
-                  hover
-                  sx={{ 
-                    '&:nth-of-type(odd)': { 
-                      backgroundColor: alpha(theme.palette.action.hover, 0.05) 
-                    },
-                    '&:hover': {
-                      backgroundColor: alpha(theme.palette.primary.main, 0.08)
-                    }
-                  }}
-                >
-                  {availableColumns.map((column) => {
-                    const value = row[column.id];
-                    return (
-                      <TableCell 
-                        key={column.id} 
-                        align={column.numeric ? 'right' : 'left'}
-                        sx={{ py: 1 }}
-                      >
-                        {column.format ? column.format(value) : value}
-                      </TableCell>
-                    );
-                  })}
-                </TableRow>
-              ))}
-              
-              {paginatedData.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={availableColumns.length} align="center" sx={{ py: 8 }}>
-                    <Box textAlign="center">
-                      <Search sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-                      <Typography variant="h6" color="text.secondary" gutterBottom>
-                        No Data Found
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        Try adjusting your filters or search terms
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        <TablePagination
-          rowsPerPageOptions={[10, 25, 50, 100]}
-          component="div"
-          count={processedData.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
-          }}
-        />
-
-        {/* Column Selection Menu */}
-        <Menu
-          anchorEl={columnMenuAnchor}
-          open={Boolean(columnMenuAnchor)}
-          onClose={() => setColumnMenuAnchor(null)}
-        >
-          <MenuItem disabled>
-            <Typography variant="subtitle2" fontWeight="bold">
-              Select Columns
-            </Typography>
-          </MenuItem>
-          <Divider />
-          {columns.map((column) => (
-            <MenuItem key={column.id} onClick={() => handleColumnToggle(column.id)}>
-              <Checkbox checked={filters.selectedColumns.has(column.id)} />
-              <ListItemText primary={column.label} />
-            </MenuItem>
-          ))}
-        </Menu>
-      </GlassCard>
-    </motion.div>
-  );
-};
-
-const SplitTabContent = ({ tabValue, playerData, splitsData, showAdvanced, quickStats }) => {
-  const theme = useTheme();
-
-  const renderContent = () => {
-    switch (tabValue) {
-      case 'overview':
-        return <OverviewContent playerData={playerData} splitsData={splitsData} quickStats={quickStats} />;
-      case 'home-away':
-        return <HomeAwayContent data={splitsData.homeAway} playerData={playerData} showAdvanced={showAdvanced} quickStats={quickStats} />;
-      case 'venues':
-        return <VenuesContent data={splitsData.venues} playerData={playerData} showAdvanced={showAdvanced} />;
-      case 'vs-teams':
-        return <VsTeamsContent data={splitsData.vsTeams} playerData={playerData} showAdvanced={showAdvanced} />;
-      case 'handedness':
-        return <HandednessContent data={splitsData.handedness} playerData={playerData} showAdvanced={showAdvanced} quickStats={quickStats} />;
-      case 'counts':
-        return <CountsContent data={splitsData.counts} playerData={playerData} showAdvanced={showAdvanced} />;
-      case 'vs-pitchers':
-        return <VsPitchersContent playerData={playerData} showAdvanced={showAdvanced} />;
-      case 'compound':
-        return <CompoundAnalyticsContent playerData={playerData} showAdvanced={showAdvanced} />;
-      default:
-        return <ComingSoonContent tabName={tabValue} />;
-    }
-  };
-
-  return (
-    <Box>
-      {renderContent()}
-    </Box>
-  );
-};
-
-// ============================================================================
-// INDIVIDUAL CONTENT COMPONENTS
-// ============================================================================
-
-const OverviewContent = ({ playerData, splitsData }) => {
-  const theme = useTheme();
-
-  return (
-    <Grid container spacing={3}>
-      <Grid item xs={12}>
-        <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={0}>
-          <GlassCard>
-            <CardHeader
-              title="Splits Overview Dashboard"
-              titleTypographyProps={{ variant: 'h5', fontWeight: 'bold' }}
-              avatar={<AnalyticsIcon sx={{ color: 'primary.main' }} />}
-              action={
-                <Box display="flex" gap={1}>
-                  <IconButton><Download /></IconButton>
-                  <IconButton><Share /></IconButton>
-                </Box>
-              }
-            />
-            <CardContent>
-              <Typography variant="body1" color="text.secondary" paragraph>
-                Comprehensive situational analysis for {playerData?.name}. 
-                Explore performance variations across different game situations, 
-                venues, and matchups with advanced count-based analytics.
-              </Typography>
-
-              <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
-                  <Box
-                    sx={{
-                      background: alpha(theme.palette.primary.main, 0.05),
-                      borderRadius: 2,
-                      p: 3,
-                      border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
-                    }}
-                  >
-                    <Typography variant="h6" gutterBottom color="primary.main" fontWeight="bold">
-                      Available Split Categories
-                    </Typography>
-                    
-                    <Box display="flex" flexDirection="column" gap={1}>
-                      <Chip label="Home vs Away Performance" icon={<Home />} variant="outlined" />
-                      <Chip label="Venue-Specific Statistics" icon={<Stadium />} variant="outlined" />
-                      <Chip label="Team Matchup Analysis" icon={<Group />} variant="outlined" />
-                      <Chip label="Pitcher Handedness Splits" icon={<Compare />} variant="outlined" />
-                      <Chip label="Count Situation Analytics" icon={<Psychology />} variant="outlined" />
-                    </Box>
-                  </Box>
-                </Grid>
-
-                <Grid item xs={12} md={6}>
-                  <Box
-                    sx={{
-                      background: alpha(theme.palette.success.main, 0.05),
-                      borderRadius: 2,
-                      p: 3,
-                      border: `1px solid ${alpha(theme.palette.success.main, 0.1)}`
-                    }}
-                  >
-                    <Typography variant="h6" gutterBottom color="success.main" fontWeight="bold">
-                      Advanced Analytics Features
-                    </Typography>
-                    
-                    <Box display="flex" flexDirection="column" gap={1}>
-                      <Chip label="Pitch-by-Pitch Analysis" icon={<Speed />} variant="outlined" color="success" />
-                      <Chip label="Count-Based Performance" icon={<BarChart />} variant="outlined" color="success" />
-                      <Chip label="Game Context Situational" icon={<ShowChart />} variant="outlined" color="success" />
-                      <Chip label="Multi-Season Trends" icon={<TrendingUp />} variant="outlined" color="success" />
-                      <Chip label="Real-Time Updates" icon={<Refresh />} variant="outlined" color="success" />
-                    </Box>
-                  </Box>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </GlassCard>
-        </motion.div>
-      </Grid>
-    </Grid>
-  );
-};
-
-const HomeAwayContent = ({ data, playerData, showAdvanced, quickStats }) => {
-  const [filters, setFilters] = useState({
-    handedness: 'all', // all, L, R
-    countType: 'all', // all, hitters, pitchers
-    selectedCount: 'all' // all, 0-0, 0-1, etc.
-  });
-  const [countSplitsData, setCountSplitsData] = useState({});
-  const [handsData, setHandsData] = useState({});
-  const [loading, setLoading] = useState(false);
-
-  // Load advanced split data when filters change
-  useEffect(() => {
-    if (showAdvanced && playerData?.id) {
-      loadAdvancedSplits();
-    }
-  }, [showAdvanced, playerData, filters]);
-
-  const loadAdvancedSplits = async () => {
-    if (!playerData?.id) return;
-    
-    setLoading(true);
-    try {
-      // Load count-based home/away splits
-      const countResponse = await fetch(`http://localhost:3001/api/splits/v2/counts-vs-home-away/${playerData.id}`);
-      if (countResponse.ok) {
-        const countData = await countResponse.json();
-        setCountSplitsData(countData);
-      }
-
-      // Load handedness home/away splits
-      const handsResponse = await fetch(`http://localhost:3001/api/splits/v2/handedness-vs-home-away/${playerData.id}`);
-      if (handsResponse.ok) {
-        const handsData = await handsResponse.json();
-        setHandsData(handsData);
-      }
-    } catch (error) {
-      console.error('Error loading advanced home/away splits:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFilterChange = (filterType, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [filterType]: value
-    }));
-  };
-
-  if (!data || !data.splits) {
-    return (
-      <Alert severity="info" sx={{ borderRadius: 2 }}>
-        <AlertTitle>No Home/Away Data</AlertTitle>
-        No home vs away split data available for this player.
-      </Alert>
-    );
-  }
-
-  const { splits } = data;
-  
-  // Prepare basic table data
-  const tableData = [
-    {
-      id: 'home',
-      name: 'Home Games',
-      situation: 'Home',
-      icon: '🏠',
-      ...splits.home?.stats?.batting,
-      games: splits.home?.games?.length || 0,
-      playCount: splits.home?.playCount || 0
-    },
-    {
-      id: 'away',
-      name: 'Away Games', 
-      situation: 'Away',
-      icon: '✈️',
-      ...splits.away?.stats?.batting,
-      games: splits.away?.games?.length || 0,
-      playCount: splits.away?.playCount || 0
-    }
-  ];
-
-  const columns = [
-    { id: 'situation', label: 'Situation', default: true, minWidth: 100 },
-    { id: 'games', label: 'Games', numeric: true, default: true },
-    { id: 'atBats', label: 'AB', numeric: true, default: true },
-    { id: 'hits', label: 'H', numeric: true, default: true },
-    { id: 'avg', label: 'AVG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'obp', label: 'OBP', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'slg', label: 'SLG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'ops', label: 'OPS', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'homeRuns', label: 'HR', numeric: true, default: false },
-    { id: 'rbi', label: 'RBI', numeric: true, default: false },
-    { id: 'runs', label: 'R', numeric: true, default: false },
-    { id: 'strikeouts', label: 'K', numeric: true, default: false },
-    { id: 'walks', label: 'BB', numeric: true, default: false },
-    { id: 'playCount', label: 'Plays', numeric: true, default: false }
-  ];
-
-  return (
-    <Box>
-      <FilterableDataTable
-        data={tableData}
-        title="Home vs Away Performance"
-        subtitle={`Comprehensive home and away split analysis for ${data.player}`}
-        icon={<Compare sx={{ color: 'primary.main' }} />}
-        columns={columns}
-        defaultSort="avg"
-        showFilters={false}
-      />
-      
-      {showAdvanced && (
-        <Box mt={3}>
-          <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={1}>
-            <GlassCard>
-              <CardHeader
-                title="Advanced Home/Away Analytics"
-                titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                avatar={<Psychology sx={{ color: 'warning.main' }} />}
-                action={
-                  <Box display="flex" gap={1} alignItems="center">
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <InputLabel>Handedness</InputLabel>
-                      <Select
-                        value={filters.handedness}
-                        onChange={(e) => handleFilterChange('handedness', e.target.value)}
-                        label="Handedness"
-                      >
-                        <MenuItem value="all">All Pitchers</MenuItem>
-                        <MenuItem value="L">vs LHP</MenuItem>
-                        <MenuItem value="R">vs RHP</MenuItem>
-                      </Select>
-                    </FormControl>
-                    
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <InputLabel>Count Type</InputLabel>
-                      <Select
-                        value={filters.countType}
-                        onChange={(e) => handleFilterChange('countType', e.target.value)}
-                        label="Count Type"
-                      >
-                        <MenuItem value="all">All Counts</MenuItem>
-                        <MenuItem value="hitters">Hitter's Counts</MenuItem>
-                        <MenuItem value="pitchers">Pitcher's Counts</MenuItem>
-                        <MenuItem value="even">Even Counts</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    {loading && <CircularProgress size={20} />}
-                  </Box>
-                }
-              />
-              <CardContent>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Performance in different count situations and handedness matchups for home vs away games
-                </Typography>
-
-                {/* Quick Stats from API */}
-                {quickStats && (
-                  <Grid container spacing={2} sx={{ mb: 3 }}>
-                    <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: alpha('#4caf50', 0.1) }}>
-                        <Typography variant="h6" color="success.main" fontWeight="bold">
-                          {quickStats.homeAway?.home?.avg || '.000'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Home AVG
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                    <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: alpha('#2196f3', 0.1) }}>
-                        <Typography variant="h6" color="primary.main" fontWeight="bold">
-                          {quickStats.homeAway?.away?.avg || '.000'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          Away AVG
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                    <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: alpha('#ff9800', 0.1) }}>
-                        <Typography variant="h6" color="warning.main" fontWeight="bold">
-                          {quickStats.handedness?.left?.avg || '.000'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          vs LHP
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                    <Grid item xs={6} md={3}>
-                      <Paper sx={{ p: 2, textAlign: 'center', bgcolor: alpha('#e91e63', 0.1) }}>
-                        <Typography variant="h6" color="secondary.main" fontWeight="bold">
-                          {quickStats.handedness?.right?.avg || '.000'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          vs RHP
-                        </Typography>
-                      </Paper>
-                    </Grid>
-                  </Grid>
-                )}
-
-                {/* Count-based analysis */}
-                {countSplitsData && Object.keys(countSplitsData).length > 0 && (
-                  <Box mt={2}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Count-Specific Home/Away Performance
-                    </Typography>
-                    
-                    {/* Filter out 3-strike and 4-ball counts */}
-                    {Object.entries(countSplitsData)
-                      .filter(([count]) => !count.includes('3-') && !count.includes('-4'))
-                      .map(([count, data]) => (
-                        <Accordion key={count} sx={{ mt: 1 }}>
-                          <AccordionSummary expandIcon={<ExpandMore />}>
-                            <Box display="flex" alignItems="center" gap={2}>
-                              <Typography variant="body1" fontWeight="medium">
-                                Count: {count}
-                              </Typography>
-                              <Chip
-                                size="small"
-                                label={`${data.home?.totalPlays || 0}H / ${data.away?.totalPlays || 0}A`}
-                                color="primary"
-                                variant="outlined"
-                              />
-                            </Box>
-                          </AccordionSummary>
-                          <AccordionDetails>
-                            <Grid container spacing={2}>
-                              <Grid item xs={6}>
-                                <Typography variant="subtitle2" color="success.main" fontWeight="bold">
-                                  Home Performance
-                                </Typography>
-                                <Typography variant="body2">
-                                  AVG: {data.home?.avg || '.000'} | OPS: {data.home?.ops || '.000'}
-                                </Typography>
-                              </Grid>
-                              <Grid item xs={6}>
-                                <Typography variant="subtitle2" color="primary.main" fontWeight="bold">
-                                  Away Performance
-                                </Typography>
-                                <Typography variant="body2">
-                                  AVG: {data.away?.avg || '.000'} | OPS: {data.away?.ops || '.000'}
-                                </Typography>
-                              </Grid>
-                            </Grid>
-                          </AccordionDetails>
-                        </Accordion>
-                      ))}
-                  </Box>
-                )}
-
-                {/* Handedness analysis */}
-                {handsData && Object.keys(handsData).length > 0 && (
-                  <Box mt={3}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Handedness-Specific Home/Away Performance
-                    </Typography>
-                    
-                    {Object.entries(handsData).map(([handedness, data]) => (
-                      <Accordion key={handedness} sx={{ mt: 1 }}>
-                        <AccordionSummary expandIcon={<ExpandMore />}>
-                          <Box display="flex" alignItems="center" gap={2}>
-                            <Typography variant="body1" fontWeight="medium">
-                              vs {handedness === 'L' ? 'Left-Handed' : 'Right-Handed'} Pitching
-                            </Typography>
-                            <Chip
-                              size="small"
-                              label={`${data.home?.totalPlays || 0}H / ${data.away?.totalPlays || 0}A`}
-                              color="secondary"
-                              variant="outlined"
-                            />
-                          </Box>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          <Grid container spacing={2}>
-                            <Grid item xs={6}>
-                              <Typography variant="subtitle2" color="success.main" fontWeight="bold">
-                                Home vs {handedness}HP
-                              </Typography>
-                              <Typography variant="body2">
-                                AVG: {data.home?.avg || '.000'} | OPS: {data.home?.ops || '.000'}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {data.home?.totalPlays || 0} plate appearances
-                              </Typography>
-                            </Grid>
-                            <Grid item xs={6}>
-                              <Typography variant="subtitle2" color="primary.main" fontWeight="bold">
-                                Away vs {handedness}HP
-                              </Typography>
-                              <Typography variant="body2">
-                                AVG: {data.away?.avg || '.000'} | OPS: {data.away?.ops || '.000'}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {data.away?.totalPlays || 0} plate appearances
-                              </Typography>
-                            </Grid>
-                          </Grid>
-                        </AccordionDetails>
-                      </Accordion>
-                    ))}
-                  </Box>
-                )}
-
-                {!countSplitsData && !handsData && (
-                  <Alert severity="info" sx={{ borderRadius: 2, mt: 2 }}>
-                    <AlertTitle>Loading Advanced Analytics...</AlertTitle>
-                    Advanced count and handedness analytics are being loaded from the comprehensive splits system.
-                  </Alert>
-                )}
-              </CardContent>
-            </GlassCard>
-          </motion.div>
-        </Box>
-      )}
-    </Box>
-  );
-};
-
-const VenuesContent = ({ data, showAdvanced }) => {
-  if (!data || !data.venues || Object.keys(data.venues).length === 0) {
-    return (
-      <Alert severity="info" sx={{ borderRadius: 2 }}>
-        <AlertTitle>No Venue Data</AlertTitle>
-        No venue-specific split data available for this player.
-      </Alert>
-    );
-  }
-
-  // Transform venues data for table
-  const tableData = Object.entries(data.venues).map(([venue, venueData]) => {
-    const homeStats = venueData.home?.stats?.batting || {};
-    const awayStats = venueData.away?.stats?.batting || {};
-    
-    // Properly combine home and away stats
-    const combinedStats = combineStats(homeStats, awayStats);
-    
-    return {
-      id: venue,
-      name: venue,
-      venue: venue,
-      homeGames: venueData.home?.games?.length || 0,
-      awayGames: venueData.away?.games?.length || 0,
-      totalGames: (venueData.home?.games?.length || 0) + (venueData.away?.games?.length || 0),
-      home: venueData.home,
-      away: venueData.away,
-      homeAvg: homeStats.avg || '.000',
-      awayAvg: awayStats.avg || '.000',
-      ...combinedStats
-    };
-  });
-
-  const columns = [
-    { id: 'venue', label: 'Venue', default: true, minWidth: 120 },
-    { id: 'totalGames', label: 'Games', numeric: true, default: true },
-    { id: 'atBats', label: 'AB', numeric: true, default: true },
-    { id: 'hits', label: 'H', numeric: true, default: true },
-    { id: 'avg', label: 'AVG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'obp', label: 'OBP', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'slg', label: 'SLG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'ops', label: 'OPS', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'homeAvg', label: 'Home AVG', numeric: true, default: false, format: (value) => value || '.000' },
-    { id: 'awayAvg', label: 'Road AVG', numeric: true, default: false, format: (value) => value || '.000' },
-    { id: 'homeGames', label: 'Home G', numeric: true, default: false },
-    { id: 'awayGames', label: 'Road G', numeric: true, default: false },
-    { id: 'homeRuns', label: 'HR', numeric: true, default: false },
-    { id: 'rbi', label: 'RBI', numeric: true, default: false },
-    { id: 'strikeouts', label: 'K', numeric: true, default: false },
-    { id: 'walks', label: 'BB', numeric: true, default: false }
-  ];
-
-  return (
-    <FilterableDataTable
-      data={tableData}
-      title="Venue Performance Analysis"
-      subtitle={`Performance breakdown across ${Object.keys(data.venues).length} different ballparks`}
-      icon={<Stadium sx={{ color: 'primary.main' }} />}
-      columns={columns}
-      defaultSort="totalGames"
-    />
-  );
-};
-
-const VsTeamsContent = ({ data, playerData, showAdvanced }) => {
-  const [filters, setFilters] = useState({
-    homeAway: 'all', // all, home, away
-    handedness: 'all', // all, L, R
-    countType: 'all', // all, hitters, pitchers
-    selectedTeam: 'all' // all, specific team
-  });
-  const [countTeamData, setCountTeamData] = useState({});
-  const [handsTeamData, setHandsTeamData] = useState({});
-  const [loading, setLoading] = useState(false);
-
-  // Load advanced split data when filters change
-  useEffect(() => {
-    if (showAdvanced && playerData?.id) {
-      loadAdvancedTeamSplits();
-    }
-  }, [showAdvanced, playerData, filters]);
-
-  const loadAdvancedTeamSplits = async () => {
-    if (!playerData?.id) return;
-    
-    setLoading(true);
-    try {
-      // Load count-based team splits
-      const countResponse = await fetch(`http://localhost:3001/api/splits/v2/counts-vs-teams/${playerData.id}`);
-      if (countResponse.ok) {
-        const countData = await countResponse.json();
-        setCountTeamData(countData);
-      }
-
-      // Load handedness team splits
-      const handsResponse = await fetch(`http://localhost:3001/api/splits/v2/handedness-vs-teams/${playerData.id}`);
-      if (handsResponse.ok) {
-        const handsData = await handsResponse.json();
-        setHandsTeamData(handsData);
-      }
-    } catch (error) {
-      console.error('Error loading advanced team splits:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFilterChange = (filterType, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [filterType]: value
-    }));
-  };
-
-  if (!data || !data.opponents || Object.keys(data.opponents).length === 0) {
-    return (
-      <Alert severity="info" sx={{ borderRadius: 2 }}>
-        <AlertTitle>No Team Matchup Data</AlertTitle>
-        No team vs team split data available for this player.
-      </Alert>
-    );
-  }
-
-  // Transform opponent data for table
-  const tableData = Object.entries(data.opponents).map(([team, teamData]) => {
-    const homeStats = teamData.home?.stats?.batting || {};
-    const awayStats = teamData.away?.stats?.batting || {};
-    
-    // Properly combine home and away stats
-    const combinedStats = combineStats(homeStats, awayStats);
-    
-    return {
-      id: team,
-      name: team,
-      opponent: team,
-      homeGames: teamData.home?.games?.length || 0,
-      awayGames: teamData.away?.games?.length || 0,
-      totalGames: (teamData.home?.games?.length || 0) + (teamData.away?.games?.length || 0),
-      home: teamData.home,
-      away: teamData.away,
-      homeAvg: homeStats.avg || '.000',
-      awayAvg: awayStats.avg || '.000',
-      homeOps: homeStats.ops || '.000',
-      awayOps: awayStats.ops || '.000',
-      ...combinedStats
-    };
-  });
-
-  const columns = [
-    { id: 'opponent', label: 'Opponent', default: true, minWidth: 80 },
-    { id: 'totalGames', label: 'Games', numeric: true, default: true },
-    { id: 'atBats', label: 'AB', numeric: true, default: true },
-    { id: 'hits', label: 'H', numeric: true, default: true },
-    { id: 'avg', label: 'AVG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'obp', label: 'OBP', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'slg', label: 'SLG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'ops', label: 'OPS', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'homeAvg', label: 'Home AVG', numeric: true, default: false, format: (value) => value || '.000' },
-    { id: 'awayAvg', label: 'Road AVG', numeric: true, default: false, format: (value) => value || '.000' },
-    { id: 'homeOps', label: 'Home OPS', numeric: true, default: false, format: (value) => value || '.000' },
-    { id: 'awayOps', label: 'Road OPS', numeric: true, default: false, format: (value) => value || '.000' },
-    { id: 'homeRuns', label: 'HR', numeric: true, default: false },
-    { id: 'rbi', label: 'RBI', numeric: true, default: false },
-    { id: 'runs', label: 'R', numeric: true, default: false },
-    { id: 'strikeouts', label: 'K', numeric: true, default: false },
-    { id: 'walks', label: 'BB', numeric: true, default: false }
-  ];
-
-  return (
-    <Box>
-      <FilterableDataTable
-        data={tableData}
-        title="Team Matchup Performance"
-        subtitle={`Performance against ${Object.keys(data.opponents).length} different opponents`}
-        icon={<Group sx={{ color: 'secondary.main' }} />}
-        columns={columns}
-        defaultSort="ops"
-      />
-
-      {showAdvanced && (
-        <Box mt={3}>
-          <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={1}>
-            <GlassCard>
-              <CardHeader
-                title="Advanced Team Matchup Analytics"
-                titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                avatar={<Psychology sx={{ color: 'secondary.main' }} />}
-                action={
-                  <Box display="flex" gap={1} alignItems="center">
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <InputLabel>Home/Away</InputLabel>
-                      <Select
-                        value={filters.homeAway}
-                        onChange={(e) => handleFilterChange('homeAway', e.target.value)}
-                        label="Home/Away"
-                      >
-                        <MenuItem value="all">All Games</MenuItem>
-                        <MenuItem value="home">Home Only</MenuItem>
-                        <MenuItem value="away">Away Only</MenuItem>
-                      </Select>
-                    </FormControl>
-                    
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <InputLabel>Handedness</InputLabel>
-                      <Select
-                        value={filters.handedness}
-                        onChange={(e) => handleFilterChange('handedness', e.target.value)}
-                        label="Handedness"
-                      >
-                        <MenuItem value="all">All Pitchers</MenuItem>
-                        <MenuItem value="L">vs LHP</MenuItem>
-                        <MenuItem value="R">vs RHP</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <InputLabel>Count Type</InputLabel>
-                      <Select
-                        value={filters.countType}
-                        onChange={(e) => handleFilterChange('countType', e.target.value)}
-                        label="Count Type"
-                      >
-                        <MenuItem value="all">All Counts</MenuItem>
-                        <MenuItem value="hitters">Hitter's Counts</MenuItem>
-                        <MenuItem value="pitchers">Pitcher's Counts</MenuItem>
-                        <MenuItem value="even">Even Counts</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    {loading && <CircularProgress size={20} />}
-                  </Box>
-                }
-              />
-              <CardContent>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Advanced count-based and handedness analysis against specific teams
-                </Typography>
-
-                {/* Count-based team analysis */}
-                {countTeamData && Object.keys(countTeamData).length > 0 && (
-                  <Box mt={2}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Count-Specific Performance vs Teams
-                    </Typography>
-                    
-                    {/* Show top 3 teams by count performance */}
-                    {Object.entries(countTeamData)
-                      .filter(([count]) => !count.includes('3-') && !count.includes('-4'))
-                      .slice(0, 3)
-                      .map(([count, teams]) => (
-                        <Accordion key={count} sx={{ mt: 1 }}>
-                          <AccordionSummary expandIcon={<ExpandMore />}>
-                            <Box display="flex" alignItems="center" gap={2}>
-                              <Typography variant="body1" fontWeight="medium">
-                                Count: {count}
-                              </Typography>
-                              <Chip
-                                size="small"
-                                label={`${Object.keys(teams).length} teams`}
-                                color="primary"
-                                variant="outlined"
-                              />
-                            </Box>
-                          </AccordionSummary>
-                          <AccordionDetails>
-                            <Grid container spacing={1}>
-                              {Object.entries(teams).slice(0, 6).map(([team, data]) => (
-                                <Grid item xs={6} md={4} key={team}>
-                                  <Paper sx={{ p: 1, textAlign: 'center', bgcolor: alpha('#1976d2', 0.05) }}>
-                                    <Typography variant="subtitle2" fontWeight="bold">
-                                      {team}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      AVG: {data.avg || '.000'} | OPS: {data.ops || '.000'}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" display="block">
-                                      {data.totalPlays || 0} PAs
-                                    </Typography>
-                                  </Paper>
-                                </Grid>
-                              ))}
-                            </Grid>
-                          </AccordionDetails>
-                        </Accordion>
-                      ))}
-                  </Box>
-                )}
-
-                {/* Handedness-based team analysis */}
-                {handsTeamData && Object.keys(handsTeamData).length > 0 && (
-                  <Box mt={3}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Handedness-Specific Performance vs Teams
-                    </Typography>
-                    
-                    {Object.entries(handsTeamData).map(([handedness, teams]) => (
-                      <Accordion key={handedness} sx={{ mt: 1 }}>
-                        <AccordionSummary expandIcon={<ExpandMore />}>
-                          <Box display="flex" alignItems="center" gap={2}>
-                            <Typography variant="body1" fontWeight="medium">
-                              vs {handedness === 'L' ? 'Left-Handed' : 'Right-Handed'} Pitching
-                            </Typography>
-                            <Chip
-                              size="small"
-                              label={`${Object.keys(teams).length} teams`}
-                              color="secondary"
-                              variant="outlined"
-                            />
-                          </Box>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                          <Grid container spacing={1}>
-                            {Object.entries(teams).slice(0, 6).map(([team, data]) => (
-                              <Grid item xs={6} md={4} key={team}>
-                                <Paper sx={{ p: 1, textAlign: 'center', bgcolor: alpha('#9c27b0', 0.05) }}>
-                                  <Typography variant="subtitle2" fontWeight="bold">
-                                    {team} ({handedness}HP)
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    AVG: {data.avg || '.000'} | OPS: {data.ops || '.000'}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary" display="block">
-                                    {data.totalPlays || 0} plate appearances
-                                  </Typography>
-                                </Paper>
-                              </Grid>
-                            ))}
-                          </Grid>
-                        </AccordionDetails>
-                      </Accordion>
-                    ))}
-                  </Box>
-                )}
-
-                {!countTeamData && !handsTeamData && (
-                  <Alert severity="info" sx={{ borderRadius: 2, mt: 2 }}>
-                    <AlertTitle>Loading Advanced Analytics...</AlertTitle>
-                    Advanced count and handedness analytics vs teams are being loaded.
-                  </Alert>
-                )}
-              </CardContent>
-            </GlassCard>
-          </motion.div>
-        </Box>
-      )}
-    </Box>
-  );
-};
-
-const HandednessContent = ({ data, showAdvanced }) => {
-  if (!data || !data.handedness) {
-    return (
-      <Alert severity="info" sx={{ borderRadius: 2 }}>
-        <AlertTitle>No Handedness Data</AlertTitle>
-        No pitcher handedness split data available for this player.
-      </Alert>
-    );
-  }
-
-  const { handedness } = data;
-  
-  // Transform handedness data for table
-  const tableData = [];
-  
-  if (handedness.left) {
-    const leftHomeStats = handedness.left.home?.stats?.batting || {};
-    const leftAwayStats = handedness.left.away?.stats?.batting || {};
-    const leftCombinedStats = combineStats(leftHomeStats, leftAwayStats);
-    
-    tableData.push({
-      id: 'vs-lhp',
-      name: 'vs Left-Handed Pitching',
-      handedness: 'LHP',
-      icon: '👈',
-      homeGames: handedness.left.home?.games?.length || 0,
-      awayGames: handedness.left.away?.games?.length || 0,
-      totalGames: (handedness.left.home?.games?.length || 0) + (handedness.left.away?.games?.length || 0),
-      home: handedness.left.home,
-      away: handedness.left.away,
-      homeAvg: leftHomeStats.avg || '.000',
-      awayAvg: leftAwayStats.avg || '.000',
-      homeOps: leftHomeStats.ops || '.000',
-      awayOps: leftAwayStats.ops || '.000',
-      ...leftCombinedStats
-    });
-  }
-  
-  if (handedness.right) {
-    const rightHomeStats = handedness.right.home?.stats?.batting || {};
-    const rightAwayStats = handedness.right.away?.stats?.batting || {};
-    const rightCombinedStats = combineStats(rightHomeStats, rightAwayStats);
-    
-    tableData.push({
-      id: 'vs-rhp',
-      name: 'vs Right-Handed Pitching',
-      handedness: 'RHP',
-      icon: '👉',
-      homeGames: handedness.right.home?.games?.length || 0,
-      awayGames: handedness.right.away?.games?.length || 0,
-      totalGames: (handedness.right.home?.games?.length || 0) + (handedness.right.away?.games?.length || 0),
-      home: handedness.right.home,
-      away: handedness.right.away,
-      homeAvg: rightHomeStats.avg || '.000',
-      awayAvg: rightAwayStats.avg || '.000',
-      homeOps: rightHomeStats.ops || '.000',
-      awayOps: rightAwayStats.ops || '.000',
-      ...rightCombinedStats
-    });
-  }
-
-  const columns = [
-    { id: 'handedness', label: 'Pitcher Hand', default: true, minWidth: 120 },
-    { id: 'totalGames', label: 'Games', numeric: true, default: true },
-    { id: 'atBats', label: 'AB', numeric: true, default: true },
-    { id: 'hits', label: 'H', numeric: true, default: true },
-    { id: 'avg', label: 'AVG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'obp', label: 'OBP', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'slg', label: 'SLG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'ops', label: 'OPS', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'homeAvg', label: 'Home AVG', numeric: true, default: false, format: (value) => value || '.000' },
-    { id: 'awayAvg', label: 'Road AVG', numeric: true, default: false, format: (value) => value || '.000' },
-    { id: 'homeOps', label: 'Home OPS', numeric: true, default: false, format: (value) => value || '.000' },
-    { id: 'awayOps', label: 'Road OPS', numeric: true, default: false, format: (value) => value || '.000' },
-    { id: 'homeRuns', label: 'HR', numeric: true, default: false },
-    { id: 'rbi', label: 'RBI', numeric: true, default: false },
-    { id: 'runs', label: 'R', numeric: true, default: false },
-    { id: 'strikeouts', label: 'K', numeric: true, default: false },
-    { id: 'walks', label: 'BB', numeric: true, default: false }
-  ];
-
-  return (
-    <Box>
-      <FilterableDataTable
-        data={tableData}
-        title="Handedness Matchup Analysis"
-        subtitle="Performance against left-handed and right-handed pitching"
-        icon={<Compare sx={{ color: 'warning.main' }} />}
-        columns={columns}
-        defaultSort="ops"
-        showFilters={false}
-      />
-
-      {showAdvanced && (
-        <Box mt={3}>
-          <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={1}>
-            <GlassCard>
-              <CardHeader
-                title="Advanced Handedness Analytics"
-                titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                avatar={<Psychology sx={{ color: 'secondary.main' }} />}
-              />
-              <CardContent>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Detailed count-based performance against left and right-handed pitching
-                </Typography>
-                
-                <Alert severity="info" sx={{ borderRadius: 2 }}>
-                  <AlertTitle>Coming Soon</AlertTitle>
-                  Advanced handedness analytics including platoon advantage analysis, 
-                  count-specific performance, and pitch-type effectiveness breakdowns.
-                </Alert>
-              </CardContent>
-            </GlassCard>
-          </motion.div>
-        </Box>
-      )}
-    </Box>
-  );
-};
-
-const CountsContent = ({ data, showAdvanced }) => {
-  if (!data || !data.counts) {
-    return (
-      <Alert severity="info" sx={{ borderRadius: 2 }}>
-        <AlertTitle>No Count Data</AlertTitle>
-        No count-specific performance data available for this player.
-      </Alert>
-    );
-  }
-
-  const { counts } = data;
-  
-  // Transform counts data for table
-  const tableData = Object.entries(counts).map(([count, countData]) => {
-    const homeStats = countData.home?.stats?.batting || {};
-    const awayStats = countData.away?.stats?.batting || {};
-    const combinedStats = combineStats(homeStats, awayStats);
-    const totalGames = (countData.home?.games?.length || 0) + (countData.away?.games?.length || 0);
-    
-    return {
-      id: count,
-      count: count,
-      name: `Count ${count}`,
-      icon: getCountIcon(count),
-      homeGames: countData.home?.games?.length || 0,
-      awayGames: countData.away?.games?.length || 0,
-      totalGames,
-      home: countData.home,
-      away: countData.away,
-      ...combinedStats
-    };
-  }).sort((a, b) => b.totalGames - a.totalGames);
-
-  // Helper function to get count-specific icons
-  function getCountIcon(count) {
-    if (count.startsWith('0-')) return '🔴'; // No strikes
-    if (count.startsWith('1-')) return '🟡'; // One strike
-    if (count.startsWith('2-')) return '🟠'; // Two strikes
-    if (count.endsWith('-0')) return '🔵'; // No balls
-    if (count.endsWith('-1')) return '🟦'; // One ball
-    if (count.endsWith('-2')) return '🟢'; // Two balls
-    if (count.endsWith('-3')) return '🟣'; // Three balls
-    return '⚾';
-  }
-
-  const columns = [
-    { id: 'count', label: 'Count', default: true, minWidth: 100 },
-    { id: 'totalGames', label: 'Games', numeric: true, default: true },
-    { id: 'atBats', label: 'AB', numeric: true, default: true },
-    { id: 'hits', label: 'H', numeric: true, default: true },
-    { id: 'avg', label: 'AVG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'obp', label: 'OBP', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'slg', label: 'SLG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'ops', label: 'OPS', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'homeRuns', label: 'HR', numeric: true, default: false },
-    { id: 'rbi', label: 'RBI', numeric: true, default: false },
-    { id: 'runs', label: 'R', numeric: true, default: false },
-    { id: 'strikeouts', label: 'K', numeric: true, default: false },
-    { id: 'walks', label: 'BB', numeric: true, default: false },
-    { id: 'doubles', label: '2B', numeric: true, default: false },
-    { id: 'triples', label: '3B', numeric: true, default: false }
-  ];
-
-  return (
-    <Box>
-      <FilterableDataTable
-        data={tableData}
-        title="Count-Specific Performance"
-        subtitle="How the player performs in different count situations"
-        icon={<Numbers sx={{ color: 'primary.main' }} />}
-        columns={columns}
-        defaultSort="ops"
-        showFilters={true}
-        searchPlaceholder="Search count situations..."
-      />
-
-      {showAdvanced && (
-        <Box mt={3}>
-          <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={1}>
-            <GlassCard>
-              <CardHeader
-                title="Count Analytics Insights"
-                titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                avatar={<Psychology sx={{ color: 'secondary.main' }} />}
-              />
-              <CardContent>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Advanced count-based performance analysis including pressure situations
-                </Typography>
-                
-                <Alert severity="info" sx={{ borderRadius: 2 }}>
-                  <AlertTitle>Coming Soon</AlertTitle>
-                  Pressure count analysis, two-strike performance, hitter's counts vs pitcher's counts, 
-                  and situational tendencies in different count scenarios.
-                </Alert>
-              </CardContent>
-            </GlassCard>
-          </motion.div>
-        </Box>
-      )}
-    </Box>
-  );
-};
-
-const VsPitchersContent = ({ playerData, showAdvanced }) => {
-  const [filters, setFilters] = useState({
-    homeAway: 'all', // all, home, away
-    countType: 'all', // all, hitters, pitchers, even
-    minPlateAppearances: 5
-  });
-  const [pitchersData, setPitchersData] = useState({});
-  const [countPitchersData, setCountPitchersData] = useState({});
-  const [loading, setLoading] = useState(false);
-
-  // Load pitcher splits data
-  useEffect(() => {
-    if (playerData?.id) {
-      loadPitchersSplits();
-    }
-  }, [playerData, filters]);
-
-  const loadPitchersSplits = async () => {
-    if (!playerData?.id) return;
-    
-    setLoading(true);
-    try {
-      const team = playerData.team;
-      const name = playerData.name;
-      const season = playerData.season || '2025';
-
-      // Pull macro subtree with count vs pitcher breakdowns
-      const subtree = await macroSplitsApi.getPlayerMacro(team, name, season, 'compound.count_vs_pitcher');
-
-      if (!subtree || typeof subtree !== 'object') {
-        setPitchersData({});
-        setCountPitchersData({});
-        return;
-      }
-
-      const initTotals = () => ({
-        plateAppearances: 0,
-        atBats: 0,
-        hits: 0,
-        doubles: 0,
-        triples: 0,
-        homeRuns: 0,
-        walks: 0,
-        runs: 0,
-        rbi: 0,
-        strikeouts: 0,
-        totalBases: 0
-      });
-
-      const addStats = (tot, b) => {
-        tot.plateAppearances += b.plateAppearances || 0;
-        tot.atBats += b.atBats || 0;
-        tot.hits += b.hits || 0;
-        tot.doubles += b.doubles || 0;
-        tot.triples += b.triples || 0;
-        tot.homeRuns += b.homeRuns || 0;
-        tot.walks += b.walks || 0;
-        tot.runs += b.runs || 0;
-        tot.rbi += b.rbi || 0;
-        tot.strikeouts += b.strikeouts || 0;
-        // Prefer totalBases if present; else compute approximation
-        if (typeof b.totalBases === 'number') {
-          tot.totalBases += b.totalBases;
-        } else {
-          tot.totalBases += (b.hits || 0) + (b.doubles || 0) + 2 * (b.triples || 0) + 3 * (b.homeRuns || 0);
-        }
-      };
-
-      const finalize = (tot) => {
-        const avg = tot.atBats > 0 ? (tot.hits / tot.atBats).toFixed(3) : '.000';
-        const obp = tot.plateAppearances > 0 ? ((tot.hits + tot.walks) / tot.plateAppearances).toFixed(3) : '.000';
-        const slg = tot.atBats > 0 ? (tot.totalBases / tot.atBats).toFixed(3) : '.000';
-        const ops = (parseFloat(obp) + parseFloat(slg)).toFixed(3);
-        return { ...tot, avg, obp, slg, ops, totalPlays: tot.plateAppearances, games: 0 };
-      };
-
-      const pitchersAgg = {};
-      const countsAgg = {};
-
-      for (const [pitcherKey, counts] of Object.entries(subtree)) {
-        const pTot = initTotals();
-        for (const [count, locs] of Object.entries(counts || {})) {
-          const cTot = initTotals();
-          ['home', 'away'].forEach((loc) => {
-            const b = locs?.[loc]?.stats?.batting;
-            if (b && typeof b === 'object') {
-              addStats(pTot, b);
-              addStats(cTot, b);
-            }
-          });
-          if (!countsAgg[count]) countsAgg[count] = {};
-          countsAgg[count][pitcherKey] = finalize(cTot);
-        }
-        pitchersAgg[pitcherKey] = finalize(pTot);
-      }
-
-      setPitchersData(pitchersAgg);
-      setCountPitchersData(countsAgg);
-    } catch (error) {
-      console.error('Error loading pitcher splits:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFilterChange = (filterType, value) => {
-    setFilters(prev => ({
-      ...prev,
-      [filterType]: value
-    }));
-  };
-
-  // Transform pitchers data for table
-  const tableData = pitchersData && Object.entries(pitchersData).length > 0 
-    ? Object.entries(pitchersData)
-        .filter(([pitcher, data]) => (data.totalPlays || 0) >= filters.minPlateAppearances)
-        .map(([pitcher, data]) => ({
-          id: pitcher,
-          pitcher: pitcher,
-          name: pitcher,
-          icon: '⚾',
-          totalPlays: data.totalPlays || 0,
-          games: data.games || 0,
-          ...data,
-          avg: data.avg || '.000',
-          obp: data.obp || '.000',
-          slg: data.slg || '.000',
-          ops: data.ops || '.000'
-        }))
-        .sort((a, b) => b.totalPlays - a.totalPlays)
-    : [];
-
-  const columns = [
-    { id: 'pitcher', label: 'Pitcher', default: true, minWidth: 120 },
-    { id: 'totalPlays', label: 'PAs', numeric: true, default: true },
-    { id: 'games', label: 'Games', numeric: true, default: true },
-    { id: 'atBats', label: 'AB', numeric: true, default: true },
-    { id: 'hits', label: 'H', numeric: true, default: true },
-    { id: 'avg', label: 'AVG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'obp', label: 'OBP', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'slg', label: 'SLG', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'ops', label: 'OPS', numeric: true, default: true, format: (value) => value || '.000' },
-    { id: 'homeRuns', label: 'HR', numeric: true, default: false },
-    { id: 'rbi', label: 'RBI', numeric: true, default: false },
-    { id: 'runs', label: 'R', numeric: true, default: false },
-    { id: 'strikeouts', label: 'K', numeric: true, default: false },
-    { id: 'walks', label: 'BB', numeric: true, default: false },
-    { id: 'doubles', label: '2B', numeric: true, default: false },
-    { id: 'triples', label: '3B', numeric: true, default: false }
-  ];
-
-  return (
-    <Box>
-      {tableData.length > 0 ? (
-        <FilterableDataTable
-          data={tableData}
-          title="Individual Pitcher Matchups"
-          subtitle={`Performance against ${tableData.length} individual pitchers (min ${filters.minPlateAppearances} PAs)`}
-          icon={<Person sx={{ color: 'primary.main' }} />}
-          columns={columns}
-          defaultSort="ops"
-          showFilters={true}
-          searchPlaceholder="Search pitcher names..."
-        />
-      ) : (
-        <Alert severity="info" sx={{ borderRadius: 2 }}>
-          <AlertTitle>Loading Pitcher Data...</AlertTitle>
-          {loading ? 'Loading individual pitcher matchup data...' : 'No pitcher matchup data available for this player.'}
-          {loading && <CircularProgress size={20} sx={{ ml: 2 }} />}
-        </Alert>
-      )}
-
-      {showAdvanced && (
-        <Box mt={3}>
-          <motion.div variants={cardVariants} initial="hidden" animate="visible" custom={1}>
-            <GlassCard>
-              <CardHeader
-                title="Advanced Pitcher Analytics"
-                titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-                avatar={<Psychology sx={{ color: 'warning.main' }} />}
-                action={
-                  <Box display="flex" gap={1} alignItems="center">
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <InputLabel>Home/Away</InputLabel>
-                      <Select
-                        value={filters.homeAway}
-                        onChange={(e) => handleFilterChange('homeAway', e.target.value)}
-                        label="Home/Away"
-                      >
-                        <MenuItem value="all">All Games</MenuItem>
-                        <MenuItem value="home">Home Only</MenuItem>
-                        <MenuItem value="away">Away Only</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <InputLabel>Count Type</InputLabel>
-                      <Select
-                        value={filters.countType}
-                        onChange={(e) => handleFilterChange('countType', e.target.value)}
-                        label="Count Type"
-                      >
-                        <MenuItem value="all">All Counts</MenuItem>
-                        <MenuItem value="hitters">Hitter's Counts</MenuItem>
-                        <MenuItem value="pitchers">Pitcher's Counts</MenuItem>
-                        <MenuItem value="even">Even Counts</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    <FormControl size="small" sx={{ minWidth: 80 }}>
-                      <InputLabel>Min PAs</InputLabel>
-                      <Select
-                        value={filters.minPlateAppearances}
-                        onChange={(e) => handleFilterChange('minPlateAppearances', e.target.value)}
-                        label="Min PAs"
-                      >
-                        <MenuItem value={1}>1+</MenuItem>
-                        <MenuItem value={3}>3+</MenuItem>
-                        <MenuItem value={5}>5+</MenuItem>
-                        <MenuItem value={10}>10+</MenuItem>
-                        <MenuItem value={15}>15+</MenuItem>
-                      </Select>
-                    </FormControl>
-
-                    {loading && <CircularProgress size={20} />}
-                  </Box>
-                }
-              />
-              <CardContent>
-                <Typography variant="body2" color="text.secondary" paragraph>
-                  Advanced count-based performance analysis against individual pitchers
-                </Typography>
-
-                {/* Count-based pitcher analysis */}
-                {countPitchersData && Object.keys(countPitchersData).length > 0 && (
-                  <Box mt={2}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Count-Specific Performance vs Pitchers
-                    </Typography>
-                    
-                    {Object.entries(countPitchersData)
-                      .filter(([count]) => !count.includes('3-') && !count.includes('-4'))
-                      .slice(0, 4)
-                      .map(([count, pitchers]) => (
-                        <Accordion key={count} sx={{ mt: 1 }}>
-                          <AccordionSummary expandIcon={<ExpandMore />}>
-                            <Box display="flex" alignItems="center" gap={2}>
-                              <Typography variant="body1" fontWeight="medium">
-                                Count: {count}
-                              </Typography>
-                              <Chip
-                                size="small"
-                                label={`${Object.keys(pitchers).length} pitchers`}
-                                color="primary"
-                                variant="outlined"
-                              />
-                            </Box>
-                          </AccordionSummary>
-                          <AccordionDetails>
-                            <Grid container spacing={1}>
-                              {Object.entries(pitchers)
-                                .filter(([pitcher, data]) => (data.totalPlays || 0) >= 2)
-                                .slice(0, 8)
-                                .map(([pitcher, data]) => (
-                                <Grid item xs={6} md={3} key={pitcher}>
-                                  <Paper sx={{ p: 1, textAlign: 'center', bgcolor: alpha('#ff9800', 0.05) }}>
-                                    <Typography variant="caption" fontWeight="bold" noWrap>
-                                      {pitcher}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" display="block">
-                                      AVG: {data.avg || '.000'}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" display="block">
-                                      {data.totalPlays || 0} PAs
-                                    </Typography>
-                                  </Paper>
-                                </Grid>
-                              ))}
-                            </Grid>
-                          </AccordionDetails>
-                        </Accordion>
-                      ))}
-                  </Box>
-                )}
-
-                {/* Summary statistics */}
-                {pitchersData && Object.keys(pitchersData).length > 0 && (
-                  <Box mt={3}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      Pitcher Matchup Summary
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6} md={3}>
-                        <Paper sx={{ p: 2, textAlign: 'center', bgcolor: alpha('#4caf50', 0.1) }}>
-                          <Typography variant="h6" color="success.main" fontWeight="bold">
-                            {Object.keys(pitchersData).length}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Total Pitchers Faced
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                      <Grid item xs={6} md={3}>
-                        <Paper sx={{ p: 2, textAlign: 'center', bgcolor: alpha('#2196f3', 0.1) }}>
-                          <Typography variant="h6" color="primary.main" fontWeight="bold">
-                            {Object.values(pitchersData).reduce((sum, data) => sum + (data.totalPlays || 0), 0)}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Total Plate Appearances
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                      <Grid item xs={6} md={3}>
-                        <Paper sx={{ p: 2, textAlign: 'center', bgcolor: alpha('#ff9800', 0.1) }}>
-                          <Typography variant="h6" color="warning.main" fontWeight="bold">
-                            {(Object.values(pitchersData).reduce((sum, data) => sum + (parseFloat(data.avg) || 0), 0) / Object.keys(pitchersData).length).toFixed(3)}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Average AVG vs All
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                      <Grid item xs={6} md={3}>
-                        <Paper sx={{ p: 2, textAlign: 'center', bgcolor: alpha('#e91e63', 0.1) }}>
-                          <Typography variant="h6" color="secondary.main" fontWeight="bold">
-                            {Object.values(pitchersData).filter(data => (data.totalPlays || 0) >= 10).length}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Frequent Matchups (10+ PAs)
-                          </Typography>
-                        </Paper>
-                      </Grid>
-                    </Grid>
-                  </Box>
-                )}
-
-                {!countPitchersData && !pitchersData && (
-                  <Alert severity="info" sx={{ borderRadius: 2, mt: 2 }}>
-                    <AlertTitle>Loading Pitcher Analytics...</AlertTitle>
-                    Advanced pitcher-specific analytics are being loaded from the comprehensive splits system.
-                  </Alert>
-                )}
-              </CardContent>
-            </GlassCard>
-          </motion.div>
-        </Box>
-      )}
-    </Box>
-  );
-};
-
-const CompoundAnalyticsContent = ({ playerData, showAdvanced }) => {
-  const [analysisType, setAnalysisType] = useState('counts-vs-team');
-  const [selectedOpponent, setSelectedOpponent] = useState('');
-  const [selectedVenue, setSelectedVenue] = useState('');
-  const [selectedHandedness, setSelectedHandedness] = useState('R');
-  const [compoundData, setCompoundData] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [availableOpponents, setAvailableOpponents] = useState([]);
-  const [availableVenues, setAvailableVenues] = useState([]);
-
-  const analysisTypes = [
-    { value: 'counts-vs-team', label: 'Count Performance vs Specific Teams', icon: <Numbers /> },
-    { value: 'counts-vs-venue', label: 'Count Performance at Specific Venues', icon: <Stadium /> },
-    { value: 'counts-vs-handedness', label: 'Count Performance vs Handedness', icon: <Compare /> },
-    { value: 'handedness-vs-team', label: 'Handedness Performance vs Teams', icon: <Group /> },
-  ];
-
-  // Load available opponents and venues from basic splits data
-  useEffect(() => {
-    const loadOptions = async () => {
-      if (!playerData) return;
-      
-      try {
-        const { team, name, season } = playerData;
-        const playerName = name.replace(/\s+/g, '_');
-
-        // Load available opponents from vs-teams endpoint
-        const teamsResponse = await fetch(`http://localhost:8081/api/v2/splits/vs-teams/${team}/${playerName}/${season}`);
-        if (teamsResponse.ok) {
-          const teamsData = await teamsResponse.json();
-          if (teamsData.opponents) {
-            const opponents = Object.keys(teamsData.opponents);
-            setAvailableOpponents(opponents);
-            if (opponents.length > 0 && !selectedOpponent) {
-              setSelectedOpponent(opponents[0]);
-            }
-          }
-        }
-
-        // Load available venues from venue endpoint
-        const venuesResponse = await fetch(`http://localhost:8081/api/v2/splits/venue/${team}/${playerName}/${season}`);
-        if (venuesResponse.ok) {
-          const venuesData = await venuesResponse.json();
-          if (venuesData.venues) {
-            const venues = Object.keys(venuesData.venues);
-            setAvailableVenues(venues);
-            if (venues.length > 0 && !selectedVenue) {
-              setSelectedVenue(venues[0]);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error loading options:', error);
-      }
-    };
-
-    loadOptions();
-  }, [playerData]);
-
-  // Load compound data when parameters change
-  useEffect(() => {
-    if (!playerData) return;
-    
-    const shouldLoad = 
-      (analysisType === 'counts-vs-team' && selectedOpponent) ||
-      (analysisType === 'counts-vs-venue' && selectedVenue) ||
-      (analysisType === 'counts-vs-handedness' && selectedHandedness) ||
-      (analysisType === 'handedness-vs-team' && selectedOpponent);
-
-    if (shouldLoad) {
-      loadCompoundData();
-    }
-  }, [analysisType, selectedOpponent, selectedVenue, selectedHandedness, playerData]);
-
-  const loadCompoundData = async () => {
-    if (!playerData) return;
-    
-    setLoading(true);
-    try {
-      const { team, name, season } = playerData;
-      const playerName = name.replace(/\s+/g, '_');
-      
-      let url = '';
-      
-      switch (analysisType) {
-        case 'counts-vs-team':
-          if (selectedOpponent) {
-            url = `http://localhost:8081/api/v2/splits/counts-vs-team/${team}/${playerName}/${season}/${selectedOpponent}`;
-          }
-          break;
-        case 'counts-vs-venue':
-          if (selectedVenue) {
-            url = `http://localhost:8081/api/v2/splits/counts-vs-venue/${team}/${playerName}/${season}/${selectedVenue}`;
-          }
-          break;
-        case 'counts-vs-handedness':
-          if (selectedHandedness) {
-            url = `http://localhost:8081/api/v2/splits/counts-vs-handedness/${team}/${playerName}/${season}/${selectedHandedness}`;
-          }
-          break;
-        case 'handedness-vs-team':
-          if (selectedOpponent) {
-            url = `http://localhost:8081/api/v2/splits/handedness-vs-team/${team}/${playerName}/${season}/${selectedOpponent}`;
-          }
-          break;
-      }
-      
-      if (url) {
-        const response = await fetch(url);
-        if (response.ok) {
-          const data = await response.json();
-          setCompoundData(data);
-        } else {
-          console.error(`API call failed: ${response.status}`);
-          setCompoundData({});
-        }
-      }
-    } catch (error) {
-      console.error('Error loading compound data:', error);
-      setCompoundData({});
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderDataTable = () => {
-    if (!compoundData || Object.keys(compoundData).length === 0) {
-      return (
-        <Alert severity="info" sx={{ mt: 2 }}>
-          <AlertTitle>No Compound Data</AlertTitle>
-          No compound analysis data available for the selected parameters.
-        </Alert>
-      );
-    }
-
-    // Render based on analysis type
-    switch (analysisType) {
-      case 'counts-vs-team':
-      case 'counts-vs-venue':
-      case 'counts-vs-handedness':
-        return renderCountAnalysis();
-      case 'handedness-vs-team':
-        return renderHandednessAnalysis();
-      default:
-        return null;
-    }
-  };
-
-  const renderCountAnalysis = () => {
-    if (!compoundData.counts) return null;
-
-    const countEntries = Object.entries(compoundData.counts)
-      .filter(([count, data]) => data?.stats?.batting)
-      .map(([count, data]) => ({
-        count,
-        ...data.stats.batting,
-        games: data.games?.length || 0,
-        lastUpdated: data.lastUpdated
-      }))
-      .sort((a, b) => (b.ops || 0) - (a.ops || 0));
-
-    return (
-      <TableContainer component={Paper} sx={{ mt: 2 }}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell><strong>Count</strong></TableCell>
-              <TableCell align="center"><strong>Games</strong></TableCell>
-              <TableCell align="center"><strong>PA</strong></TableCell>
-              <TableCell align="center"><strong>AVG</strong></TableCell>
-              <TableCell align="center"><strong>OBP</strong></TableCell>
-              <TableCell align="center"><strong>SLG</strong></TableCell>
-              <TableCell align="center"><strong>OPS</strong></TableCell>
-              <TableCell align="center"><strong>HR</strong></TableCell>
-              <TableCell align="center"><strong>RBI</strong></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {countEntries.map(({ count, games, plateAppearances, avg, obp, slg, ops, homeRuns, rbi }) => (
-              <TableRow
-                key={count}
-                sx={{ 
-                  '&:nth-of-type(odd)': { backgroundColor: alpha('#1976d2', 0.02) },
-                  '&:hover': { backgroundColor: alpha('#1976d2', 0.05) }
-                }}
-              >
-                <TableCell>
-                  <Chip 
-                    label={count} 
-                    size="small" 
-                    color="primary" 
-                    variant="outlined"
-                  />
-                </TableCell>
-                <TableCell align="center">{games}</TableCell>
-                <TableCell align="center">{plateAppearances || 0}</TableCell>
-                <TableCell align="center">
-                  <Typography
-                    variant="body2"
-                    fontFamily="monospace"
-                    color={avg >= 0.300 ? 'success.main' : avg >= 0.250 ? 'warning.main' : 'error.main'}
-                    fontWeight="medium"
-                  >
-                    {avg?.toFixed(3) || '.---'}
-                  </Typography>
-                </TableCell>
-                <TableCell align="center" sx={{ fontFamily: 'monospace' }}>
-                  {obp?.toFixed(3) || '.---'}
-                </TableCell>
-                <TableCell align="center" sx={{ fontFamily: 'monospace' }}>
-                  {slg?.toFixed(3) || '.---'}
-                </TableCell>
-                <TableCell align="center">
-                  <Typography
-                    variant="body2"
-                    fontFamily="monospace"
-                    fontWeight="bold"
-                    color={ops >= 0.900 ? 'success.main' : ops >= 0.750 ? 'warning.main' : 'error.main'}
-                  >
-                    {ops?.toFixed(3) || '.---'}
-                  </Typography>
-                </TableCell>
-                <TableCell align="center">{homeRuns || 0}</TableCell>
-                <TableCell align="center">{rbi || 0}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
-  };
-
-  const renderHandednessAnalysis = () => {
-    if (!compoundData.handedness) return null;
-
-    const handednessEntries = Object.entries(compoundData.handedness)
-      .filter(([hand, data]) => data?.stats?.batting)
-      .map(([hand, data]) => ({
-        handedness: hand === 'L' ? 'vs LHP' : 'vs RHP',
-        ...data.stats.batting,
-        games: data.games?.length || 0
-      }));
-
-    return (
-      <TableContainer component={Paper} sx={{ mt: 2 }}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell><strong>Handedness</strong></TableCell>
-              <TableCell align="center"><strong>Games</strong></TableCell>
-              <TableCell align="center"><strong>PA</strong></TableCell>
-              <TableCell align="center"><strong>AVG</strong></TableCell>
-              <TableCell align="center"><strong>OBP</strong></TableCell>
-              <TableCell align="center"><strong>SLG</strong></TableCell>
-              <TableCell align="center"><strong>OPS</strong></TableCell>
-              <TableCell align="center"><strong>HR</strong></TableCell>
-              <TableCell align="center"><strong>RBI</strong></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {handednessEntries.map(({ handedness, games, plateAppearances, avg, obp, slg, ops, homeRuns, rbi }) => (
-              <TableRow key={handedness}>
-                <TableCell>
-                  <Chip 
-                    label={handedness} 
-                    size="small" 
-                    color={handedness.includes('LHP') ? 'secondary' : 'primary'}
-                    variant="outlined"
-                  />
-                </TableCell>
-                <TableCell align="center">{games}</TableCell>
-                <TableCell align="center">{plateAppearances || 0}</TableCell>
-                <TableCell align="center" sx={{ fontFamily: 'monospace' }}>
-                  {avg?.toFixed(3) || '.---'}
-                </TableCell>
-                <TableCell align="center" sx={{ fontFamily: 'monospace' }}>
-                  {obp?.toFixed(3) || '.---'}
-                </TableCell>
-                <TableCell align="center" sx={{ fontFamily: 'monospace' }}>
-                  {slg?.toFixed(3) || '.---'}
-                </TableCell>
-                <TableCell align="center" sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
-                  {ops?.toFixed(3) || '.---'}
-                </TableCell>
-                <TableCell align="center">{homeRuns || 0}</TableCell>
-                <TableCell align="center">{rbi || 0}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
-  };
-
-  const getSelectedParameter = () => {
-    switch (analysisType) {
-      case 'counts-vs-team':
-      case 'handedness-vs-team':
-        return selectedOpponent;
-      case 'counts-vs-venue':
-        return selectedVenue?.replace(/_/g, ' ');
-      case 'counts-vs-handedness':
-        return selectedHandedness === 'R' ? 'Right-Handed Pitchers' : 'Left-Handed Pitchers';
-      default:
-        return '';
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <Grid container spacing={3}>
-        {/* Control Panel */}
-        <Grid item xs={12}>
-          <GlassCard>
-            <CardHeader
-              title="Compound Situational Analytics"
-              subheader="Multi-dimensional split analysis combining multiple factors"
-              titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-              avatar={<AutoAwesome sx={{ color: 'primary.main' }} />}
-            />
-            <CardContent>
-              <Grid container spacing={3}>
-                {/* Analysis Type Selection */}
-                <Grid item xs={12} md={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Analysis Type</InputLabel>
-                    <Select
-                      value={analysisType}
-                      onChange={(e) => setAnalysisType(e.target.value)}
-                      label="Analysis Type"
-                    >
-                      {analysisTypes.map(type => (
-                        <MenuItem key={type.value} value={type.value}>
-                          <Box display="flex" alignItems="center" gap={1}>
-                            {type.icon}
-                            {type.label}
-                          </Box>
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                {/* Dynamic Parameter Selection */}
-                <Grid item xs={12} md={6}>
-                  {(analysisType === 'counts-vs-team' || analysisType === 'handedness-vs-team') && (
-                    <FormControl fullWidth>
-                      <InputLabel>Opponent Team</InputLabel>
-                      <Select
-                        value={selectedOpponent}
-                        onChange={(e) => setSelectedOpponent(e.target.value)}
-                        label="Opponent Team"
-                      >
-                        {availableOpponents.map(team => (
-                          <MenuItem key={team} value={team}>{team}</MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  )}
-
-                  {analysisType === 'counts-vs-venue' && (
-                    <FormControl fullWidth>
-                      <InputLabel>Venue</InputLabel>
-                      <Select
-                        value={selectedVenue}
-                        onChange={(e) => setSelectedVenue(e.target.value)}
-                        label="Venue"
-                      >
-                        {availableVenues.map(venue => (
-                          <MenuItem key={venue} value={venue}>
-                            {venue.replace(/_/g, ' ')}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  )}
-
-                  {analysisType === 'counts-vs-handedness' && (
-                    <FormControl fullWidth>
-                      <InputLabel>Pitcher Handedness</InputLabel>
-                      <Select
-                        value={selectedHandedness}
-                        onChange={(e) => setSelectedHandedness(e.target.value)}
-                        label="Pitcher Handedness"
-                      >
-                        <MenuItem value="R">Right-Handed Pitchers</MenuItem>
-                        <MenuItem value="L">Left-Handed Pitchers</MenuItem>
-                      </Select>
-                    </FormControl>
-                  )}
-                </Grid>
-              </Grid>
-
-              {getSelectedParameter() && (
-                <Box mt={2}>
-                  <Typography variant="body2" color="text.secondary">
-                    Analyzing: <strong>{getSelectedParameter()}</strong>
-                  </Typography>
-                </Box>
-              )}
-            </CardContent>
-          </GlassCard>
-        </Grid>
-
-        {/* Data Display */}
-        <Grid item xs={12}>
-          <GlassCard>
-            <CardHeader
-              title={`${analysisTypes.find(t => t.value === analysisType)?.label || 'Analysis'} Results`}
-              titleTypographyProps={{ variant: 'h6', fontWeight: 'bold' }}
-              action={loading && <CircularProgress size={24} />}
-            />
-            <CardContent>
-              {renderDataTable()}
-            </CardContent>
-          </GlassCard>
-        </Grid>
-      </Grid>
-    </motion.div>
-  );
-};
-
-const ComingSoonContent = ({ tabName }) => (
-  <motion.div variants={cardVariants} initial="hidden" animate="visible">
-    <GlassCard>
-      <CardContent sx={{ textAlign: 'center', py: 8 }}>
-        <AutoAwesome sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          {tabName.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())} Analysis
-        </Typography>
-        <Typography variant="h6" color="text.secondary" paragraph>
-          Advanced situational analytics coming soon
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          This section will feature comprehensive {tabName.replace('-', ' ')} split analysis 
-          with interactive visualizations and deep statistical insights.
-        </Typography>
-      </CardContent>
-    </GlassCard>
-  </motion.div>
-);
-
-export default Splits;
+export default SplitsExplorer;

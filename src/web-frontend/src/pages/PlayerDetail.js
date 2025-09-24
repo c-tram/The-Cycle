@@ -48,10 +48,23 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { playersApi, statsApi } from '../services/apiService';
 import { themeUtils } from '../theme/theme';
 import { calculatePlayerCVR, getCVRDisplay, formatSalary } from '../utils/cvrCalculations'; // v3.0 - FIXED EXPORTS
-import { getTeamLogoUrl as getSharedTeamLogoUrl } from '../utils/teamLogos';
 
 // Team logo utility
-const getTeamLogoUrl = (teamCode) => getSharedTeamLogoUrl(teamCode, 500);
+const getTeamLogoUrl = (teamCode) => {
+  if (!teamCode) return null;
+  const code = teamCode.toUpperCase();
+  const codeMap = {
+    AZ: 'ARI',
+    CWS: 'CHW',
+    KC: 'KCR',
+    SD: 'SDP',
+    SF: 'SFG',
+    TB: 'TBR',
+    WSH: 'WSN',
+  };
+  const logoCode = codeMap[code] || code;
+  return `https://a.espncdn.com/i/teamlogos/mlb/500/${logoCode}.png`;
+};
 
 // WAR Display Helper
 const getWARDisplay = (war) => {

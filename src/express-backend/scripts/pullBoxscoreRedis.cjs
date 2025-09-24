@@ -3065,8 +3065,8 @@ async function pullBoxscoresToRedis(season, startDate, endDate) {
 if (require.main === module) {
   const season = process.argv[2] || '2025';
   // Full MLB season: Opening Day (late March) through current date (or full season)
-  const startDate = process.argv[3] || '2025-03-17';  // Opening Day 2025 is 3-17
-  const endDate = process.argv[4] || '2025-09-21';    // Current date (adjust to completed games)
+  const startDate = process.argv[3] || '2025-09-22';  // Opening Day 2025 is 3-17
+  const endDate = process.argv[4] || '2025-09-22';    // Current date (adjust to completed games)
   
   console.log(`🏁 Starting MLB data pull for ${season} season`);
   console.log(`📅 Date range: ${startDate} to ${endDate}`);
@@ -3119,6 +3119,129 @@ if (require.main === module) {
         }
       }
       
+      // ==================================================================
+      // 📊 Generate League Baselines (Single Redis Key)
+      // Key: baseline:season:2025:latest
+      // ==================================================================
+      try {
+        console.log('\n🔄 Generating league baselines (batting & pitching)...');
+
+        // Ensure connection
+        if (redisClient.status !== 'ready') {
+          console.log('🔄 Reconnecting Redis for baseline generation...');
+          await redisClient.disconnect();
+          await redisClient.connect();
+        }
+
+        const season = '2025';
+        const teamSeasonKeys = await redisClient.keys(`team:*:${season}:season`);
+        if (!teamSeasonKeys.length) {
+          console.log('⚠️  No team season keys found – skipping baseline generation');
+        } else {
+          const battingTotals = {
+            atBats: 0, hits: 0, doubles: 0, triples: 0, homeRuns: 0, baseOnBalls: 0,
+            hitByPitch: 0, sacFlies: 0, strikeOuts: 0, stolenBases: 0, caughtStealing: 0,
+            totalBases: 0, plateAppearances: 0, runs: 0, rbi: 0
+          };
+          const pitchingTotals = {
+            inningsPitched: '0.0', hits: 0, runs: 0, earnedRuns: 0, homeRuns: 0,
+            baseOnBalls: 0, strikeOuts: 0, battersFaced: 0, wins: 0, losses: 0
+          };
+
+          // Helper to sum innings (string like 12.2) → accumulate outs
+            const inningsToOuts = (ipStr) => {
+              if (!ipStr) return 0;
+              const parts = ipStr.toString().split('.');
+              const whole = parseInt(parts[0] || '0', 10);
+              const frac = parseInt(parts[1] || '0', 10); // 0,1,2 representing outs
+              return whole * 3 + frac;
+            };
+            const outsToInningsStr = (outs) => {
+              const whole = Math.floor(outs / 3);
+              const rem = outs % 3;
+              return `${whole}.${rem}`;
+            };
+
+          let totalPitchingOuts = 0;
+
+          for (const k of teamSeasonKeys) {
+            try {
+              const raw = await redisClient.get(k);
+              if (!raw) continue;
+              const teamObj = JSON.parse(raw);
+              const b = teamObj.batting || {};
+              battingTotals.atBats += b.atBats || 0;
+              battingTotals.hits += b.hits || 0;
+              battingTotals.doubles += b.doubles || 0;
+              battingTotals.triples += b.triples || 0;
+              battingTotals.homeRuns += b.homeRuns || 0;
+              battingTotals.baseOnBalls += b.baseOnBalls || 0;
+              battingTotals.hitByPitch += b.hitByPitch || 0;
+              battingTotals.sacFlies += b.sacFlies || b.sacrificeFlies || 0;
+              battingTotals.strikeOuts += b.strikeOuts || 0;
+              battingTotals.stolenBases += b.stolenBases || 0;
+              battingTotals.caughtStealing += b.caughtStealing || 0;
+              battingTotals.totalBases += b.totalBases || 0;
+              battingTotals.plateAppearances += b.plateAppearances || ( (b.atBats||0) + (b.baseOnBalls||0) + (b.hitByPitch||0) + (b.sacFlies||0) );
+              battingTotals.runs += b.runs || 0;
+              battingTotals.rbi += b.rbi || 0;
+
+              const p = teamObj.pitching || {};
+              totalPitchingOuts += inningsToOuts(p.inningsPitched);
+              pitchingTotals.hits += p.hits || 0;
+              pitchingTotals.runs += p.runs || 0;
+              pitchingTotals.earnedRuns += p.earnedRuns || 0;
+              pitchingTotals.homeRuns += p.homeRuns || 0;
+              pitchingTotals.baseOnBalls += p.baseOnBalls || 0;
+              pitchingTotals.strikeOuts += p.strikeOuts || 0;
+              pitchingTotals.battersFaced += p.battersFaced || 0;
+              pitchingTotals.wins += p.wins || 0;
+              pitchingTotals.losses += p.losses || 0;
+            } catch (teamErr) {
+              console.log(`⚠️  Failed parsing ${k}:`, teamErr.message);
+            }
+          }
+
+          pitchingTotals.inningsPitched = outsToInningsStr(totalPitchingOuts);
+
+          // Reuse existing calculators for professional rate stats
+          const leagueBatting = calculateBattingStats(battingTotals);
+          const leaguePitching = calculatePitchingStats(pitchingTotals);
+
+          const baselineKey = `baseline:season:${season}:latest`;
+          const baselinePayload = {
+            season,
+            generated: new Date().toISOString(),
+            sourceTeamCount: teamSeasonKeys.length,
+            batting: { 
+              totals: battingTotals, 
+              ...leagueBatting,
+              // Explicitly surface rates for frontend deviation logic
+              avg: leagueBatting.avg,
+              obp: leagueBatting.obp,
+              slg: leagueBatting.slg,
+              ops: leagueBatting.ops,
+              kRate: leagueBatting.kRate,
+              bbRate: leagueBatting.bbRate
+            },
+            pitching: { 
+              totals: pitchingTotals, 
+              ...leaguePitching,
+              era: leaguePitching.era,
+              whip: leaguePitching.whip,
+              fip: leaguePitching.fip,
+              kRate: leaguePitching.strikeOuts && leaguePitching.battersFaced ? Number(((leaguePitching.strikeOuts / leaguePitching.battersFaced)).toFixed(3)) : 0,
+              bbRate: leaguePitching.baseOnBalls && leaguePitching.battersFaced ? Number(((leaguePitching.baseOnBalls / leaguePitching.battersFaced)).toFixed(3)) : 0
+            }
+          };
+
+          await redisClient.set(baselineKey, JSON.stringify(baselinePayload));
+          console.log(`✅ League baselines stored at ${baselineKey}`);
+        }
+      } catch (baselineErr) {
+        console.error('⚠️  Failed generating league baselines:', baselineErr.message);
+      }
+
       // �🔍 VERIFICATION: Count what actually made it to Redis
       console.log('\n🔍 Verifying stored data...');
       
