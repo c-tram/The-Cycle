@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-# Dev run script for The Cycle - last updated: 2025-06-30 by coletrammell
+# Dev run script for The Cycle - last updated: 2025-09-24 by coletrammell
 # Use this script to run both backend and frontend in dev mode
 # Update this comment with each commit to track changes
 
@@ -18,7 +18,7 @@ git config core.preloadindex true
 git add .
 
 # 2. Commit with a timestamped message
-git commit -m "Macro & Splits Overhaul: unified macro route (on-the-fly fallback), dynamic league baselines (batting+pitching), pitching integration & auto-detect, CSV & percentile fixes, player key normalization (underscores), graceful empty macro 200s, prep for team logo fixes, API refactors & stability hardening. $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
+git commit -m "Perf & UX: removed N+1 team schedule loads (Dashboard & Teams), season aggregate winPct fallback, optimized team leader tabs, global route transition overlay (enhanced LoadingScreen variant), unified loading animation, groundwork for progressive hydration & future caching. $(date '+%Y-%m-%d %H:%M:%S')" || echo "No changes to commit."
 
 # 3. Force push to GitHub remote (overwrites remote with local)
 echo "Force pushing to GitHub..."

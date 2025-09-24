@@ -214,42 +214,22 @@ const Teams = ({ category }) => {
 
       const response = await teamsApi.getTeams(apiParams);
       const newTeams = response.teams || [];
-      
-      // Fix team records by calculating actual wins/losses from game logs
-      const teamsWithActualRecords = await Promise.all(newTeams.map(async (team) => {
-        try {
-          // Fetch team schedule to calculate actual record
-          const scheduleData = await teamsApi.getTeamSchedule(team.id, { 
-            year: '2025', 
-            limit: 200 
-          });
-          const games = scheduleData.games || [];
-          
-          if (games.length > 0) {
-            const wins = games.filter(game => game.result === 'W').length;
-            const losses = games.filter(game => game.result === 'L').length;
-            const ties = games.filter(game => game.result === 'T').length;
-            
-            // Update record with actual calculated values
-            return {
-              ...team,
-              record: { wins, losses, ties: ties || 0 },
-              gameCount: games.length,
-              standings: {
-                ...team.standingss,
-                winPercentage: games.length > 0 ? wins / games.length : 0
-              }
-            };
+      // PERFORMANCE: Avoid N+1 schedule fetch; rely on season aggregate already containing record & standings
+      // Provide a lightweight fallback to compute winPct if missing
+      const normalizedTeams = newTeams.map(team => {
+        const wins = team.record?.wins || 0;
+        const losses = team.record?.losses || 0;
+        const computedWinPct = (wins + losses) > 0 ? wins / (wins + losses) : 0;
+        return {
+          ...team,
+          standings: {
+            ...team.standings,
+            winPercentage: team.standings?.winPercentage != null ? team.standings.winPercentage : computedWinPct
           }
-        } catch (scheduleErr) {
-          console.log(`Could not fetch schedule for ${team.id}:`, scheduleErr);
-        }
-        
-        // Return original team if schedule fetch fails
-        return team;
-      }));
-      
-      setTeams(teamsWithActualRecords);
+        };
+      });
+
+      setTeams(normalizedTeams);
       
     } catch (err) {
       console.error('Error loading teams:', err);

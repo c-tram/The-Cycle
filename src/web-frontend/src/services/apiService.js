@@ -14,10 +14,23 @@ const apiClient = axios.create({
   },
 });
 
+// Simple network activity tracker for conditional route transition overlay
+let pendingRequests = 0;
+const listeners = new Set();
+const notify = () => listeners.forEach(l => {
+  try { l(pendingRequests); } catch (_) { /* noop */ }
+});
+
+export const networkActivity = {
+  subscribe: (fn) => { listeners.add(fn); return () => listeners.delete(fn); },
+  getPending: () => pendingRequests
+};
+
 // Request interceptor for debugging
 apiClient.interceptors.request.use(
   (config) => {
     console.log(`🚀 API Request: ${config.method?.toUpperCase()} ${config.url}`);
+  pendingRequests += 1; notify();
     return config;
   },
   (error) => {
@@ -30,10 +43,12 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => {
     console.log(`✅ API Response: ${response.config.url} (${response.status})`);
+  pendingRequests = Math.max(0, pendingRequests - 1); notify();
     return response;
   },
   (error) => {
     console.error('❌ API Response Error:', error.response?.data || error.message);
+  pendingRequests = Math.max(0, pendingRequests - 1); notify();
     return Promise.reject(error);
   }
 );

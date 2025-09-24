@@ -3,7 +3,8 @@ import { Box, CircularProgress, Typography, useTheme, alpha } from '@mui/materia
 import { motion } from 'framer-motion';
 import { SportsBaseball } from '@mui/icons-material';
 
-const LoadingScreen = ({ message = 'Loading baseball analytics...' }) => {
+// variant: 'full' (startup) or 'overlay' (route transition)
+const LoadingScreen = ({ message = 'Loading baseball analytics...', variant = 'full' }) => {
   const theme = useTheme();
 
   return (
@@ -18,14 +19,19 @@ const LoadingScreen = ({ message = 'Loading baseball analytics...' }) => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'background.default',
-        zIndex: 9999
+        backgroundColor: variant === 'overlay' 
+          ? alpha(theme.palette.background.default, 0.85) 
+          : 'background.default',
+        backdropFilter: variant === 'overlay' ? 'blur(6px)' : 'none',
+        zIndex: 9999,
+        pointerEvents: variant === 'overlay' ? 'none' : 'auto'
       }}
     >
       <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
+        initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5, ease: 'easeOut' }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
       >
         <Box
           sx={{
@@ -33,7 +39,8 @@ const LoadingScreen = ({ message = 'Loading baseball analytics...' }) => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
-            gap: 4
+            gap: 4,
+            px: 2
           }}
         >
           {/* Animated Logo */}
@@ -49,9 +56,9 @@ const LoadingScreen = ({ message = 'Loading baseball analytics...' }) => {
           >
             <Box
               sx={{
-                width: 80,
-                height: 80,
-                borderRadius: '20px',
+                width: variant === 'overlay' ? 64 : 80,
+                height: variant === 'overlay' ? 64 : 80,
+                borderRadius: variant === 'overlay' ? 3 : '20px',
                 background: `linear-gradient(135deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                 display: 'flex',
                 alignItems: 'center',
@@ -62,7 +69,7 @@ const LoadingScreen = ({ message = 'Loading baseball analytics...' }) => {
                 overflow: 'hidden'
               }}
             >
-              <SportsBaseball sx={{ fontSize: 40 }} />
+              <SportsBaseball sx={{ fontSize: variant === 'overlay' ? 34 : 40 }} />
               
               {/* Animated background overlay */}
               <motion.div

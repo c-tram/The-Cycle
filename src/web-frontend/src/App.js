@@ -12,6 +12,7 @@ import Sidebar from './components/layout/Sidebar';
 import LoadingScreen from './components/common/LoadingScreen';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import FloatingChatWidget from './components/FloatingChatWidget';
+import RouteTransitionLoader from './components/common/RouteTransitionLoader';
 
 // Page components
 import Dashboard from './pages/Dashboard';
@@ -128,6 +129,8 @@ function App() {
                 backgroundColor: 'background.default'
               }}
             >
+              {/* Route transition overlay loader */}
+              <RouteTransitionLoader />
               <AnimatePresence mode="wait">
                 <motion.div
                   key={window.location.pathname}

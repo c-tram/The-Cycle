@@ -121,98 +121,33 @@ const Dashboard = () => {
       const tabPromises = tabs.map(async (tab) => {
         if (tab.category === 'team') {
           if (tab.stat === 'winPercentage') {
-            // Fix standings by using schedule API (same approach as Teams.js)
-            return teamsApi.getTeams({ limit: 50 }).then(async data => {
-              const teams = data?.teams || [];
-              
-              // Calculate actual records from schedule API
-              const teamsWithCorrectRecords = await Promise.all(teams.map(async (team) => {
-                try {
-                  const scheduleData = await teamsApi.getTeamSchedule(team.id, { 
-                    year: '2025', 
-                    limit: 200 
-                  });
-                  const games = scheduleData.games || [];
-                  
-                  if (games.length > 0) {
-                    const wins = games.filter(game => game.result === 'W').length;
-                    const losses = games.filter(game => game.result === 'L').length;
-                    const ties = games.filter(game => game.result === 'T').length;
-                    
-                    return {
-                      ...team,
-                      record: { wins, losses, ties: ties || 0 },
-                      winPercentage: games.length > 0 ? wins / games.length : 0,
-                      gameCount: games.length
-                    };
-                  }
-                } catch (scheduleErr) {
-                  console.log(`Could not fetch schedule for ${team.id}:`, scheduleErr);
-                }
-                return team;
+            // OPTIMIZATION: Avoid N per-team schedule calls; rely on season records already in /teams payload
+            return teamsApi.getTeams({ year: '2025', sortBy: 'winPct' }).then(data => {
+              const teams = (data?.teams || []).map(t => ({
+                ...t,
+                winPercentage: (t.standings?.winPercentage ?? 0) || (t.record && (t.record.wins || 0) + (t.record.losses || 0) > 0
+                  ? (t.record.wins || 0) / ((t.record.wins || 0) + (t.record.losses || 0))
+                  : 0)
               }));
-              
-              // Sort by win percentage
-              const sortedStandings = teamsWithCorrectRecords
-                .filter(team => team.winPercentage > 0)
-                .sort((a, b) => b.winPercentage - a.winPercentage);
-              
-              return { 
-                key: tab.key, 
-                data: sortedStandings 
-              };
+              const sorted = teams
+                .filter(t => t.winPercentage > 0)
+                .sort((a, b) => b.winPercentage - a.winPercentage)
+                .slice(0, 25); // cap for safety
+              return { key: tab.key, data: sorted };
             });
           } else {
-            // For CVR/WAR team stats, get all teams and fix records using schedule API (same as Teams.js)
-            return teamsApi.getTeams({ limit: 50 }).then(async data => {
+            // OPTIMIZATION: Single call; compute stat from season aggregates
+            return teamsApi.getTeams({ year: '2025' }).then(data => {
               const teams = data?.teams || [];
-              
-              // Fix team records by calculating actual wins/losses from schedule API (same approach as Teams.js)
-              const teamsWithCorrectRecords = await Promise.all(teams.map(async (team) => {
-                try {
-                  // Fetch team schedule to calculate actual record
-                  const scheduleData = await teamsApi.getTeamSchedule(team.id, { 
-                    year: '2025', 
-                    limit: 200 
-                  });
-                  const games = scheduleData.games || [];
-                  
-                  if (games.length > 0) {
-                    const wins = games.filter(game => game.result === 'W').length;
-                    const losses = games.filter(game => game.result === 'L').length;
-                    const ties = games.filter(game => game.result === 'T').length;
-                    
-                    // Update record with actual calculated values
-                    return {
-                      ...team,
-                      record: { wins, losses, ties: ties || 0 },
-                      gameCount: games.length,
-                      standings: {
-                        ...team.standings,
-                        winPercentage: games.length > 0 ? wins / games.length : 0
-                      }
-                    };
-                  }
-                } catch (scheduleErr) {
-                  console.log(`Could not fetch schedule for ${team.id}:`, scheduleErr);
-                }
-                return team; // Return original team if schedule fetch fails
-              }));
-              
-              // Sort teams by the specific stat in descending order
-              const sortedTeams = teamsWithCorrectRecords
+              const sortedTeams = teams
                 .map(team => ({
                   ...team,
                   statValue: getTeamStatValue(team, tab.stat)
                 }))
-                .filter(team => team.statValue > 0) // Filter out teams with no/zero stat
-                .sort((a, b) => b.statValue - a.statValue) // Descending order
-                .slice(0, 10); // Take top 10 for tabs
-              
-              return { 
-                key: tab.key, 
-                data: sortedTeams 
-              };
+                .filter(team => team.statValue > 0)
+                .sort((a, b) => b.statValue - a.statValue)
+                .slice(0, 10);
+              return { key: tab.key, data: sortedTeams };
             });
           }
         } else {
